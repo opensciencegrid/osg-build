@@ -94,11 +94,18 @@ def copy_to_repo(yum_base, rpms):
             subprocess.call(['createrepo', '-p', '--update', repo[k]])
 
 
-def make_mock_config(arch, cfg_dir):
+def make_mock_config(arch, cfg_dir, mockver='old'):
+    """Autogenerate a mock config for arch 'arch'. 'mockver' is needed because
+    mock config file format changed incompatibly somewhere in mock 0.8 or so
+    and we need support for both 0.6.x (centos) and 1.x (batlab).
+
+    """
     cfg_name = 'mock-auto-' + arch + '.' + str(os.getuid())
     cfg_path = os.path.join(cfg_dir, cfg_name + ".cfg")
+    if mockver == 'old': template = OLD_MOCK_CFG_TEMPLATE
+    if mockver == 'new': template = NEW_MOCK_CFG_TEMPLATE
     unslurp(cfg_path,
-            MOCK_CFG_TEMPLATE.safe_substitute(
+            template.safe_substitute(
                 NAME=cfg_name, ARCH=arch))
     logging.info("Mock config has been created in " + cfg_path)
 
@@ -391,8 +398,6 @@ class VDTBuild(object):
                                     self.options['target_arch']).group(1)
                 cfg_dir = self.results_dir
                 cfg_name = make_mock_config(arch, cfg_dir)
-                # TESTME
-                # TODO add to batlab task
             elif mock_config.startswith('/'):
                 # Absolute path
                 if not os.path.isfile(mock_config + ".cfg"):
@@ -453,8 +458,9 @@ class VDTBuild(object):
             (name, version, release, time.strftime("%Y%m%d%H%M",
                                                   time.localtime()))
         # TODO See if the rpm's a noarch and behave appropriately.
-        i386_mock_cfg = make_mock_config("i386", glue_dir)
-        x86_64_mock_cfg = make_mock_config("x86_64", glue_dir)
+        # TODO 'mockver' is a hack.
+        i386_mock_cfg = make_mock_config("i386", glue_dir, mockver='new')
+        x86_64_mock_cfg = make_mock_config("x86_64", glue_dir, mockver='new')
 
         platform_post_args = ["--host=" + getfqdn()]
         platform_post_args += ["--script=" + os.path.abspath(sys.argv[0])]
@@ -493,9 +499,14 @@ class VDTBuild(object):
                   self.options['nmi_submit_machine'],
                   remote_dirname))
         # Submit the build on the nmi submit machine
+        # TODO: HAAACK
+        if self.options['nmi_submit_machine'].endswith('.batlab.org'):
+            nmi_submit_path = "/usr/local/nmi/bin"
+        else:
+            nmi_submit_path = "/nmi/bin"
         os.system(("""ssh %s 'cd %s;""" +
                    """sed -i -e "s,@NMIDIR@,`pwd`," *.scp;""" +
-                   """/nmi/bin/nmi_submit --must-match cmdfile'""") % \
+                   nmi_submit_path + """/nmi_submit --must-match cmdfile'""") % \
                   (self.options['nmi_submit_machine'], remote_dirname))
         # platform-post.py will put the resulting rpms in results_dir, as well
         # as push them to the yum repo if push_to_yum and yum_base are set.
@@ -554,6 +565,8 @@ push         Push the given RPMs to the yum repositories only.
             "--nop", "--no-push-to-yum", action="store_false",
             dest="push_to_yum",
             help="Do not copy completed RPMs to a YUM repository.")
+        parser.add_option(
+            "--nmi-submit-machine")
         parser.add_option(
             "-q", "--quiet", type=None, action="callback",
             callback=(lambda *args: logging.basicConfig(level=logging.ERROR)),
@@ -625,6 +638,9 @@ push         Push the given RPMs to the yum repositories only.
 
         if options.email:
             buildopts['email'] = options.email
+
+        if options.nmi_submit_machine:
+            buildopts['nmi_submit_machine'] = options.nmi_submit_machine
 
         # Special case for working_directory being TEMP
         if buildopts.get('working_directory') == 'TEMP':

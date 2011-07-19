@@ -70,12 +70,16 @@ def rebuild(arch=None):
     else:
         cwd = os.getcwd()
         try:
-            mock_cfg = re.sub(r'\.cfg$',
+            mock_cfg = re.sub(r'\.cfg$', '',
                               glob("glue/mock-auto-" + arch + "*")[0])
         except IndexError:
             raise RemoteTaskError("No mock config for this platform!")
+        if os.path.exists("/etc/mock/site-defaults.cfg"):
+            shutil.copy("/etc/mock/site-defaults.cfg", cwd)
+        if os.path.exists("/etc/mock/logging.ini"):
+            shutil.copy("/etc/mock/logging.ini", cwd)
         cmd = ["mock", "--configdir", cwd, "-r", mock_cfg,
-               "--resultdir", cwd]
+               "--resultdir", cwd, "--rebuild", glob("*.src.rpm")[0]]
         checked_call(cmd)
 
 def package():

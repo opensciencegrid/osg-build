@@ -1,4 +1,4 @@
-VERSION = 0.0.4
+VERSION = 0.0.5
 PYFILES = $(wildcard *.py)
 SCRIPT = vdt-build
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")

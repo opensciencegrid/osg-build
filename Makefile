@@ -1,0 +1,43 @@
+VERSION = 0.0.4
+PYFILES = $(wildcard *.py)
+SCRIPT = vdt-build
+PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
+BINDIR = /usr/bin
+DOCDIR = /usr/share/doc/vdt-build
+AFS_SOFTWARE_DIR = /p/vdt/public/html/upstream/vdt-build
+
+_default:
+	@echo "Nothing to make. Try make install"
+
+clean:
+	rm -f *.py[co] *~
+
+install:
+	@if [ "$(DESTDIR)" = "" ]; then                                        \
+		echo " ";                                                      \
+		echo "ERROR: A destdir is required";                           \
+		exit 1;                                                        \
+	fi
+
+	mkdir -p $(DESTDIR)/$(PYTHON_SITELIB)
+	for p in $(PYFILES); do                                                \
+		install -p -m 644 $$p $(DESTDIR)/$(PYTHON_SITELIB)/$$p;        \
+	done
+	mkdir -p $(DESTDIR)/$(DOCDIR)
+	install -p -m 644 sample-vdt-build.ini $(DESTDIR)/$(DOCDIR)/sample-vdt-build.ini
+	    
+	mkdir -p $(DESTDIR)/$(BINDIR)
+	install -p -m 755 $(SCRIPT) $(DESTDIR)/$(BINDIR)
+
+	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(DESTDIR)/$(BINDIR)/$(SCRIPT)
+
+dist:
+	mkdir -p vdt-build-$(VERSION)
+	cp -p $(PYFILES) $(SCRIPT) Makefile sample-vdt-build.ini vdt-build-$(VERSION)/
+	tar czf vdt-build-$(VERSION).tar.gz vdt-build-$(VERSION)/
+
+afsdist: dist
+	mkdir -p $(AFS_SOFTWARE_DIR)/$(VERSION)
+	mv -f vdt-build-$(VERSION).tar.gz $(AFS_SOFTWARE_DIR)/$(VERSION)/
+	rm -rf vdt-build-$(VERSION)
+

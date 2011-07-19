@@ -1,0 +1,704 @@
+#!/usr/bin/env python2
+from glob import glob
+import fnmatch as fnmatch_
+from fnmatch import fnmatch
+import logging
+from optparse import OptionParser
+import os
+import re
+import shutil
+from string import Template
+from socket import getfqdn
+import subprocess
+import sys
+import tempfile
+import time
+from urllib import urlretrieve
+from ConfigParser import *
+
+from VDTBuildUtils import *
+from VDTBuildConstants import *
+
+logging.basicConfig(level=logging.DEBUG)
+
+
+__version__ = '@VERSION@'
+
+class VDTBuildError(Exception):
+    pass
+
+
+class VDTPrebuildError(Exception):
+    pass
+
+
+class VDTPushError(Exception):
+    pass
+
+
+class UsageError(Exception):
+    pass
+
+
+def verify_yum_repos(yum_base):
+    if not os.path.isdir(yum_base):
+        raise VDTPushError(("Yum repository base directory '%s' doesn't " +
+                           "exist or is not a directory. If it's not a " +
+                           "typo, rerun with --init-repos to create it and " +
+                           "its subdirectories.") % yum_base)
+
+    for arch in ['i386', 'noarch', 'x86_64', 'src']:
+        subdir = os.path.join(yum_base, arch)
+        if not os.path.isdir(subdir):
+            raise VDTPushError(
+                ("Yum repository subdirectory '%s' doesn't exist or is not " +
+                "a directory. If it's not a typo, rerun with --init-repos " +
+                "to create it.") % subdir)
+
+
+def copy_to_repo(yum_base, rpms):
+    if not yum_base:
+        logging.error("Destination yum repo not given.")
+        return
+
+    repo = {}
+    for arch in ['i386', 'noarch', 'x86_64', 'src']:
+        repo[arch] = os.path.join(yum_base, arch)
+
+    for rpm in rpms:
+        bn = os.path.basename(rpm)
+        logging.info("Copying %s to repos in %s", bn, yum_base)
+
+        if fnmatch(rpm, '*.i[3-6]86.rpm'):
+            shutil.copy(rpm, repo['i386'])
+        elif fnmatch(rpm, '*.x86_64.rpm'):
+            shutil.copy(rpm, repo['x86_64'])
+        elif fnmatch(rpm, '*.noarch.rpm'):
+            shutil.copy(rpm, repo['noarch'])
+
+            i386linkfn = os.path.join(repo['i386'], bn)
+            if os.path.exists(i386linkfn):
+                os.unlink(i386linkfn)
+            os.symlink('../noarch/' + bn, i386linkfn)
+
+            x86_64linkfn = os.path.join(repo['x86_64'], bn)
+            if os.path.exists(x86_64linkfn):
+                os.unlink(x86_64linkfn)
+            os.symlink('../noarch/' + bn, x86_64linkfn)
+        elif fnmatch(rpm, '*.src.rpm'):
+            shutil.copy(rpm, repo['src'])
+
+    logging.info("Updating repos")
+    for k in repo.keys():
+        if k != 'noarch':
+            subprocess.call(['createrepo', '-p', '--update', repo[k]])
+
+
+def make_mock_config(arch, cfg_dir):
+    cfg_name = 'mock-auto-' + arch + '.' + str(os.getuid())
+    cfg_path = os.path.join(cfg_dir, cfg_name + ".cfg")
+    unslurp(cfg_path,
+            MOCK_CFG_TEMPLATE.safe_substitute(
+                NAME=cfg_name, ARCH=arch))
+    logging.info("Mock config has been created in " + cfg_path)
+
+    return cfg_name
+
+
+class VDTBuild(object):
+    def __init__(self, package_dir, opts): 
+        self.package_dir = package_dir
+
+        self.options = opts.copy()
+
+        self.abs_package_dir = os.path.abspath(self.package_dir)
+        self.working_subdir = os.path.abspath(
+            os.path.join(
+                self.options['working_directory'], package_dir))
+        safe_makedirs(self.working_subdir)
+        self.results_dir = os.path.join(self.working_subdir, WD_RESULTS)
+        self.prebuild_dir = os.path.join(self.working_subdir, WD_PREBUILD)
+        self.unpacked_dir = os.path.join(self.working_subdir, WD_UNPACKED)
+        self.unpacked_tarball_dir = os.path.join(
+            self.working_subdir, WD_UNPACKED_TARBALL)
+    
+    def get_rpmbuild_defines(self, prebuild):
+        """Get a list of --define arguments to pass to rpmbuild based on the
+        working dir and the subdirectories specified in the WD_* constants.
+
+        """
+        defines = [
+            "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
+            "_topdir " + self.working_subdir,
+            "dist .vdt"]
+
+        if prebuild:
+            defines += [
+                "_srcrpmdir " + self.prebuild_dir,
+                "_specdir " + self.prebuild_dir,
+                "_sourcedir " + self.prebuild_dir]
+        else:
+            defines += [
+                "_srcrpmdir " + self.results_dir,
+                "_rpmdir " + self.results_dir,
+                "_specdir " + self.results_dir,
+                "_sourcedir " + self.results_dir,
+                "_builddir " + os.path.join(self.results_dir, "BUILD"),
+                "_tmppath " + os.path.join(self.results_dir, "tmp")]
+
+        return ['--define=' + d for d in defines]
+
+    def make_srpm(self, spec_fn):
+        cmd = "rpmbuild -bs --nodeps".split(' ')
+        cmd += self.get_rpmbuild_defines(prebuild=True)
+        cmd += [spec_fn]
+        err_msg_prefix = ("Error making SRPM from %s\n" +
+                          "Command used was: %s\n") % \
+                         (spec_fn, " ".join(cmd))
+        pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+        output = pipe.communicate()[0]
+        err = pipe.returncode
+        if err:
+            logging.error("Rpmbuild failed. Output follows: " + output)
+            raise VDTPrebuildError(err_msg_prefix +
+                                   "Rpmbuild return code %d" % err)
+        else:
+            match = re.search(r"""(?xms)^Wrote: ([^\n]+.src.rpm)$""", output)
+            if match:
+                srpm = match.group(1).strip()
+                if os.path.isfile(srpm):
+                    return srpm
+            raise VDTPrebuildError(err_msg_prefix +
+                                   "Unable to find result.")
+
+    def process_dot_source(self, sfilename, destdir):
+        """Read a .source file, fetch any files mentioned in it from the
+        cache.
+
+        """
+        safe_makedirs(destdir)
+        downloaded = []
+        try:
+            sfile = open(sfilename, 'r')
+            for lineno, line in enumerate(sfile):
+                line = line.strip()
+                if line.startswith('#'): continue
+                basename = os.path.basename(line)
+                if line.startswith('/'):
+                    uri = "file://" + line
+                    logging.warning(
+                        "An absolute path has been given in %s line %d. " +
+                        "It is recommended to use only paths relative to %s" +
+                        "in your source files.", sfilename, lineno+1,
+                        self.options['cache_prefix'])
+                elif not re.match(r'/|\w+://', line): # relative path
+                    uri = os.path.join(self.options['cache_prefix'], line)
+                else:
+                    uri = line
+
+                logging.info('Retrieving ' + uri)
+                (filename, header) = urlretrieve(
+                    uri, os.path.join(destdir, basename))
+                downloaded.append(filename)
+        finally:
+            sfile.close()
+
+        return downloaded
+
+    def prebuild_osg(self):
+        """Prebuild osg packages (those with an osg/root directory tree).
+
+        """
+        osg_dir = os.path.join(self.abs_package_dir, 'osg')
+        spec_filenames = glob(os.path.join(osg_dir, '*.spec'))
+        if not spec_filenames:
+            raise VDTPrebuildError('Cannot find a spec file')
+        if not glob(os.path.join(osg_dir, 'root/*')):
+            raise VDTPrebuildError('osg/root empty')
+
+        try:
+            spec_filehandle = open(spec_filenames[0], 'r')
+            spec_contents = spec_filehandle.read()
+        finally:
+            spec_filehandle.close()
+
+        (macro_vars, expanded_spec) = spec_parse(spec_contents)
+
+        tarball_filename = macro_vars['source0']
+
+        old_dir = os.getcwd()
+        os.chdir(os.path.join(osg_dir, 'root'))
+        if re.search(r'\.tar\.gz|\.tgz', tarball_filename):
+            tar_cmd = ['tar', 'czf']
+        elif re.search(r'\.tar\.bz2|\.tbz2', tarball_filename):
+            tar_cmd = ['tar', 'cjf']
+        else:
+            raise VDTPrebuildError(
+                ".tar.gz/.tgz or .tar.bz2/.tbz2 expected for source 0, got: "+
+                tarball_filename)
+
+        tarball_path = os.path.join(self.prebuild_dir, tarball_filename)
+        tar_cmd += [tarball_path, "--exclude",  '*/.svn/*']
+        tar_cmd += glob("*")
+
+        logging.info("Creating tarball:\n" + ' '.join(tar_cmd))
+        ret = subprocess.call(tar_cmd)
+        os.chdir(old_dir)
+
+        if ret:
+            raise VDTPrebuildError('Making tarball ' + tarball_path +
+                                   ' failed with return code ' + str(ret))
+
+        shutil.copy(spec_filenames[0], self.prebuild_dir)
+
+    def prebuild_extsrc(self):
+        """Prebuild packages with external sources.
+        Process *.source files in upstream/ directory, downloading upstream
+        sources mentioned in them from the software cache. Unpack SRPMs if
+        there are any. Override upstream files with those in the osg/
+        directory.
+
+        """
+        upstream_dir = os.path.join(self.abs_package_dir, 'upstream')
+        osg_dir = os.path.join(self.abs_package_dir, 'osg')
+
+        # Process upstream/*.source files
+        dot_sources = glob(os.path.join(upstream_dir, '*.source'))
+        downloaded = []
+        for s in dot_sources:
+            logging.debug('Processing .source file %s', s)
+            downloaded += [
+                os.path.abspath(x)
+                for x in self.process_dot_source(s, self.prebuild_dir)]
+
+        # Process downloaded SRPMs
+        srpms = fnmatch_.filter(downloaded, '*.src.rpm')
+        if srpms:
+            safe_makedirs(self.unpacked_dir)
+            for s in srpms:
+                shutil.move(s, self.unpacked_dir)
+            moved_srpms = glob(os.path.join(self.unpacked_dir, "*.src.rpm"))
+            old_dir = os.getcwd()
+            os.chdir(self.unpacked_dir)
+            for s in moved_srpms:
+                logging.info("Unpacking SRPM " + s)
+                super_unpack(s)
+                os.unlink(s)
+            os.chdir(old_dir)
+            for f in glob(os.path.join(self.unpacked_dir, '*')):
+                logging.debug('Copying unpacked file ' + f)
+                shutil.copy(f, self.prebuild_dir)
+
+        # Process other files in upstream
+        other_sources = [x for x in glob(os.path.join(upstream_dir, '*'))
+                         if not fnmatch(x, '*.source')]
+        for s in other_sources:
+            logging.debug('Copying other source ' + s)
+            shutil.copy(s, self.prebuild_dir)
+
+        if self.options.get('full_extract'):
+            # Extract any archives we downloaded plus any archives in the SRPM
+            if os.path.isdir(self.unpacked_dir):
+                downloaded += [
+                    os.path.abspath(x)
+                    for x in glob(os.path.join(self.unpacked_dir,'*'))
+                    if os.path.isfile(x)]
+            safe_makedirs(self.unpacked_tarball_dir)
+            old_dir = os.getcwd()
+            os.chdir(self.unpacked_tarball_dir)
+            for f in downloaded:
+                logging.info("Extracting " + f)
+                super_unpack(f)
+            os.chdir(old_dir)
+            logging.info('Extracted files to ' + self.unpacked_tarball_dir)
+
+        # Override downloaded files with what's in osg/
+        if os.path.isdir(osg_dir):
+            for f in glob(os.path.join(osg_dir, '*')):
+                logging.debug('Copying osg file ' + f)
+                shutil.copy(f, self.prebuild_dir)
+
+        
+    def prebuild(self):
+        """Prebuild the package in package_dir: create an SRPM containing
+        upstream sources (if any) plus our changes (if any) plus a spec file.
+        
+        Return the name of the SRPM created.
+        """
+        safe_makedirs(self.prebuild_dir)
+        if os.path.isdir(os.path.join(self.abs_package_dir, 'osg/root')):
+            self.prebuild_osg()
+        else:
+            self.prebuild_extsrc()
+
+        spec_filenames = glob(os.path.join(self.prebuild_dir, '*.spec'))
+        if not spec_filenames:
+            raise VDTPrebuildError("No spec file found in " +
+                                   self.prebuild_dir)
+
+        result_srpm = self.make_srpm(spec_filenames[0])
+        if result_srpm:
+            logging.info("Files have been prepared in %s.", self.prebuild_dir)
+            return os.path.abspath(result_srpm)
+
+    def rpmbuild(self):
+        """Build the package using rpmbuild on the local machine.
+        Push results to yum if 'push_to_yum' is true.
+
+        """
+        srpm = self.prebuild()
+        safe_makedirs(self.results_dir)
+        shutil.copy(srpm, self.results_dir)
+        for d in ['BUILD', 'tmp']:
+            safe_makedirs(os.path.join(self.results_dir, d))
+        cmd = ["rpmbuild"]
+        cmd += self.get_rpmbuild_defines(prebuild=False)
+        cmd += ["--rebuild", srpm]
+        if self.options.has_key('target_arch'):
+            cmd += ["--target", self.options['target_arch']]
+        err = subprocess.call(cmd)
+
+        # TODO Parse rpmbuild output instead of using glob
+        if err:
+            raise VDTBuildError('Making RPM failed (command was: '+ " ".join(cmd) +')')
+        else:
+            rpms = [x for x in glob(os.path.join(self.results_dir, "*.rpm"))
+                    if not fnmatch(x, '*.src.rpm')]
+            logging.info("The following RPM(s) have been created:\n" +
+                         "\n".join(rpms))
+
+        if self.options.get('push_to_yum') and self.options.get('yum_base'):
+            copy_to_repo(self.options['yum_base'], rpms + [srpm])
+
+    def mock(self):
+        """Build the package using mock on the local machine.
+        Push results to yum if 'push_to_yum' is true.
+
+        """
+        srpm = self.prebuild()
+        safe_makedirs(self.results_dir)
+        cmd = ['mock']
+        mock_config = self.options.get('mock_config')
+        if mock_config is not None:
+            mock_config = re.sub(r'\.cfg$', '', mock_config)
+            if mock_config == "AUTO":
+                # TODO Make sure uname()[4] returns either i386 or x86_64.
+                if not self.options.get('target_arch'):
+                    arch = os.uname()[4]
+                else:
+                    arch = re.match(r'(\w+)-?',
+                                    self.options['target_arch']).group(1)
+                cfg_dir = self.results_dir
+                cfg_name = make_mock_config(arch, cfg_dir)
+                # TESTME
+                # TODO add to batlab task
+            elif mock_config.startswith('/'):
+                # Absolute path
+                if not os.path.isfile(mock_config + ".cfg"):
+                    raise VDTBuildError("Couldn't find mock config file " +
+                                        mock_config + ".cfg")
+                cfg_name = os.path.basename(mock_config)
+                cfg_dir = os.path.dirname(mock_config)
+            else:
+            	# Relative path. Can be relative to cwd or /etc/mock. Prefer
+            	# cwd.
+            	cfg_name = os.path.basename(mock_config)
+            	given_cfg_dir = os.path.dirname(mock_config)
+            	cfg_dir1 = os.path.abspath(given_cfg_dir)
+            	cfg_dir2 = os.path.abspath(os.path.join('/etc/mock',
+                                                        given_cfg_dir))
+                if os.path.isfile(os.path.join(cfg_dir1, cfg_name + ".cfg")):
+                    cfg_dir = cfg_dir1
+                elif os.path.isfile(os.path.join(cfg_dir2, cfg_name + ".cfg")):
+                    cfg_dir = cfg_dir2
+                else:
+                    raise VDTBuildError(
+                        ("Couldn't find mock config file %s.cfg (looked in " +
+                         "%s, %s") % (mock_config, cfg_dir1, cfg_dir2))
+
+        cmd += ['--configdir', cfg_dir, '-r', cfg_name]
+        cmd += ['--resultdir', self.results_dir, 'rebuild', srpm]
+
+        err = subprocess.call(cmd)
+        if err:
+            raise VDTBuildError('Mock build failed (command was: ' +
+                                ' '.join(cmd) + ')')
+        # Clean up after ourselves.
+        subprocess.call(["mock", "--configdir", cfg_dir, "-r", cfg_name,
+                         "clean"])
+
+        rpms = [x for x in glob(os.path.join(self.results_dir, "*.rpm"))
+                if not fnmatch(x, '*.src.rpm')]
+        logging.info("The following RPM(s) have been created:\n" +
+                     "\n".join(rpms))
+
+        if self.options.get('push_to_yum') and self.options.get('yum_base'):
+            copy_to_repo(self.options['yum_base'], rpms + [srpm])
+
+    def batlab(self):
+        srpm = self.prebuild()
+        safe_makedirs(self.results_dir)
+        nmi_prebuild_dir = os.path.join(self.working_subdir, '_nmi_prebuild')
+        safe_makedirs(nmi_prebuild_dir)
+        glue_dir = os.path.join(nmi_prebuild_dir, "glue")
+        safe_makedirs(glue_dir)
+
+        name,version,release = subprocess.Popen(
+            ['rpm', '-qp', '--qf', '%{name}\n%{version}\n%{release}', srpm],
+            stdout=subprocess.PIPE).communicate()[0].split("\n")
+
+
+        remote_dirname = "%s-%s-%s-%s" % \
+            (name, version, release, time.strftime("%Y%m%d%H%M",
+                                                  time.localtime()))
+        # TODO See if the rpm's a noarch and behave appropriately.
+        i386_mock_cfg = make_mock_config("i386", glue_dir)
+        x86_64_mock_cfg = make_mock_config("x86_64", glue_dir)
+
+        platform_post_args = ["--host=" + getfqdn()]
+        platform_post_args += ["--script=" + os.path.abspath(sys.argv[0])]
+        platform_post_args += ["--results-dir=" + self.results_dir]
+        if self.options.get('push_to_yum') and self.options.get('yum_base'):
+            platform_post_args += ["--yum-base=" +
+                                   self.options['yum_base']]
+
+        cmdfile_text = CMDFILE_TEMPLATE.safe_substitute(
+            NAME=name, VERSION=version, RELEASE=release,
+            NOTIFY=self.options.get('email') or "",
+            PLATFORM_POST_ARGS=" ".join(
+                ["'"+x+"'" for x in platform_post_args]))
+
+        unslurp(os.path.join(nmi_prebuild_dir, "cmdfile"), cmdfile_text)
+        # Find the glue files under sys.path and copy them to nmi_prebuild_dir
+        # Files may be in a vdt-build/ subdir.
+        for glue_file in ["remote-task.py", "remote-declare.py",
+                          "platform-post.py"]:
+            dest = os.path.join(glue_dir, glue_file)
+            shutil.copy(findfile(glue_file, sys.path) or
+                        findfile(os.path.join("vdt-build", glue_file),
+                                              sys.path), 
+                        dest)
+            os.chmod(dest, 0755)
+
+        unslurp(os.path.join(nmi_prebuild_dir, "glue.scp"), GLUE_SCP_TEXT)
+        shutil.copy(srpm, nmi_prebuild_dir)
+        srpm_scp_text = SRPM_SCP_TEMPLATE.safe_substitute(
+            SRPM=os.path.basename(srpm))
+        unslurp(os.path.join(nmi_prebuild_dir, "srpm.scp"), srpm_scp_text)
+            
+        # Upload nmi_prebuild_dir to the nmi submit machine
+        os.system("scp -r %s %s:%s" % \
+                  (nmi_prebuild_dir,
+                  self.options['nmi_submit_machine'],
+                  remote_dirname))
+        # Submit the build on the nmi submit machine
+        os.system(("""ssh %s 'cd %s;""" +
+                   """sed -i -e "s,@NMIDIR@,`pwd`," *.scp;""" +
+                   """/nmi/bin/nmi_submit --must-match cmdfile'""") % \
+                  (self.options['nmi_submit_machine'], remote_dirname))
+        # platform-post.py will put the resulting rpms in results_dir, as well
+        # as push them to the yum repo if push_to_yum and yum_base are set.
+        # Put the srpm in the results dir so it'll get pushed as well.
+        shutil.copy(srpm, self.results_dir)
+
+
+
+
+
+def init_repos(base_repo):
+    for repo in ['i386', 'noarch', 'x86_64', 'src']:
+        safe_makedirs(os.path.join(base_repo, repo))
+
+
+def main(argv=None):
+    if argv is None: argv=sys.argv
+
+    try:
+        parser = OptionParser("""
+   %prog TASK PACKAGE1 <PACKAGE2..n> [options]
+or %prog push RPM1 <RPM2..n> [options]
+
+Valid tasks are:
+prebuild     Preprocess the package, create SRPM to be submitted, and stop.
+rpmbuild     Build using rpmbuild(8) on the local machine.
+mock         Build using mock(1) on the local machine.
+batlab       Submit a build to the NMI Build and Test Lab. (unimplemented)
+push         Push the given RPMs to the yum repositories only.
+""")
+        parser.add_option(
+            "-c", "--cache-prefix",
+            help="The prefix for the software cache to take source files " +
+            "from. The following special caches exist: " +
+            "AFS (%s), and " % AFS_CACHE_PREFIX +
+            "VDT (%s). " % WEB_CACHE_PREFIX +
+            "The default cache is AFS (if available) or VDT (if not).")
+        parser.add_option(
+            "-C", "--config-file",
+            help="The file to get configuration for this script.")
+        parser.add_option(
+            "-e", "--email",
+            help="The email address to send notifications to (batlab task).")
+        parser.add_option(
+            "--full-extract", action="store_true",
+            help="Fully extract all source files.")
+        parser.add_option(
+            "--init-repos", action="store_true",
+            help="Create directories under 'yum_base' to hold the YUM " +
+            "repositories in.")
+        parser.add_option("-m", "--mock-config",
+                          help="The location of the mock config file.")
+        parser.add_option("-p", "--push-to-yum", action="store_true",
+                          help="Copy completed RPMs to a YUM repostiory.")
+        parser.add_option(
+            "--nop", "--no-push-to-yum", action="store_false",
+            dest="push_to_yum",
+            help="Do not copy completed RPMs to a YUM repository.")
+        parser.add_option(
+            "-q", "--quiet", type=None, action="callback",
+            callback=(lambda *args: logging.basicConfig(level=logging.ERROR)),
+            help="Display less information.")
+        parser.add_option("-t", "--target-arch",
+                          help="The target architecture to build for " +
+                          "(rpmbuild and mock tasks only)")
+        parser.add_option(
+            "-w", "--working-directory",
+            help="The base directory to use for temporary files made by the "+
+            "script. If it is 'TEMP', a randomly-named directory under /tmp "+
+            "is used.")
+        parser.add_option(
+            "-y", "--yum-base",
+            help="The base directory containing the YUM repositories to " +
+            "push RPMs to.")
+
+        (options, args) = parser.parse_args(argv[1:])
+
+        if len(args) < 1:
+            raise UsageError('Need task!')
+        if len(args) < 2:
+            raise UsageError('Need packages!')
+
+        task = args[0]
+
+        # Defaults
+        buildopts = {
+            'working_directory': '.',
+            'nmi_submit_machine': 'nmi-s003.cs.wisc.edu', }
+        if os.path.exists(AFS_CACHE_PATH):
+            buildopts['cache_prefix'] = AFS_CACHE_PREFIX
+        else:
+            buildopts['cache_prefix'] = WEB_CACHE_PREFIX
+
+
+
+        # Read the config file
+        cfg_file = os.path.expanduser(options.config_file or
+                                      DEFAULT_CONFIG_FILE)
+        if os.path.exists(cfg_file):
+            cfg = ConfigParser()
+            cfg.read(cfg_file)
+            buildopts.update(cfg.items('options'))
+            logging.debug("Read default config from %s", cfg_file)
+
+        # Overrides from command line
+        if options.working_directory:
+            buildopts['working_directory'] = options.working_directory
+
+        if options.cache_prefix:
+            buildopts['cache_prefix'] = options.cache_prefix
+
+        if options.full_extract:
+            buildopts['full_extract'] = True
+
+        if options.mock_config:
+            buildopts['mock_config'] = options.mock_config
+
+        if options.push_to_yum is not None:
+            buildopts['push_to_yum'] = options.push_to_yum
+
+        if options.yum_base:
+            buildopts['yum_base'] = options.yum_base
+            buildopts['push_to_yum'] = True
+
+        if options.target_arch:
+            buildopts['target_arch'] = options.target_arch
+
+        if options.email:
+            buildopts['email'] = options.email
+
+        # Special case for working_directory being TEMP
+        if buildopts.get('working_directory') == 'TEMP':
+            buildopts['working_directory'] = \
+                tempfile.mkdtemp(prefix='vdt-build-')
+            logging.info('Working directory is %s',
+                         buildopts['working_directory'])
+
+        # Special case for cache_prefix being AFS or VDT
+        if buildopts.get('cache_prefix') == 'AFS':
+            buildopts['cache_prefix'] = AFS_CACHE_PREFIX
+        elif buildopts.get('cache_prefix') == 'VDT':
+            buildopts['cache_prefix'] = WEB_CACHE_PREFIX
+
+        if options.init_repos:
+            if not buildopts.has_key('yum_base'):
+                raise UsageError("No yum base specified with --init-repos! " +
+                    "Must pass -y or specify yum_base in the config file.")
+            else:
+                init_repos(buildopts['yum_base'])
+
+
+
+        # Find task that matches what user entered. Allows user to enter first
+        # few characters if task is unambiguous.
+        valid_tasks = ['batlab', 'prebuild', 'mock', 'push', 'rpmbuild']
+
+        matching_tasks = [x for x in valid_tasks if x[0:len(task)] == task]
+
+        if len(matching_tasks) > 1:
+            raise UsageError('Ambiguous task')
+        elif not matching_tasks:
+            raise UsageError('No valid task')
+        else:
+            real_task = matching_tasks[0]
+
+        if real_task == 'push':
+            # Push should probably be a separate script entirely.
+            rpms = args[1:]
+            if not buildopts.has_key('yum_base'):
+                raise UsageError(
+                    "No yum repo specified for task push! " +
+                    "Must pass -y or specify yum_base in the config file.")
+            copy_to_repo(buildopts['yum_base'], rpms)
+        else:
+            packages = args[1:]
+            if not buildopts.has_key('push_to_yum'):
+                if real_task == 'mock' or real_task == 'batlab':
+                    buildopts['push_to_yum'] = True
+                else:
+                    buildopts['push_to_yum'] = False
+
+            if buildopts['push_to_yum'] and buildopts.has_key('yum_base'):
+                verify_yum_repos(buildopts['yum_base'])
+                    
+            for p in packages:
+                if not os.path.isdir(p):
+                    raise UsageError(p + " isn't a package dir!")
+                builder = VDTBuild(p, buildopts)
+                if real_task == 'prebuild':
+                    builder.prebuild()
+                elif real_task == 'rpmbuild':
+                    builder.rpmbuild()
+                elif real_task == 'mock':
+                    builder.mock()
+                elif real_task == 'batlab':
+                    builder.batlab()
+    except UsageError, e:
+        sys.stderr.write("Usage error: " + str(e) + "\n")
+        parser.print_help()
+        return 2
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())
+

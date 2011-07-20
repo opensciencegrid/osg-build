@@ -36,10 +36,16 @@ for f in files:
 
 if options.yum_base:
     print("Pushing to yum repos under", options.yum_base)
-    checked_call(["ssh", "-x", options.host,
-                  "/s/std/bin/runauth", options.script,
-                  "push", os.path.join(options.results_dir, "*.rpm"),
-                  "--yum-base", options.yum_base])
+    if options.host.endswith('.cs.wisc.edu'): # TODO: HACK
+        checked_call(["ssh", "-x", options.host,
+                    "/s/std/bin/runauth", options.script,
+                    "push", os.path.join(options.results_dir, "*.rpm"),
+                    "--yum-base", options.yum_base])
+    else:
+        checked_call(["ssh", "-x", options.host,
+                    options.script,
+                    "push", os.path.join(options.results_dir, "*.rpm"),
+                    "--yum-base", options.yum_base])
 else:
     print("Not pushing to yum repos")
 

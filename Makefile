@@ -1,6 +1,7 @@
-VERSION = 0.0.7
+VERSION = 0.0.8
 PYFILES = $(wildcard *.py)
-SCRIPT = vdt-build
+MAIN_SCRIPT = vdt-build
+PUSH_SCRIPT = push-rpm-to-vdt
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 BINDIR = /usr/bin
 DOCDIR = /usr/share/doc/vdt-build
@@ -27,13 +28,14 @@ install:
 	install -p -m 644 sample-vdt-build.ini $(DESTDIR)/$(DOCDIR)/sample-vdt-build.ini
 	    
 	mkdir -p $(DESTDIR)/$(BINDIR)
-	install -p -m 755 $(SCRIPT) $(DESTDIR)/$(BINDIR)
+	install -p -m 755 $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)
+	install -p -m 755 $(PUSH_SCRIPT) $(DESTDIR)/$(BINDIR)
 
-	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(DESTDIR)/$(BINDIR)/$(SCRIPT)
+	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(DESTDIR)/$(BINDIR)/$(MAIN_SCRIPT)
 
 dist:
 	mkdir -p vdt-build-$(VERSION)
-	cp -p $(PYFILES) $(SCRIPT) Makefile sample-vdt-build.ini vdt-build-$(VERSION)/
+	cp -p $(PYFILES) $(MAIN_SCRIPT) $(PUSH_SCRIPT) Makefile sample-vdt-build.ini vdt-build-$(VERSION)/
 	tar czf vdt-build-$(VERSION).tar.gz vdt-build-$(VERSION)/
 
 afsdist: dist

@@ -80,7 +80,14 @@ def rebuild(arch=None):
             shutil.copy("/etc/mock/logging.ini", cwd)
         cmd = ["mock", "--configdir", cwd, "-r", mock_cfg,
                "--resultdir", cwd, "--rebuild", glob("*.src.rpm")[0]]
-        checked_call(cmd)
+        try:
+            checked_call(cmd)
+        except RemoteTaskError, e:
+            print "Error executing mock\n" + str(e)
+            print "Mock logs follow:"
+            subprocess.call("cat *.log", shell=True)
+            sys.exit(1)
+            
 
 def package():
     os.makedirs("results")

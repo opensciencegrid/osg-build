@@ -91,7 +91,7 @@ def copy_to_repo(yum_base, rpms):
     logging.info("Updating repos")
     for k in repo.keys():
         if k != 'noarch':
-            subprocess.call(['createrepo', '-p', '--update', repo[k]])
+            subprocess.call(['createrepo', '-p', '--update', '-d', repo[k]])
 
 
 def make_mock_config(arch, cfg_dir, mockver='old'):
@@ -617,14 +617,9 @@ push         Push the given RPMs to the yum repositories only.
         # Defaults
         buildopts = {
             'working_directory': '.',
-            'nmi_submit_machine': 'nmi-s003.cs.wisc.edu',
-            'mock_config': 'AUTO',}
-        if os.path.exists(AFS_CACHE_PATH):
-            buildopts['cache_prefix'] = AFS_CACHE_PREFIX
-        else:
-            buildopts['cache_prefix'] = WEB_CACHE_PREFIX
-
-
+            'nmi_submit_machine': 'submit-01.batlab.org',
+            'mock_config': 'AUTO',
+            'cache_prefix': 'AUTO',}
 
         # Read the config file
         cfg_file = os.path.expanduser(options.config_file or
@@ -676,6 +671,11 @@ push         Push the given RPMs to the yum repositories only.
             buildopts['cache_prefix'] = AFS_CACHE_PREFIX
         elif buildopts.get('cache_prefix') == 'VDT':
             buildopts['cache_prefix'] = WEB_CACHE_PREFIX
+        elif buildopts.get('cache_prefix') == 'AUTO':
+            if os.path.exists(AFS_CACHE_PATH):
+                buildopts['cache_prefix'] = AFS_CACHE_PREFIX
+            else:
+                buildopts['cache_prefix'] = WEB_CACHE_PREFIX
 
         if options.init_repos:
             if not buildopts.has_key('yum_base'):

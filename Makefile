@@ -1,4 +1,4 @@
-VERSION = 0.0.5
+VERSION = 0.0.6
 PYFILES = $(wildcard *.py)
 SCRIPT = vdt-build
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
@@ -15,7 +15,7 @@ clean:
 install:
 	@if [ "$(DESTDIR)" = "" ]; then                                        \
 		echo " ";                                                      \
-		echo "ERROR: A destdir is required";                           \
+		echo "ERROR: DESTDIR is required";                             \
 		exit 1;                                                        \
 	fi
 
@@ -41,3 +41,14 @@ afsdist: dist
 	mv -f vdt-build-$(VERSION).tar.gz $(AFS_SOFTWARE_DIR)/$(VERSION)/
 	rm -rf vdt-build-$(VERSION)
 
+release: dist
+	@if [ "$(DESTDIR)" = "" ]; then                                        \
+		echo " ";                                                      \
+		echo "ERROR: DESTDIR is required";                             \
+		exit 1;                                                        \
+	fi
+	mkdir -p $(DESTDIR)/vdt-build/$(VERSION)
+	mv -f vdt-build-$(VERSION).tar.gz $(DESTDIR)/vdt-build/$(VERSION)/
+	rm -rf vdt-build-$(VERSION)
+
+	

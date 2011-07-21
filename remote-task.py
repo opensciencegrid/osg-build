@@ -12,11 +12,20 @@ have_mock = not os.system("which mock &>/dev/null")
 class RemoteTaskError(Exception):
     pass
 
+class CalledProcessError(Exception):
+    pass
+
 def checked_call(*args):
+    if type(args[0]) == type(''):
+        cmd = args[0]
+    elif type(args[0]) == type([]) or type(args[0]) == type(()):
+        cmd = "'" + "' '".join(args[0]) + "'"
+    print "Running " + cmd
     err = subprocess.call(*args)
+    print "Subprocess returned " + str(err)
     if err:
-        raise RemoteTaskError("subprocess.call(" + str(args) + ") returned " +
-                              str(err) + "!")
+        raise CalledProcessError("subprocess.call(" + str(args) + ") returned " +
+                                 str(err) + "!")
 
 def init_nmi():
     taskname = os.environ.get('_NMI_TASKNAME')
@@ -78,11 +87,15 @@ def rebuild(arch=None):
             shutil.copy("/etc/mock/site-defaults.cfg", cwd)
         if os.path.exists("/etc/mock/logging.ini"):
             shutil.copy("/etc/mock/logging.ini", cwd)
+        print "Using mock config " + mock_cfg + ":"
+        subprocess.call("cat " + mock_cfg, shell=True)
+        print "Starting up mock"
         cmd = ["mock", "--configdir", cwd, "-r", mock_cfg,
-               "--resultdir", cwd, "--rebuild", glob("*.src.rpm")[0]]
+               "--resultdir", cwd,
+               "--rebuild", glob("*.src.rpm")[0]]
         try:
             checked_call(cmd)
-        except RemoteTaskError, e:
+        except CalledProcessError, e:
             print "Error executing mock\n" + str(e)
             print "Mock logs follow:"
             subprocess.call("cat *.log", shell=True)

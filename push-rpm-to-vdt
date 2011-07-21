@@ -29,6 +29,10 @@ options, args = parser.parse_args(sys.argv[1:])
 
 rpms = args
 
+if not options.host:
+    raise Exception('host not specified')
+if not options.yum_base:
+    raise Exception("yum-base not specified")
 
 repo = {}
 for arch in ['i386', 'noarch', 'x86_64', 'src']:
@@ -40,15 +44,15 @@ noarch_rpms = fnmatch_.filter(rpms, '*.noarch.rpm')
 src_rpms = fnmatch_.filter(rpms, '*.src.rpm')
 
 if i386_rpms:
-    checked_call(["scp", i386_rpms, options.host + ":" + options.yum_base + '/i386/'])
+    checked_call(["scp"] + i386_rpms + [options.host + ":" + options.yum_base + '/i386/'])
 if x86_64_rpms:
-    checked_call(["scp", x86_64_rpms, options.host + ":" + options.yum_base + '/x86_64/'])
+    checked_call(["scp"] + x86_64_rpms + [options.host + ":" + options.yum_base + '/x86_64/'])
 if noarch_rpms:
-    checked_call(["scp", noarch_rpms, options.host + ":" + options.yum_base + '/noarch/']) 
-    checked_call(["scp", noarch_rpms, options.host + ":" + options.yum_base + '/i386/']) 
-    checked_call(["scp", noarch_rpms, options.host + ":" + options.yum_base + '/x86_64/']) 
+    checked_call(["scp"] + noarch_rpms + [options.host + ":" + options.yum_base + '/noarch/']) 
+    checked_call(["scp"] + noarch_rpms + [options.host + ":" + options.yum_base + '/i386/']) 
+    checked_call(["scp"] + noarch_rpms + [options.host + ":" + options.yum_base + '/x86_64/']) 
 if src_rpms:
-    checked_call(["scp", noarch_rpms, options.host + ":" + options.yum_base + '/src/']) 
+    checked_call(["scp"] + noarch_rpms + [options.host + ":" + options.yum_base + '/src/']) 
 
 for k in repo.keys():
     if k != 'noarch':

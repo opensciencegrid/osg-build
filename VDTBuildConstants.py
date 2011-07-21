@@ -41,60 +41,6 @@ recursive   = false
 untar       = false
 """)
 
-#MOCK_CFG_TEMPLATE = string.Template('''
-##!/usr/bin/python -tt
-#import os
-#config_opts['root'] = '$NAME'
-#config_opts['target_arch'] = '$ARCH'
-#config_opts['chroot_setup_cmd'] = 'install buildsys-build yum-priorities rpm-build'
-#
-#config_opts['yum.conf'] = """
-#[main]
-#cachedir=/var/cache/yum
-#debuglevel=1
-#logfile=/var/log/yum.log
-#reposdir=/dev/null
-#retries=20
-#obsoletes=1
-#gpgcheck=0
-#assumeyes=1
-#
-## repos
-#
-#[sl-base]
-#name=SL 5 Base
-#baseurl=http://ftp.scientificlinux.org/linux/scientific/55/$basearch/SL
-#        http://ftp1.scientificlinux.org/linux/scientific/55/$basearch/SL
-#        http://ftp2.scientificlinux.org/linux/scientific/55/$basearch/SL
-#        ftp://ftp.scientificlinux.org/linux/scientific/55/$basearch/SL
-#
-#[sl-security]
-#name=SL 5 security updates
-#baseurl=http://ftp.scientificlinux.org/linux/scientific/55/$basearch/updates/security
-#        http://ftp1.scientificlinux.org/linux/scientific/55/$basearch/updates/security
-#        http://ftp2.scientificlinux.org/linux/scientific/55/$basearch/updates/security
-#        ftp://ftp.scientificlinux.org/linux/scientific/55/$basearch/updates/security
-#
-#[vdt]
-#name=vdt
-#baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$basearch/
-#priority=98
-#
-#[epel]
-#name=Extra Packages for Enterprise Linux 5 - $basearch
-##baseurl=http://download.fedoraproject.org/pub/epel/5/$basearch
-#mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=epel-5&arch=$basearch
-#"""
-#
-#config_opts['macros'] = """
-#%_topdir /builddir/build
-#%_rpmfilename  %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm
-#
-## please change this to reflect the Distro Tree and Repo hosting packages!
-#%dist    .vdt
-#
-#"""
-#''')
 
 OLD_MOCK_CFG_TEMPLATE = string.Template('''
 #!/usr/bin/python -tt
@@ -114,19 +60,19 @@ retries=20
 obsoletes=1
 gpgcheck=0
 assumeyes=1
-#exclude=[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhijklmnopqrstuvwxyz]*.i*86 g[abcdefghijkmnopqrstuvwxyz]*.i?86 glib2.i?86 glib.i?86 *-devel.i?86
+$EXCLUDELINE
 # repos
 
 [os]
 name=os
-mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$basearch&repo=os
-#baseurl=http://mirror.centos.org/centos/5/os/$basearch/
+mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$BASEARCH&repo=os
+#baseurl=http://mirror.centos.org/centos/5/os/$BASEARCH/
 
 [updates]
 name=updates
-#mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$basearch&repo=updates
-#baseurl=http://mirror.centos.org/centos/5/updates/$basearch/
-baseurl=http://mirror.unl.edu/centos/5/os/$basearch/
+#mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$BASEARCH&repo=updates
+#baseurl=http://mirror.centos.org/centos/5/updates/$BASEARCH/
+baseurl=http://mirror.unl.edu/centos/5/os/$BASEARCH/
 
 [groups]
 name=groups
@@ -134,13 +80,13 @@ baseurl=http://dev.centos.org/centos/buildsys/5/
 
 [vdt]
 name=vdt
-baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$basearch/
+baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$BASEARCH/
 priority=98
 
 [epel]
-name=Extra Packages for Enterprise Linux 5 - $basearch
-#baseurl=http://download.fedoraproject.org/pub/epel/5/$basearch
-mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=epel-5&arch=$basearch
+name=Extra Packages for Enterprise Linux 5 - $BASEARCH
+#baseurl=http://download.fedoraproject.org/pub/epel/5/$BASEARCH
+mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=epel-5&arch=$BASEARCH
 
 [jpackage-generic-5.0]
 name=JPackage (free), generic
@@ -187,14 +133,9 @@ config_opts['macros'] = """
 %_topdir /builddir/build
 %_rpmfilename  %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm
 
-# Change the next two lines to reflect yourself.
-
-#%packager  YourName <YourEmail@server.com>
-#%vendor   
-#%distribution 
 
 # please change this to reflect the Distro Tree and Repo hosting packages!
-%dist    .vdt
+%dist    .osg
 %centos_ver     5
 
 #%_smp_mflags   -j1
@@ -222,19 +163,19 @@ retries=20
 obsoletes=1
 gpgcheck=0
 assumeyes=1
-#exclude=[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhijklmnopqrstuvwxyz]*.i*86 g[abcdefghijkmnopqrstuvwxyz]*.i?86 glib2.i?86 glib.i?86 *-devel.i?86
+$EXCLUDELINE
 # repos
 
 [os]
 name=os
-mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$basearch&repo=os
-#baseurl=http://mirror.centos.org/centos/5/os/$basearch/
+mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$BASEARCH&repo=os
+#baseurl=http://mirror.centos.org/centos/5/os/$BASEARCH/
 
 [updates]
 name=updates
-#mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$basearch&repo=updates
-#baseurl=http://mirror.centos.org/centos/5/updates/$basearch/
-baseurl=http://mirror.unl.edu/centos/5/os/$basearch/
+#mirrorlist=http://mirrorlist.centos.org/?release=5&arch=$BASEARCH&repo=updates
+#baseurl=http://mirror.centos.org/centos/5/updates/$BASEARCH/
+baseurl=http://mirror.unl.edu/centos/5/os/$BASEARCH/
 
 [groups]
 name=groups
@@ -242,13 +183,13 @@ baseurl=http://dev.centos.org/centos/buildsys/5/
 
 [vdt]
 name=vdt
-baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$basearch/
+baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$BASEARCH/
 priority=98
 
 [epel]
-name=Extra Packages for Enterprise Linux 5 - $basearch
-#baseurl=http://download.fedoraproject.org/pub/epel/5/$basearch
-mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=epel-5&arch=$basearch
+name=Extra Packages for Enterprise Linux 5 - $BASEARCH
+#baseurl=http://download.fedoraproject.org/pub/epel/5/$BASEARCH
+mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=epel-5&arch=$BASEARCH
 
 [jpackage-generic-5.0]
 name=JPackage (free), generic
@@ -297,6 +238,6 @@ config_opts['macros']['%_rpmfilename'] = "%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{AR
 # Change the next two lines to reflect yourself.
 
 # please change this to reflect the Distro Tree and Repo hosting packages!
-config_opts['macros']['%dist'] = ".vdt"
+config_opts['macros']['%dist'] = ".osg"
 
 ''')

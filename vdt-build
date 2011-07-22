@@ -114,7 +114,7 @@ def make_mock_config(arch, cfg_dir, mockver='old'):
 #"""
     else:
         basearch = arch
-    cfg_name = 'mock-auto-' + arch + '.' + str(os.getuid())
+    cfg_name = "mock-auto-%s.%d.%d" % (arch, os.getuid(), os.getpid())
     cfg_path = os.path.join(cfg_dir, cfg_name + ".cfg")
     if mockver == 'old': template = OLD_MOCK_CFG_TEMPLATE
     if mockver == 'new': template = NEW_MOCK_CFG_TEMPLATE
@@ -206,6 +206,7 @@ class VDTBuild(object):
             for lineno, line in enumerate(sfile):
                 line = line.strip()
                 if line.startswith('#'): continue
+                if line == '': continue
                 basename = os.path.basename(line)
                 if line.startswith('/'):
                     uri = "file://" + line
@@ -318,6 +319,11 @@ class VDTBuild(object):
         other_sources = [x for x in glob(os.path.join(upstream_dir, '*'))
                          if not fnmatch(x, '*.source')]
         for s in other_sources:
+            bn = os.path.basename(s)
+            if bn in [WD_RESULTS, WD_PREBUILD, WD_UNPACKED,
+                        WD_UNPACKED_TARBALL] or bn.endswith('~'):
+                logging.debug('Skipping other source ' + s)
+                continue
             logging.debug('Copying other source ' + s)
             shutil.copy(s, self.prebuild_dir)
 
@@ -340,6 +346,11 @@ class VDTBuild(object):
         # Override downloaded files with what's in osg/
         if os.path.isdir(osg_dir):
             for f in glob(os.path.join(osg_dir, '*')):
+                bn = os.path.basename(f)
+                if bn in [WD_RESULTS, WD_PREBUILD, WD_UNPACKED,
+                          WD_UNPACKED_TARBALL] or bn.endswith('~'):
+                    logging.debug('Skipping ' + f)
+                    continue
                 logging.debug('Copying osg file ' + f)
                 shutil.copy(f, self.prebuild_dir)
 
@@ -407,23 +418,37 @@ class VDTBuild(object):
         if mock_config is not None:
             mock_config = re.sub(r'\.cfg$', '', mock_config)
             if mock_config == "AUTO":
-                # TODO Make sure uname()[4] returns either i386 or x86_64.
-                if not self.options.get('target_arch'):
-                    arch = os.uname()[4]
+                machine_arch = os.uname()[4]
+                if re.search("i[3-6]86", self.options.get("target_arch", "")):
+                    arch = 'i386'
+                elif re.search("x86_64", self.options.get("target_arch", "")) and not re.search("x86_64", machine_arch):
+                    raise VDTBuildError("Can't do 64-bit build on 32-bit machine")
                 else:
-                    arch = re.match(r'(\w+)-?',
-                                    self.options['target_arch']).group(1)
+                    arch = machine_arch
+                #arch = re.match(r'(\w+)-?',
+                #                self.options['target_arch']).group(1)
                 # Get mock version. The mock config file format changed in
                 # 0.8.x, so that affects the generation.
-                mock_version, mock_error = subprocess.Popen(
+                mock_output, mock_error = subprocess.Popen(
                     ["mock", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE). \
                     communicate()
-                mock_version = mock_version.strip()
-                match = re.match(r'''(\d+)\.(\d+)''', mock_version)
+                mock_output = mock_output.strip()
+                match = re.match(r'''(\d+)\.(\d+)''', mock_output)
                 if not match:
-                    print >>sys.stderr,"Unable to determine the mock version"
-                    print >>sys.stderr,"Mock output is:"
-                    print >>sys.stderr,mock_version, "\n", mock_error
+                    if re.search(r'''mock group''', mock_output):
+                        print >>sys.stderr, \
+                            "You are not able to do a mock build on this " + \
+                            "machine because you are not in the mock group."
+                        print >>sys.stderr, \
+                            "/etc/group must be edited and your username " + \
+                            "must be added to the mock group."
+                        print >>sys.stderr, \
+                            "You might need to log out and log in for the " + \
+                            "changes to take effect"
+                    else:
+                        print >>sys.stderr,"Unable to determine the mock version"
+                        print >>sys.stderr,"Mock output is:"
+                        print >>sys.stderr,mock_output, "\n", mock_error
                 major = int(match.group(1))
                 minor = int(match.group(2))
                 cfg_dir = self.results_dir
@@ -464,6 +489,8 @@ class VDTBuild(object):
 
         cmd += ['--configdir', cfg_dir, '-r', cfg_name]
         cmd += ['--resultdir', self.results_dir, 'rebuild', srpm]
+        if self.options['target_arch']:
+            cmd += ['--arch', self.options['target_arch']]
 
         err = subprocess.call(cmd)
         if err:
@@ -728,7 +755,18 @@ push         Push the given RPMs to the yum repositories only.
                 raise UsageError(
                     "No yum repo specified for task push! " +
                     "Must pass -y or specify yum_base in the config file.")
-            copy_to_repo(buildopts['yum_base'], rpms)
+            real_rpms = []
+            for r in rpms:
+                if os.path.isfile(r) and r.endswith('.rpm'):
+                    real_rpms += [r]
+                elif os.path.isdir(r):
+                    def _push_os_walk_helper(arg, dirname, files):
+                        for f in files:
+                            df = os.path.join(dirname, f)
+                            if df.endswith('.rpm'):
+                                real_rpms += [df]
+                    os.path.walk(r, _push_os_walk_helper)
+            copy_to_repo(buildopts['yum_base'], real_rpms)
         else:
             packages = args[1:]
             if not buildopts.has_key('push_to_yum'):

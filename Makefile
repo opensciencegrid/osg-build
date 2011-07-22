@@ -1,4 +1,4 @@
-VERSION = 0.0.11
+VERSION = 0.0.13
 PYFILES = $(wildcard *.py)
 MAIN_SCRIPT = vdt-build
 PUSH_SCRIPT = push-rpm-to-vdt

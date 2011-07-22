@@ -135,7 +135,7 @@ config_opts['macros'] = """
 
 
 # please change this to reflect the Distro Tree and Repo hosting packages!
-%dist    .osg
+%dist    .$DIST
 %centos_ver     5
 
 #%_smp_mflags   -j1
@@ -238,6 +238,6 @@ config_opts['macros']['%_rpmfilename'] = "%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{AR
 # Change the next two lines to reflect yourself.
 
 # please change this to reflect the Distro Tree and Repo hosting packages!
-config_opts['macros']['%dist'] = ".osg"
+config_opts['macros']['%dist'] = ".$DIST"
 
 ''')

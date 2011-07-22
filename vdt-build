@@ -95,7 +95,7 @@ def copy_to_repo(yum_base, rpms):
             subprocess.call(['createrepo', '-p', '--update', '-d', repo[k]])
 
 
-def make_mock_config(arch, cfg_dir, mockver='old'):
+def make_mock_config(arch, cfg_dir, mockver='old', dist='osg'):
     """Autogenerate a mock config for arch 'arch'. 'mockver' is needed because
     mock config file format changed incompatibly somewhere in mock 0.8 or so
     and we need support for both 0.6.x (centos) and 1.x (batlab).
@@ -121,7 +121,8 @@ def make_mock_config(arch, cfg_dir, mockver='old'):
     unslurp(cfg_path,
             template.safe_substitute(
                 NAME=cfg_name, ARCH=arch, BASEARCH=basearch,
-                EXCLUDELINE=excludeline))
+                EXCLUDELINE=excludeline,
+                DIST=dist))
     logging.info("Mock config has been created in " + cfg_path)
 
     return cfg_name
@@ -152,7 +153,7 @@ class VDTBuild(object):
         defines = [
             "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
             "_topdir " + self.working_subdir,
-            "dist .osg"]
+            "dist ." + self.options.get('distro_tag', 'osg')]
 
         if prebuild:
             defines += [
@@ -363,6 +364,7 @@ class VDTBuild(object):
         """
         safe_makedirs(self.prebuild_dir)
         if os.path.isdir(os.path.join(self.abs_package_dir, 'osg/root')):
+            logging.warning("osg/root is deprecated")
             self.prebuild_osg()
         else:
             self.prebuild_extsrc()
@@ -445,6 +447,7 @@ class VDTBuild(object):
                         print >>sys.stderr, \
                             "You might need to log out and log in for the " + \
                             "changes to take effect"
+                        sys.exit(1)
                     else:
                         print >>sys.stderr,"Unable to determine the mock version"
                         print >>sys.stderr,"Mock output is:"
@@ -462,7 +465,7 @@ class VDTBuild(object):
                         shutil.copy("/etc/mock/logging.ini", cfg_dir)
                 else:
                     mockver = 'old'
-                cfg_name = make_mock_config(arch, cfg_dir, mockver)
+                cfg_name = make_mock_config(arch, cfg_dir, mockver, self.options.get('distro_tag', 'osg'))
             elif mock_config.startswith('/'):
                 # Absolute path
                 if not os.path.isfile(mock_config + ".cfg"):
@@ -489,7 +492,7 @@ class VDTBuild(object):
 
         cmd += ['--configdir', cfg_dir, '-r', cfg_name]
         cmd += ['--resultdir', self.results_dir, 'rebuild', srpm]
-        if self.options['target_arch']:
+        if self.options.has_key('target_arch'):
             cmd += ['--arch', self.options['target_arch']]
 
         err = subprocess.call(cmd)
@@ -526,8 +529,8 @@ class VDTBuild(object):
                                                   time.localtime()))
         # TODO See if the rpm's a noarch and behave appropriately.
         # TODO 'mockver' is a hack.
-        i386_mock_cfg = make_mock_config("i386", glue_dir, mockver='new')
-        x86_64_mock_cfg = make_mock_config("x86_64", glue_dir, mockver='new')
+        i386_mock_cfg = make_mock_config("i386", glue_dir, mockver='new', dist=self.options.get('distro_tag', 'osg'))
+        x86_64_mock_cfg = make_mock_config("x86_64", glue_dir, mockver='new', dist=self.options.get('distro_tag', 'osg'))
 
         platform_post_args = ["--host=" + getfqdn()]
         platform_post_args += ["--script=" + os.path.abspath(sys.argv[0])]
@@ -615,6 +618,9 @@ push         Push the given RPMs to the yum repositories only.
             "-C", "--config-file",
             help="The file to get configuration for this script.")
         parser.add_option(
+            "--distro-tag",
+            help="The distribution tag to append to the end of the release. (Default: osg)")
+        parser.add_option(
             "-e", "--email",
             help="The email address to send notifications to (batlab task).")
         parser.add_option(
@@ -668,7 +674,8 @@ push         Push the given RPMs to the yum repositories only.
             'working_directory': '.',
             'nmi_submit_machine': 'submit-01.batlab.org',
             'mock_config': 'AUTO',
-            'cache_prefix': 'AUTO',}
+            'cache_prefix': 'AUTO',
+            'distro_tag': 'osg'}
 
         # Read the config file
         cfg_file = os.path.expanduser(options.config_file or
@@ -707,6 +714,9 @@ push         Push the given RPMs to the yum repositories only.
 
         if options.nmi_submit_machine:
             buildopts['nmi_submit_machine'] = options.nmi_submit_machine
+
+        if options.distro_tag:
+            buildopts['distro_tag'] = options.distro_tag
 
         # Special case for working_directory being TEMP
         if buildopts.get('working_directory') == 'TEMP':
@@ -794,6 +804,8 @@ push         Push the given RPMs to the yum repositories only.
         sys.stderr.write("Usage error: " + str(e) + "\n")
         parser.print_help()
         return 2
+    except SystemExit, e:
+        return e.code
     except Exception, e:
         sys.stderr.write("-------------------------------------------------------------------------------\n")
         sys.stderr.write("\tAn exception occurred:\n")

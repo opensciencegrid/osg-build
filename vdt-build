@@ -760,12 +760,12 @@ push         Push the given RPMs to the yum repositories only.
                 if os.path.isfile(r) and r.endswith('.rpm'):
                     real_rpms += [r]
                 elif os.path.isdir(r):
-                    def _push_os_walk_helper(arg, dirname, files):
+                    def _push_os_walk_helper(real_rpms, dirname, files):
                         for f in files:
                             df = os.path.join(dirname, f)
                             if df.endswith('.rpm'):
                                 real_rpms += [df]
-                    os.path.walk(r, _push_os_walk_helper)
+                    os.path.walk(r, _push_os_walk_helper, real_rpms)
             copy_to_repo(buildopts['yum_base'], real_rpms)
         else:
             packages = args[1:]

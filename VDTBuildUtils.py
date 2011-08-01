@@ -2,6 +2,50 @@ import os
 import re
 import subprocess
 
+
+class CalledProcessError(Exception):
+    pass
+
+
+def checked_call(*args, **kwargs):
+    """A wrapper around subprocess.call() that raises CalledProcessError on
+    a nonzero return code. Similar to subprocess.check_call() in 2.7+, but
+    prints the command to run and the result unless 'quiet=True' is passed.
+    Also, if the first argument is a string and shell=False isn't passed,
+    then shell=True is passed to subprocess.call().
+
+    """
+    err = unchecked_call(*args, **kwargs)
+    if err:
+        raise CalledProcessError(
+            "Error in checked_call(%s, %s): subprocess returned %s" % \
+            (str(args), str(kwargs), str(err)))
+
+
+def unchecked_call(*args, **kwargs):
+    """A wrapper around subprocess.call() with the same semantics as checked_call: 
+    Prints the command to run and the result unless 'quiet=True' is passed.
+    Also, if the first argument is a string and shell=False isn't passed,
+    then shell=True is passed to subprocess.call().
+
+    """
+    quiet = kwargs.pop('quiet', False)
+    if not quiet:
+        if type(args[0]) == type(''):
+            cmd = args[0]
+        elif type(args[0]) == type([]) or type(args[0]) == type(()):
+            cmd = "'" + "' '".join(args[0]) + "'"
+        print "Running " + cmd
+
+    if type(args[0]) == type('') and 'shell' not in kwargs:
+        kwargs['shell'] = True
+
+    err = subprocess.call(*args, **kwargs)
+    if not quiet:
+        print "Subprocess returned " + str(err)
+    return err
+
+
 def get_rpmrc():
     """A naive way of parsing the output of rpm --showrc to get the variables"""
 
@@ -13,6 +57,7 @@ def get_rpmrc():
 
     return vars_dict
 
+
 def slurp(filename):
     try:
         fh = open(filename, 'r')
@@ -21,6 +66,7 @@ def slurp(filename):
         fh.close()
     return contents
 
+
 def unslurp(filename, contents):
     try:
         fh = open(filename, 'w')
@@ -28,16 +74,30 @@ def unslurp(filename, contents):
     finally:
         fh.close()
 
-def findfile(filename, paths):
+
+def find_file(filename, paths):
     """Go through each directory in paths and look for filename in it. Return
     the first match.
 
     """
+    matches = find_files(filename, paths)
+    if matches:
+        return matches[0]
+    else:
+        return None
+
+
+def find_files(filename, paths):
+    """Go through each directory in paths and look for filename in it. Return
+    all matches.
+
+    """
+    matches = []
     for p in paths:
         j = os.path.join(p, filename)
         if os.path.exists(j):
-            return j
-    return None
+            matches += [j]
+    return matches
             
 
 def _spec_replvar(macro_vars, match):
@@ -50,6 +110,7 @@ def _spec_replvar(macro_vars, match):
             return ''
         else:
             return match.group(0)
+
 
 def spec_expand_macros(macro_vars, string):
     '''Expand the macro variables in macro_vars in string'''
@@ -69,7 +130,6 @@ def spec_expand_macros(macro_vars, string):
         if nsubs == 0 or estring == old_estring:
             done = True
     return estring
-
     
 
 def spec_parse(spec_contents):
@@ -152,6 +212,7 @@ def spec_parse(spec_contents):
 
     return (macro_vars, expanded_spec)
 
+
 def super_unpack(*compressed_files):
     '''Extracts compressed files, calling the appropriate expansion
     program based on the file extension.'''
@@ -177,6 +238,7 @@ def super_unpack(*compressed_files):
             if cf.endswith(ext):
                 subprocess.call(cmd % re.escape(cf), shell=True)
                 break
+
 
 def safe_makedirs(directory, mode=0777):
     if not os.path.isdir(directory):

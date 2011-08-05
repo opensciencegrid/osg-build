@@ -7,6 +7,7 @@ AFS_CACHE_PATH = '/p/vdt/public/html/upstream'
 AFS_CACHE_PREFIX = 'file://' + AFS_CACHE_PATH
 WEB_CACHE_PREFIX = 'http://vdt.cs.wisc.edu/upstream'
 DEFAULT_CONFIG_FILE = '~/.vdt-build.ini'
+KOJI_TAG = "el5-osg" # TODO this should be configurable
 
 CMDFILE_TEMPLATE = string.Template("""
 component           = $NAME
@@ -21,9 +22,10 @@ platforms           = x86_64_sl_5.6
 project             = VDT
 project_release     = 3.0
 remote_declare      = glue/remote-declare.py
+#remote_declare_args = rebuild_i386 rebuild_x86_64 package koji_import koji_tag
 remote_declare_args = rebuild_i386 rebuild_x86_64 package
 remote_task         = glue/remote-task.py
-remote_task_args    = $REMOTE_TASK_ARGS
+remote_task_args    = " $REMOTE_TASK_ARGS "
 run_type            = build
 #append_requirements = (Machine =?= 'mock-1.batlab.org')
 """)

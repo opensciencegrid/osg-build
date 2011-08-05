@@ -3,30 +3,22 @@ import re
 import shutil
 import string
 import subprocess
+import sys
 
 from VDTBuildUtils import *
-
-class NotInMockGroupError(Exception):
-    pass
 
 
 def get_mock_version():
     """Return mock version as a 2-element tuple (major, minor)"""
-    mock_output, mock_error = subprocess.Popen(
-        ["mock", "--version"], stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE). \
-        communicate()
-    mock_output = mock_output.strip()
-    match = re.match(r'''(\d+)\.(\d+)''', mock_output)
+    query = subprocess.Popen(
+        ["rpm", "-q", "mock"], stdout=subprocess.PIPE).communicate()[0]
+    match = re.match(r'''mock-((?:\d+\.?)+)-''', query)
     if not match:
-        if re.search(r'''mock group''', mock_output):
-            raise NotInMockGroupError()
-        else:
-            print >>sys.stderr,"Unable to determine the mock version"
-            print >>sys.stderr,"Mock output is:"
-            print >>sys.stderr,mock_output, "\n", mock_error
-            raise Exception() # TODO Do better than this.
-    return (int(match.group(1)), int(match.group(2)))
+        print >>sys.stderr,"Unable to determine the mock version"
+        print >>sys.stderr,"Make sure mock in installed (yum install mock)"
+        raise Exception(query) # TODO do better than this
+    version = [int(x) for x in match.group(1).split(".")]
+    return tuple(version)
 
 
 def make_mock_config(arch, cfg_dir, mockver=None, dist='osg', index=''):
@@ -46,7 +38,7 @@ def make_mock_config(arch, cfg_dir, mockver=None, dist='osg', index=''):
     if mockver is None:
         mockver = get_mock_version()
 
-    if mockver <= (0, 8):
+    if mockver < (0, 8):
         template = OLD_MOCK_CFG_TEMPLATE
     else:
         template = NEW_MOCK_CFG_TEMPLATE

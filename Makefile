@@ -1,5 +1,6 @@
-VERSION = 0.0.14
-PYFILES = $(wildcard *.py)
+VERSION = 0.0.15
+PYFILES = $(wildcard *.py) vdtkoji.conf
+# TODO: Move vdtkoji.conf
 MAIN_SCRIPT = vdt-build
 PUSH_SCRIPT = push-rpm-to-vdt
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")

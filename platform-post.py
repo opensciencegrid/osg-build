@@ -10,32 +10,7 @@ import time
 from VDTBuildUtils import *
 
 
-KOJI_HUB = "http://koji-hub.batlab.org/kojihub"
-KOJI_TAG = "dist-el5-vdt"
 RUNAUTH = "/s/std/bin/runauth"
-have_koji = not os.system("which koji &>/dev/null")
-
-
-def koji_import():
-    """Import all rpms into koji."""
-    if not have_koji:
-        print "Koji not installed. Skipping koji_import."
-        return
-    for f in glob("*.rpm") + glob("results/*.rpm"):
-        unchecked_call("koji import %s --create-build" % f)
-
-
-def koji_tag():
-    """Tag the rpms we just imported."""
-    if not have_koji:
-        print "Koji not installed. Skipping koji_tag."
-        return
-    for f in glob("*.rpm") + glob("results/*.rpm"):
-        bn = os.path.basename(f)
-        # strip off arch and extension
-        nvr = re.sub(r'\.\w+\.rpm$', '', bn)
-        unchecked_call("koji tag-pkg %s %s" % \
-                       (KOJI_TAG, nvr))
 
 
 # Turn off buffering for stdout/stderr
@@ -50,9 +25,6 @@ parser.add_option("--script")
 options, args = parser.parse_args(sys.argv[1:])
 
 checked_call(["tar", "xvzf", "results.tar.gz"])
-
-koji_tag()
-koji_import()
 
 try:
     tempdir = "/tmp/results-%d.%d.%s" % \

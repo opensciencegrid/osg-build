@@ -12,7 +12,10 @@ from VDTBuildUtils import *
 from VDTBuildMockConfig import *
 
 
+#KOJI_HUB = "http://koji-hub.batlab.org/kojihub"
+#KOJI_TAG = "dist-el5-vdt"
 have_mock = not os.system("which mock &>/dev/null")
+have_koji = not os.system("which koji &>/dev/null")
 
 class RemoteTaskError(Exception):
     pass
@@ -79,7 +82,6 @@ def rebuild(arch=None):
     if arch is None:
         arch = re.search('x86(_64)?', os.environ['NMI_PLATFORM'])
     mockver = get_mock_version()
-
     cwd = os.getcwd()
     mock_cfg = make_mock_config(arch, cwd, mockver, options.dist,
                                 os.environ.get("_CONDOR_SLOT", "0"))
@@ -118,6 +120,30 @@ def package():
     checked_call(cmd)
 
 
+# TODO move to platform-post
+def koji_import():
+    """Import all rpms into koji."""
+    if not have_koji:
+        print "Koji not installed. Skipping koji_import."
+        return
+    for f in glob("*.rpm") + glob("results/*.rpm"):
+        unchecked_call("koji import %s --create-build" % f)
+
+
+# TODO move to platform-post
+def koji_tag():
+    """Tag the rpms we just imported."""
+    if not have_koji:
+        print "Koji not installed. Skipping koji_tag."
+        return
+    for f in glob("*.rpm") + glob("results/*.rpm"):
+        bn = os.path.basename(f)
+        # strip off arch and extension
+        nvr = re.sub(r'\.\w+\.rpm$', '', bn)
+        unchecked_call("koji tag-pkg %s %s" % \
+                       (KOJI_TAG, nvr))
+
+
 # Turn off buffering for stdout/stderr
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
@@ -138,7 +164,16 @@ options, args = parser.parse_args(sys.argv[1:])
 
 taskname = init_nmi()
 
+## TODO Don't do this, it should be in platform-post.py once we get koji
+## installed on the submit machine.
+#execute_kojidir = os.path.join(os.environ['HOME'], ".koji")
+#user_kojidir = os.path.join("/home", os.environ['USER'], ".koji")
+#if not os.path.isdir(execute_kojidir) \
+#        and os.path.isdir(user_kojidir):
+#    os.system("cp -rp %s %s" % (user_kojidir, execute_kojidir))
+####
+
 print "======= Task Output ======="
-eval("sys.exit(" + os.environ['_NMI_TASKNAME'] + "())")
+sys.exit(locals()[os.environ['_NMI_TASKNAME']]())
 
 

@@ -1,4 +1,4 @@
-VERSION = 0.0.15
+VERSION = 0.0.16
 PYFILES = $(wildcard *.py) vdtkoji.conf
 # TODO: Move vdtkoji.conf
 MAIN_SCRIPT = vdt-build

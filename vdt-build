@@ -405,7 +405,7 @@ class VDTBuild(object):
 
             mockver = get_mock_version()
             try:
-                mock_gid = grp.getgrnam('mock')
+                mock_gid = grp.getgrnam('mock').gr_gid
             except KeyError:
                 raise VDTBuildError("The mock group does not exist on this" +
                     " system!")
@@ -576,7 +576,10 @@ class VDTBuild(object):
             raise VDTBuildError("Need to know koji login. Either pass --kojilogin or set kojilogin in your config file.")
         safe_makedirs(self.results_dir)
         koji_cmd = ["koji", "--config", conf_file_dest, "--authtype", "ssl"]
-        unchecked_call(koji_cmd + ["add-pkg", KOJI_TAG, os.path.basename(self.package_dir), "--owner", self.options['kojilogin']])
+        unchecked_call(koji_cmd +
+                       ["add-pkg", KOJI_TAG,
+                        os.path.basename(self.abs_package_dir), "--owner",
+                        self.options['kojilogin']])
         # TODO KOJI_TAG should be configurable
         build_subcmd = ["build", KOJI_TAG, srpm]
         if self.options.get('scratch'):

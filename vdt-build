@@ -8,7 +8,6 @@ from optparse import OptionParser
 import os
 import re
 import shutil
-from string import Template
 from socket import getfqdn
 import subprocess
 import sys
@@ -22,10 +21,11 @@ from VDTBuildUtils import *
 from VDTBuildConstants import *
 from VDTBuildMockConfig import *
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 __version__ = '@VERSION@'
+
 
 class VDTBuildError(Exception):
     pass
@@ -50,7 +50,7 @@ def verify_yum_repos(yum_base):
                            "typo, rerun with --init-repos to create it and " +
                            "its subdirectories.") % yum_base)
 
-    for arch in ['i386', 'noarch', 'x86_64', 'src']:
+    for arch in ['i386', 'x86_64', 'src']:
         subdir = os.path.join(yum_base, arch)
         if not os.path.isdir(subdir):
             raise VDTPushError(
@@ -65,7 +65,7 @@ def copy_to_repo(yum_base, rpms):
         return
 
     repo = {}
-    for arch in ['i386', 'noarch', 'x86_64', 'src']:
+    for arch in ['i386', 'x86_64', 'src']:
         repo[arch] = os.path.join(yum_base, arch)
 
     for rpm in rpms:
@@ -77,17 +77,8 @@ def copy_to_repo(yum_base, rpms):
         elif fnmatch(rpm, '*.x86_64.rpm'):
             shutil.copy(rpm, repo['x86_64'])
         elif fnmatch(rpm, '*.noarch.rpm'):
-            shutil.copy(rpm, repo['noarch'])
-
-            i386linkfn = os.path.join(repo['i386'], bn)
-            if os.path.exists(i386linkfn):
-                os.unlink(i386linkfn)
-            os.symlink('../noarch/' + bn, i386linkfn)
-
-            x86_64linkfn = os.path.join(repo['x86_64'], bn)
-            if os.path.exists(x86_64linkfn):
-                os.unlink(x86_64linkfn)
-            os.symlink('../noarch/' + bn, x86_64linkfn)
+            shutil.copy(rpm, repo['i386'])
+            shutil.copy(rpm, repo['x86_64'])
         elif fnmatch(rpm, '*.src.rpm'):
             shutil.copy(rpm, repo['src'])
 
@@ -110,8 +101,8 @@ class VDTBuild(object):
         # the package dir, get rid of any parent or current directory
         # components so doing "vdtbuild pre -w TEMP ../foobar" won't put stuff
         # in "/tmp/foobar"
-        if os.path.realpath(self.options['working_directory']) != \
-                os.path.realpath('.'):
+        if (os.path.realpath(self.options['working_directory']) !=
+                os.path.realpath('.')):
             package_dir_no_parent = re.sub(r'^(\.\.?/)+', '', package_dir)
             self.working_subdir = os.path.abspath(
                 os.path.join(
@@ -157,9 +148,9 @@ class VDTBuild(object):
         cmd = "rpmbuild -bs --nodeps".split(' ')
         cmd += self.get_rpmbuild_defines(prebuild=True)
         cmd += [spec_fn]
-        err_msg_prefix = ("Error making SRPM from %s\n" +
-                          "Command used was: %s\n") % \
-                         (spec_fn, " ".join(cmd))
+        err_msg_prefix = (("Error making SRPM from %s\n" +
+                           "Command used was: %s\n") %
+                           (spec_fn, " ".join(cmd)))
         pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
         output = pipe.communicate()[0]
@@ -410,15 +401,15 @@ class VDTBuild(object):
                 raise VDTBuildError("The mock group does not exist on this" +
                     " system!")
             if mock_gid not in os.getgroups():
-                print >>sys.stderr, \
-                    "You are not able to do a mock build on this " + \
-                    "machine because you are not in the mock group."
-                print >>sys.stderr, \
-                    "/etc/group must be edited and your username " + \
-                    "must be added to the mock group."
-                print >>sys.stderr, \
-                    "You might need to log out and log in for the " + \
-                    "changes to take effect"
+                print >>sys.stderr, (
+                    "You are not able to do a mock build on this " +
+                    "machine because you are not in the mock group.")
+                print >>sys.stderr, (
+                    "/etc/group must be edited and your username " +
+                    "must be added to the mock group.")
+                print >>sys.stderr, (
+                    "You might need to log out and log in for the " +
+                    "changes to take effect")
                 sys.exit(1)
 
             if mock_config == "AUTO":
@@ -500,9 +491,9 @@ class VDTBuild(object):
             stdout=subprocess.PIPE).communicate()[0].split("\n")
 
 
-        remote_dirname = "%s-%s-%s-%s" % \
+        remote_dirname = ("%s-%s-%s-%s" %
             (name, version, release, time.strftime("%Y%m%d%H%M",
-                                                  time.localtime()))
+                                                   time.localtime())))
 
         remote_task_args = ["--dist=" + self.options.get('distro_tag', "osg")]
         platform_post_args = ["--host=" + getfqdn()]
@@ -540,7 +531,7 @@ class VDTBuild(object):
         unslurp(os.path.join(nmi_prebuild_dir, "srpm.scp"), srpm_scp_text)
             
         # Upload nmi_prebuild_dir to the nmi submit machine
-        os.system("scp -r %s %s:%s" % \
+        os.system("scp -r %s %s:%s" %
                   (nmi_prebuild_dir,
                   self.options['nmi_submit_machine'],
                   remote_dirname))
@@ -552,7 +543,7 @@ class VDTBuild(object):
             nmi_submit_path = "/nmi/bin"
         os.system(("""ssh %s 'cd %s;""" +
                    """sed -i -e "s,@NMIDIR@,`pwd`," *.scp;""" +
-                   nmi_submit_path + """/nmi_submit --must-match cmdfile'""") % \
+                   nmi_submit_path + """/nmi_submit --must-match cmdfile'""") %
                   (self.options['nmi_submit_machine'], remote_dirname))
         # platform-post.py will put the resulting rpms in results_dir, as well
         # as push them to the yum repo if push_to_yum and yum_base are set.
@@ -572,15 +563,51 @@ class VDTBuild(object):
             shutil.copy(conf_file, conf_file_dest)
         else:
             raise VDTBuildError("Can't find vdtkoji.conf")
-        if not self.options.get('kojilogin'):
-            raise VDTBuildError("Need to know koji login. Either pass --kojilogin or set kojilogin in your config file.")
+        if not os.path.exists(KOJI_CLIENT_CERT):
+            raise VDTBuildError(
+                "Unable to find your Koji client cert at " + KOJI_CLIENT_CERT)
+
+        subject = backtick(
+            ["openssl", "x509", "-in", KOJI_CLIENT_CERT, "-noout", "-subject",
+             "-nameopt", "multiline"])
+        # Get the last commonName
+        cn_match = re.search(r"""(?xms)
+            ^ \s* commonName \s* = \s* ([^\n]+) \s* $
+            (?!.*commonName)""", subject)
+
+        if self.options.has_key('kojilogin'):
+            cn = self.options['kojilogin']
+        elif cn_match:
+            cn = cn_match.group(1)
+        else:
+            raise VDTBuildError(
+                "Unable to determine your Koji login. Either pass " +
+                "--kojilogin or verify that " +
+                "'openssl x509 -in %s -noout -subject'" % (KOJI_CLIENT_CERT) +
+                " gives you a subject with a CN.")
         safe_makedirs(self.results_dir)
         koji_cmd = ["koji", "--config", conf_file_dest, "--authtype", "ssl"]
-        unchecked_call(koji_cmd +
-                       ["add-pkg", KOJI_TAG,
-                        os.path.basename(self.abs_package_dir), "--owner",
-                        self.options['kojilogin']])
+
+        # See if the package needs to be added
+        # TODO Error checking
         # TODO KOJI_TAG should be configurable
+        found = False
+        package_name = os.path.basename(self.abs_package_dir)
+        list_pkgs = backtick(koji_cmd +
+                             ["list-pkgs", "--package", package_name])
+        for line in list_pkgs.split("\n"):
+            fields = re.split(r"\s*", line, 2)
+            try:
+                if fields[1] == KOJI_TAG:
+                    found = True
+            except IndexError:
+                pass
+        if not found:
+            unchecked_call(
+                koji_cmd +
+                ["add-pkg", KOJI_TAG,
+                 os.path.basename(self.abs_package_dir), "--owner",
+                 cn])
         build_subcmd = ["build", KOJI_TAG, srpm]
         if self.options.get('scratch'):
             build_subcmd += ["--scratch"]
@@ -595,11 +622,28 @@ def init_repos(base_repo):
         safe_makedirs(os.path.join(base_repo, repo))
 
 
-def main(argv=None):
-    if argv is None: argv=sys.argv
+def push_task(rpms, yum_base):
+    # Push should probably be a separate script entirely.
+    if not yum_base:
+        raise UsageError(
+            "No yum repo specified for task push! " +
+            "Must pass -y or specify yum_base in the config file.")
+    real_rpms = []
+    for r in rpms:
+        if os.path.isfile(r) and r.endswith('.rpm'):
+            real_rpms += [r]
+        elif os.path.isdir(r):
+            def _push_os_walk_helper(real_rpms, dirname, files):
+                for f in files:
+                    df = os.path.join(dirname, f)
+                    if df.endswith('.rpm'):
+                        real_rpms += [df]
+            os.path.walk(r, _push_os_walk_helper, real_rpms)
+    copy_to_repo(yum_base, real_rpms)
+    
 
-    try:
-        parser = OptionParser("""
+def parse_cmdline_args(argv):
+    parser = OptionParser("""
    %prog TASK PACKAGE1 <PACKAGE2..n> [options]
 or %prog push RPM1 <RPM2..n> [options]
 
@@ -611,76 +655,88 @@ batlab       Submit a build to the NMI Build and Test Lab.
 push         Push the given RPMs to the yum repositories only.
 koji         Build using koji
 """)
-        parser.add_option(
-            "-c", "--cache-prefix",
-            help="The prefix for the software cache to take source files " +
-            "from. The following special caches exist: " +
-            "AFS (%s), and " % AFS_CACHE_PREFIX +
-            "VDT (%s). " % WEB_CACHE_PREFIX +
-            "The default cache is AFS (if available) or VDT (if not).")
-        parser.add_option(
-            "-C", "--config-file",
-            help="The file to get configuration for this script.")
-        parser.add_option(
-            "--distro-tag",
-            help="The distribution tag to append to the end of the release." +
-            " (Default: osg)")
-        parser.add_option(
-            "-e", "--email",
-            help="The email address to send notifications to (batlab task).")
-        parser.add_option(
-            "--full-extract", action="store_true",
-            help="Fully extract all source files.")
-        parser.add_option(
-            "--init-repos", action="store_true",
-            help="Create directories under 'yum_base' to hold the YUM " +
-            "repositories in.")
-        parser.add_option(
-            "-k", "--kojilogin",
-            help="The login you use for koji (most likely your CN, e.g." +
-            "'Matyas Selmeci 564109')",
-        )
-        parser.add_option(
-            "-m", "--mock-config",
-            help="The location of the mock config file. " +
-            "defaults to AUTO to use an autogenerated file " +
-            "recommended for vdt builds")
-        parser.add_option(
-            "-p", "--push-to-yum", action="store_true",
-            help="Copy completed RPMs to a YUM repostiory.")
-        parser.add_option(
-            "--nop", "--no-push-to-yum", action="store_false",
-            dest="push_to_yum",
-            help="Do not copy completed RPMs to a YUM repository.")
-        parser.add_option(
-            "--nmi-submit-machine",
-            help="The machine in the nmi build and test lab to submit builds to")
-        parser.add_option(
-            "-q", "--quiet", type=None, action="callback",
-            callback=(lambda *args: logging.basicConfig(level=logging.ERROR)),
-            help="Display less information.")
-        parser.add_option(
-            "--scratch", action="store_true",
-            help="Perform a scratch build (koji task only)")
-        parser.add_option(
-            "-t", "--target-arch",
-            help="The target architecture to build for " +
-            "(rpmbuild and mock tasks only)")
-        parser.add_option(
-            "-v", "--verbose", type=None, action="callback",
-            callback=(lambda *args: logging.basicConfig(level=logging.DEBUG)),
-            help="Display more information.")
-        parser.add_option(
-            "-w", "--working-directory",
-            help="The base directory to use for temporary files made by the "+
-            "script. If it is 'TEMP', a randomly-named directory under /tmp "+
-            "is used.")
-        parser.add_option(
-            "-y", "--yum-base",
-            help="The base directory containing the YUM repositories to " +
-            "push RPMs to.")
+    parser.add_option(
+        "-c", "--cache-prefix",
+        help="The prefix for the software cache to take source files " +
+        "from. The following special caches exist: " +
+        "AFS (%s), and " % AFS_CACHE_PREFIX +
+        "VDT (%s). " % WEB_CACHE_PREFIX +
+        "AUTO (AFS if avaliable, VDT if not) " +
+        "The default cache is AUTO.")
+    parser.add_option(
+        "-C", "--config-file",
+        help="The file to get configuration for this script.")
+    parser.add_option(
+        "--distro-tag",
+        help="The distribution tag to append to the end of the release." +
+        " (Default: osg)")
+    parser.add_option(
+        "-e", "--email",
+        help="The email address to send notifications to (batlab task).")
+    parser.add_option(
+        "--full-extract", action="store_true",
+        help="Fully extract all source files.")
+    parser.add_option(
+        "--init-repos", action="store_true",
+        help="Create directories under 'yum_base' to hold the YUM " +
+        "repositories in.")
+    parser.add_option(
+        "-k", "--kojilogin",
+        help="The login you use for koji (most likely your CN, e.g." +
+        "'Matyas Selmeci 564109')")
+    parser.add_option(
+        "-m", "--mock-config",
+        help="The location of the mock config file. " +
+        "defaults to AUTO to use an autogenerated file " +
+        "recommended for vdt builds")
+    parser.add_option(
+        "-p", "--push-to-yum", action="store_true",
+        help="Copy completed RPMs to a YUM repostiory.")
+    parser.add_option(
+        "--nop", "--no-push-to-yum", action="store_false",
+        dest="push_to_yum",
+        help="Do not copy completed RPMs to a YUM repository.")
+    parser.add_option(
+        "--nmi-submit-machine",
+        help="The machine in the nmi build and test lab to submit builds to")
+    parser.add_option(
+        "-q", "--quiet", type=None, action="callback",
+        callback=(lambda *args: logging.basicConfig(level=logging.WARNING)),
+        help="Display less information.")
+    parser.add_option(
+        "--scratch", action="store_true",
+        help="Perform a scratch build (koji task only)")
+    parser.add_option(
+        "-t", "--target-arch",
+        help="The target architecture to build for " +
+        "(rpmbuild and mock tasks only)")
+    parser.add_option(
+        "-v", "--verbose", type=None, action="callback",
+        callback=(lambda *args: logging.basicConfig(level=logging.DEBUG)),
+        help="Display more information.")
+    parser.add_option(
+        "-w", "--working-directory",
+        help="The base directory to use for temporary files made by the "+
+        "script. If it is 'TEMP', a randomly-named directory under /tmp "+
+        "is used.")
+    parser.add_option(
+        "-y", "--yum-base",
+        help="The base directory containing the YUM repositories to " +
+        "push RPMs to. Passing this implies --push-to-yum")
 
-        (options, args) = parser.parse_args(argv[1:])
+    optnames = [x.dest for x in parser.option_list if x.dest is not None]
+
+    options, args = parser.parse_args(argv[1:])
+
+    return (parser, options, args, optnames)
+
+
+
+def main(argv=None):
+    if argv is None: argv=sys.argv
+
+    try:
+        parser, options, args, optnames = parse_cmdline_args(argv)
 
         if len(args) < 1:
             raise UsageError('Need task!')
@@ -691,65 +747,45 @@ koji         Build using koji
 
         # Defaults
         buildopts = {
-            'working_directory': '.',
-            'nmi_submit_machine': 'submit-1.batlab.org',
-            'mock_config': 'AUTO',
             'cache_prefix': 'AUTO',
-            'distro_tag': 'osg'}
+            'distro_tag': 'osg',
+            'full_extract': False,
+            'init_repos': False,
+            'mock_config': 'AUTO',
+            'nmi_submit_machine': 'submit-1.batlab.org',
+            'scratch': False,
+            'working_directory': '.',
+            }
 
         # Read the config file
-        cfg_file = os.path.expanduser(options.config_file or
-                                      DEFAULT_CONFIG_FILE)
+        if options.config_file:
+            cfg_file = options.config_file
+        else:
+            cfg_file = DEFAULT_CONFIG_FILE
+
         if os.path.exists(cfg_file):
             cfg = ConfigParser()
             cfg.read(cfg_file)
             buildopts.update(cfg.items('options'))
             logging.debug("Read default config from %s", cfg_file)
+        else:
+            logging.debug("Config file not found at %s", cfg_file)
 
         # Overrides from command line
-        if options.working_directory:
-            buildopts['working_directory'] = options.working_directory
-
-        if options.cache_prefix:
-            buildopts['cache_prefix'] = options.cache_prefix
-
-        if options.full_extract:
-            buildopts['full_extract'] = True
-
-        if options.mock_config:
-            buildopts['mock_config'] = options.mock_config
-
-        if options.push_to_yum is not None:
-            buildopts['push_to_yum'] = options.push_to_yum
-
+        for optname in optnames:
+            optval = getattr(options, optname, None)
+            if optval is not None:
+                buildopts[optname] = optval
         if options.yum_base:
             buildopts['yum_base'] = options.yum_base
             buildopts['push_to_yum'] = True
 
-        if options.target_arch:
-            buildopts['target_arch'] = options.target_arch
-
-        if options.email:
-            buildopts['email'] = options.email
-
-        if options.nmi_submit_machine:
-            buildopts['nmi_submit_machine'] = options.nmi_submit_machine
-
-        if options.distro_tag:
-            buildopts['distro_tag'] = options.distro_tag
-
-        if options.scratch:
-            buildopts['scratch'] = options.scratch
-
-        if options.kojilogin:
-            buildopts['kojilogin'] = options.kojilogin
-
         # Special case for working_directory being TEMP
         if buildopts.get('working_directory') == 'TEMP':
-            buildopts['working_directory'] = \
-                tempfile.mkdtemp(prefix='vdt-build-')
-            logging.info('Working directory is %s',
-                         buildopts['working_directory'])
+            buildopts['working_directory'] = (
+                tempfile.mkdtemp(prefix='vdt-build-'))
+            logging.debug('Working directory is %s',
+                          buildopts['working_directory'])
 
         # Special case for cache_prefix being AFS or VDT
         if buildopts.get('cache_prefix') == 'AFS':
@@ -763,7 +799,7 @@ koji         Build using koji
                 buildopts['cache_prefix'] = WEB_CACHE_PREFIX
 
         if options.init_repos:
-            if not buildopts.has_key('yum_base'):
+            if not buildopts.get('yum_base'):
                 raise UsageError("No yum base specified with --init-repos! " +
                     "Must pass -y or specify yum_base in the config file.")
             else:
@@ -785,36 +821,19 @@ koji         Build using koji
             real_task = matching_tasks[0]
 
         if real_task == 'push':
-            # Push should probably be a separate script entirely.
-            rpms = args[1:]
-            if not buildopts.has_key('yum_base'):
-                raise UsageError(
-                    "No yum repo specified for task push! " +
-                    "Must pass -y or specify yum_base in the config file.")
-            real_rpms = []
-            for r in rpms:
-                if os.path.isfile(r) and r.endswith('.rpm'):
-                    real_rpms += [r]
-                elif os.path.isdir(r):
-                    def _push_os_walk_helper(real_rpms, dirname, files):
-                        for f in files:
-                            df = os.path.join(dirname, f)
-                            if df.endswith('.rpm'):
-                                real_rpms += [df]
-                    os.path.walk(r, _push_os_walk_helper, real_rpms)
-            copy_to_repo(buildopts['yum_base'], real_rpms)
+            push_task(args[1:], buildopts.get('yum_base'))
         else:
-            packages = args[1:]
-            if not buildopts.has_key('push_to_yum'):
+            package_dirs = args[1:]
+            if buildopts.get('push_to_yum') is not None:
                 if real_task == 'mock' or real_task == 'batlab':
                     buildopts['push_to_yum'] = True
                 else:
                     buildopts['push_to_yum'] = False
 
-            if buildopts['push_to_yum'] and buildopts.has_key('yum_base'):
+            if buildopts.get('push_to_yum') and buildopts.get('yum_base'):
                 verify_yum_repos(buildopts['yum_base'])
                     
-            for p in packages:
+            for p in package_dirs:
                 if not os.path.isdir(p):
                     raise UsageError(p + " isn't a package dir!")
                 builder = VDTBuild(p, buildopts)
@@ -827,23 +846,23 @@ koji         Build using koji
                 elif real_task == 'batlab':
                     builder.batlab()
                 elif real_task == 'koji':
-                    if not buildopts.has_key('kojilogin'):
-                        raise UsageError(
-                            "Need to know koji login. Either pass --kojilogin" +
-                            "or set kojilogin in your config file.")
                     builder.koji()
+
     except UsageError, e:
-        sys.stderr.write("Usage error: " + str(e) + "\n")
+        print >>sys.stderr, "Usage error: " + str(e) + "\n"
         parser.print_help()
         return 2
     except SystemExit, e:
         return e.code
+    except KeyboardInterrupt:
+        print >>sys.stderr, "Interrupted\n"
+        return 3
     except Exception, e:
-        sys.stderr.write("-" * 79 + "\n")
-        sys.stderr.write("\tAn exception occurred:\n")
-        sys.stderr.write("\t" + str(e) + "\n")
-        sys.stderr.write("-" * 79 + "\n")
-        sys.stderr.write("Full traceback follows:\n")
+        print >>sys.stderr, "-" * 79 + "\n"
+        print >>sys.stderr, "\tAn exception occurred:\n"
+        print >>sys.stderr, "\t" + str(e) + "\n"
+        print >>sys.stderr, "-" * 79 + "\n"
+        print >>sys.stderr, "Full traceback follows:\n"
         traceback.print_exc()
         return 1
 

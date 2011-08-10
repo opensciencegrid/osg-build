@@ -159,6 +159,14 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
 enabled=1
 priority=10
 
+[koji-el5-osg-development]
+name=OSG Development Repository on koji-hub
+baseurl=http://koji-hub.batlab.org/mnt/koji/repos/el5-osg-development/latest/$basearch/
+failovermethod=priority
+gpgcheck=0
+enabled=1
+priority=5
+
 """
 '''
 

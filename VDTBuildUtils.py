@@ -46,6 +46,16 @@ def unchecked_call(*args, **kwargs):
     return err
 
 
+def backtick(*args, **kwargs):
+    if type(args[0]) == type('') and 'shell' not in kwargs:
+        kwargs['shell'] = True
+
+    kwargs['stdout'] = subprocess.PIPE
+    proc = subprocess.Popen(*args, **kwargs)
+
+    return proc.communicate()[0].strip()
+
+
 def get_rpmrc():
     """A naive way of parsing the output of rpm --showrc to get the variables"""
 

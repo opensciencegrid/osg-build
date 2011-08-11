@@ -7,9 +7,12 @@ WD_UNPACKED_TARBALL = '_upstream_tarball_contents'
 AFS_CACHE_PATH = '/p/vdt/public/html/upstream'
 AFS_CACHE_PREFIX = 'file://' + AFS_CACHE_PATH
 WEB_CACHE_PREFIX = 'http://vdt.cs.wisc.edu/upstream'
-DEFAULT_CONFIG_FILE = os.path.expanduser('~/.vdt-build.ini')
+DEFAULT_CONFIG_FILE = os.path.expanduser("~/.osg-build.ini")
+ALT_DEFAULT_CONFIG_FILE = os.path.expanduser("~/.vdt-build.ini")
 KOJI_TAG = "el5-osg" # TODO this should be configurable
 KOJI_CLIENT_CERT = os.path.expanduser("~/.koji/client.crt") # TODO needs to be synced with vdtkoji.conf
+KOJI_CONF = "osg-koji.conf"
+DATA_DIR = "/usr/share/osg-build"
 
 CMDFILE_TEMPLATE = string.Template("""
 component           = $NAME

@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-from VDTBuildUtils import *
+from osg_build_lib.utils import *
 
 
 RUNAUTH = "/s/std/bin/runauth"

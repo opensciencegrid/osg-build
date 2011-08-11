@@ -8,8 +8,8 @@ import shutil
 import subprocess
 import sys
 
-from VDTBuildUtils import *
-from VDTBuildMockConfig import *
+from osg_build_lib.utils import *
+from osg_build_lib.mock_config import *
 
 
 have_mock = not os.system("which mock &>/dev/null")

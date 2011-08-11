@@ -5,7 +5,7 @@ import string
 import subprocess
 import sys
 
-from VDTBuildUtils import *
+from osg_build_lib.utils import *
 
 
 def get_mock_version():
@@ -111,8 +111,8 @@ baseurl=http://mirror.unl.edu/centos/5/os/$BASEARCH/
 name=groups
 baseurl=http://dev.centos.org/centos/buildsys/5/
 
-[vdt]
-name=vdt
+[osg-development]
+name=osg-development
 baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$BASEARCH/
 priority=98
 
@@ -159,13 +159,13 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
 enabled=1
 priority=10
 
-[koji-el5-osg-development]
+[osg-minefield]
 name=OSG Development Repository on koji-hub
 baseurl=http://koji-hub.batlab.org/mnt/koji/repos/el5-osg-development/latest/$basearch/
 failovermethod=priority
 gpgcheck=0
 enabled=1
-priority=5
+priority=98
 
 """
 '''

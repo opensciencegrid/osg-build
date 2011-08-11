@@ -4,7 +4,17 @@ import subprocess
 
 
 class CalledProcessError(Exception):
-    pass
+    def __init__(self, process, returncode, output=None):
+        self.process = process
+        self.returncode = returncode
+        self.output = output
+
+    def __str__(self):
+        return ("Error in called process(%s): subprocess returned %s" %
+                (str(self.process), str(self.returncode)))
+
+    def __repr__(self):
+        return (repr(self.process), repr(self.returncode), repr(self.output))
 
 
 def checked_call(*args, **kwargs):
@@ -17,9 +27,7 @@ def checked_call(*args, **kwargs):
     """
     err = unchecked_call(*args, **kwargs)
     if err:
-        raise CalledProcessError(
-            "Error in checked_call(%s, %s): subprocess returned %s" % \
-            (str(args), str(kwargs), str(err)))
+        raise CalledProcessError([args, kwargs], err, None)
 
 
 def unchecked_call(*args, **kwargs):
@@ -47,13 +55,41 @@ def unchecked_call(*args, **kwargs):
 
 
 def backtick(*args, **kwargs):
+    """A wrapper around subprocess.Popen() that returns the stdout of the
+    called process. Ignores errors.
+
+    """
+    try:
+        output = checked_backtick(*args, **kwargs)
+    except CalledProcessError, e:
+        output = e.output
+
+    return output
+
+
+def checked_backtick(*args, **kwargs):
+    """A wrapper around subprocess.Popen() that returns the stdout of the
+    called process. Raises CalledProcessError if the process has a nonzero
+    exit code. The output field of the CalledProcessError contains the output
+    in that case.
+
+    """
     if type(args[0]) == type('') and 'shell' not in kwargs:
         kwargs['shell'] = True
 
+    nostrip = kwargs.pop('nostrip', False)
     kwargs['stdout'] = subprocess.PIPE
     proc = subprocess.Popen(*args, **kwargs)
 
-    return proc.communicate()[0].strip()
+    output = proc.communicate()[0]
+    if not nostrip:
+        output = output.strip()
+    err = proc.returncode
+
+    if err:
+        raise CalledProcessError([args, kwargs], err, output)
+    else:
+        return output
 
 
 def get_rpmrc():

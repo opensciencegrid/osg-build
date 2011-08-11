@@ -17,35 +17,50 @@ import urllib2
 from ConfigParser import *
 import traceback
 
-from VDTBuildUtils import *
-from VDTBuildConstants import *
-from VDTBuildMockConfig import *
-
-logging.basicConfig(level=logging.INFO)
+from osg_build_lib.constants import *
+from osg_build_lib.mock_config import *
+from osg_build_lib.utils import *
 
 
 __version__ = '@VERSION@'
 
 
-class VDTBuildError(Exception):
+class Error(Exception):
+    """Base class for exceptions"""
+    def __init__(self, msg, tb=None):
+        self.msg = msg
+        if tb is None:
+            self.traceback = traceback.format_exc()
+
+    def __repr__(self):
+        return repr((self.msg, self.traceback))
+
+    def __str__(self):
+        return str(self.msg)
+
+
+class OSGBuildError(Error):
     pass
 
 
-class VDTPrebuildError(Exception):
-    pass
+class OSGPrebuildError(Error):
+    def __init__(self, msg, tb=None):
+        Error.__init__(self, "Error in pre-build step: " + msg, tb)
 
 
-class VDTPushError(Exception):
-    pass
+class OSGPushError(Error):
+    def __init__(self, msg, tb=None):
+        Error.__init__(self, "Error in push step: " + msg, tb)
 
 
-class UsageError(Exception):
-    pass
+class UsageError(Error):
+    def __init__(self, msg, tb=None):
+        Error.__init__(self, "Usage error: " + msg + "\n", tb)
 
 
 def verify_yum_repos(yum_base):
     if not os.path.isdir(yum_base):
-        raise VDTPushError(("Yum repository base directory '%s' doesn't " +
+        raise OSGPushError(("Yum repository base directory '%s' doesn't " +
                            "exist or is not a directory. If it's not a " +
                            "typo, rerun with --init-repos to create it and " +
                            "its subdirectories.") % yum_base)
@@ -53,7 +68,7 @@ def verify_yum_repos(yum_base):
     for arch in ['i386', 'x86_64', 'src']:
         subdir = os.path.join(yum_base, arch)
         if not os.path.isdir(subdir):
-            raise VDTPushError(
+            raise OSGPushError(
                 ("Yum repository subdirectory '%s' doesn't exist or is not " +
                 "a directory. If it's not a typo, rerun with --init-repos " +
                 "to create it.") % subdir)
@@ -90,7 +105,7 @@ def copy_to_repo(yum_base, rpms):
 
 
 
-class VDTBuild(object):
+class OSGBuild(object):
     def __init__(self, package_dir, opts): 
         self.package_dir = package_dir
 
@@ -157,7 +172,7 @@ class VDTBuild(object):
         err = pipe.returncode
         if err:
             logging.error("Rpmbuild failed. Output follows: " + output)
-            raise VDTPrebuildError(err_msg_prefix +
+            raise OSGPrebuildError(err_msg_prefix +
                                    "Rpmbuild return code %d" % err)
         else:
             match = re.search(r"""(?xms)^Wrote: ([^\n]+.src.rpm)$""", output)
@@ -165,7 +180,7 @@ class VDTBuild(object):
                 srpm = match.group(1).strip()
                 if os.path.isfile(srpm):
                     return srpm
-            raise VDTPrebuildError(err_msg_prefix +
+            raise OSGPrebuildError(err_msg_prefix +
                                    "Unable to find result.")
 
     def process_dot_source(self, sfilename, destdir):
@@ -212,9 +227,9 @@ class VDTBuild(object):
         osg_dir = os.path.join(self.abs_package_dir, 'osg')
         spec_filenames = glob(os.path.join(osg_dir, '*.spec'))
         if not spec_filenames:
-            raise VDTPrebuildError('Cannot find a spec file')
+            raise OSGPrebuildError('Cannot find a spec file')
         if not glob(os.path.join(osg_dir, 'root/*')):
-            raise VDTPrebuildError('osg/root empty')
+            raise OSGPrebuildError('osg/root empty')
 
         try:
             spec_filehandle = open(spec_filenames[0], 'r')
@@ -233,12 +248,12 @@ class VDTBuild(object):
         elif re.search(r'\.tar\.bz2|\.tbz2', tarball_filename):
             tar_cmd = ['tar', 'cjf']
         else:
-            raise VDTPrebuildError(
+            raise OSGPrebuildError(
                 ".tar.gz/.tgz or .tar.bz2/.tbz2 expected for source 0, got: "+
                 tarball_filename)
 
         tarball_path = os.path.join(self.prebuild_dir, tarball_filename)
-        tar_cmd += [tarball_path, "--exclude",  '*/.svn/*']
+        tar_cmd += [tarball_path, "--exclude",  '*/.svn*']
         tar_cmd += glob("*")
 
         logging.info("Creating tarball:\n" + ' '.join(tar_cmd))
@@ -246,7 +261,7 @@ class VDTBuild(object):
         os.chdir(old_dir)
 
         if ret:
-            raise VDTPrebuildError('Making tarball ' + tarball_path +
+            raise OSGPrebuildError('Making tarball ' + tarball_path +
                                    ' failed with return code ' + str(ret))
 
         shutil.copy(spec_filenames[0], self.prebuild_dir)
@@ -295,7 +310,7 @@ class VDTBuild(object):
         for s in other_sources:
             bn = os.path.basename(s)
             if bn in [WD_RESULTS, WD_PREBUILD, WD_UNPACKED,
-                        WD_UNPACKED_TARBALL] or bn.endswith('~'):
+                      WD_UNPACKED_TARBALL] or bn.endswith('~'):
                 logging.debug('Skipping other source ' + s)
                 continue
             logging.debug('Copying other source ' + s)
@@ -345,7 +360,7 @@ class VDTBuild(object):
 
         spec_filenames = glob(os.path.join(self.prebuild_dir, '*.spec'))
         if not spec_filenames:
-            raise VDTPrebuildError("No spec file found in " +
+            raise OSGPrebuildError("No spec file found in " +
                                    self.prebuild_dir)
 
         result_srpm = self.make_srpm(spec_filenames[0])
@@ -372,7 +387,7 @@ class VDTBuild(object):
 
         # TODO Parse rpmbuild output instead of using glob
         if err:
-            raise VDTBuildError('Making RPM failed (command was: '+ " ".join(cmd) +')')
+            raise OSGBuildError('Making RPM failed (command was: '+ " ".join(cmd) +')')
         else:
             rpms = [x for x in glob(os.path.join(self.results_dir, "*.rpm"))
                     if not fnmatch(x, '*.src.rpm')]
@@ -398,7 +413,7 @@ class VDTBuild(object):
             try:
                 mock_gid = grp.getgrnam('mock').gr_gid
             except KeyError:
-                raise VDTBuildError("The mock group does not exist on this" +
+                raise OSGBuildError("The mock group does not exist on this" +
                     " system!")
             if mock_gid not in os.getgroups():
                 print >>sys.stderr, (
@@ -416,8 +431,9 @@ class VDTBuild(object):
                 machine_arch = os.uname()[4]
                 if re.search("i[3-6]86", self.options.get("target_arch", "")):
                     arch = 'i386'
-                elif re.search("x86_64", self.options.get("target_arch", "")) and not re.search("x86_64", machine_arch):
-                    raise VDTBuildError("Can't do 64-bit build on 32-bit machine")
+                elif (re.search("x86_64", self.options.get("target_arch", ""))
+                        and not re.search("x86_64", machine_arch)):
+                    raise OSGBuildError("Can't do 64-bit build on 32-bit machine")
                 else:
                     arch = machine_arch
 
@@ -429,7 +445,7 @@ class VDTBuild(object):
             elif mock_config.startswith('/'):
                 # Absolute path
                 if not os.path.isfile(mock_config + ".cfg"):
-                    raise VDTBuildError("Couldn't find mock config file " +
+                    raise OSGBuildError("Couldn't find mock config file " +
                                         mock_config + ".cfg")
                 cfg_name = os.path.basename(mock_config)
                 cfg_dir = os.path.dirname(mock_config)
@@ -446,7 +462,7 @@ class VDTBuild(object):
                 elif os.path.isfile(os.path.join(cfg_dir2, cfg_name + ".cfg")):
                     cfg_dir = cfg_dir2
                 else:
-                    raise VDTBuildError(
+                    raise OSGBuildError(
                         ("Couldn't find mock config file %s.cfg (looked in " +
                          "%s, %s") % (mock_config, cfg_dir1, cfg_dir2))
 
@@ -460,12 +476,12 @@ class VDTBuild(object):
 
         err = subprocess.call(cmd)
         if err:
-            raise VDTBuildError('Mock build failed (command was: ' +
+            raise OSGBuildError('Mock build failed (command was: ' +
                                 ' '.join(cmd) + ')')
         # Clean up after ourselves.
         if mock_config is not None:
             subprocess.call(["mock", "--configdir", cfg_dir, "-r", cfg_name,
-                            "clean"])
+                             "clean"])
         else:
             subprocess.call(["mock", "clean"])
 
@@ -513,16 +529,12 @@ class VDTBuild(object):
 
         unslurp(os.path.join(nmi_prebuild_dir, "cmdfile"), cmdfile_text)
         # Find the glue files under sys.path and copy them to nmi_prebuild_dir
-        # Files may be in a vdt-build/ subdir.
-        for glue_file in ["remote-task.py", "remote-declare.py",
-                          "platform-post.py", "VDTBuildMockConfig.py",
-                          "VDTBuildUtils.py", "VDTBuildConstants.py"]:
-            dest = os.path.join(glue_dir, glue_file)
-            shutil.copy(find_file(glue_file, sys.path) or
-                        find_file(os.path.join("vdt-build", glue_file),
-                                               sys.path), 
+        dest = os.path.join(glue_dir, "osg_build_lib")
+        shutil.copytree(find_file("osg_build_lib", sys.path),
                         dest)
-            os.chmod(dest, 0755)
+        for f in glob(os.path.join(dest, "*.py")):
+            os.chmod(f, 0755)
+        shutil.rmtree(os.path.join(dest, ".svn"), ignore_errors=True)
 
         unslurp(os.path.join(nmi_prebuild_dir, "glue.scp"), GLUE_SCP_TEXT)
         shutil.copy(srpm, nmi_prebuild_dir)
@@ -550,21 +562,26 @@ class VDTBuild(object):
         # Put the srpm in the results dir so it'll get pushed as well.
         shutil.copy(srpm, self.results_dir)
 
+
     def koji(self):
         if os.system("which koji &>/dev/null"):
-            raise VDTBuildError("Can't find koji!")
+            raise OSGBuildError("Can't find koji!")
         srpm = self.prebuild()
         koji_prebuild_dir = os.path.join(self.working_subdir, '_koji_prebuild')
         safe_makedirs(koji_prebuild_dir)
 
-        conf_file = find_file("vdtkoji.conf", sys.path)
-        conf_file_dest = os.path.join(koji_prebuild_dir, "vdtkoji.conf")
+        conf_file_search_path = sys.path + [DATA_DIR]
+        conf_file = find_file(KOJI_CONF, conf_file_search_path)
+        conf_file_dest = os.path.join(koji_prebuild_dir, KOJI_CONF)
         if conf_file:
             shutil.copy(conf_file, conf_file_dest)
         else:
-            raise VDTBuildError("Can't find vdtkoji.conf")
+            raise OSGBuildError(
+                "Can't find " + KOJI_CONF +
+                "; search path was:\n" + ":".join(conf_file_search_path))
+
         if not os.path.exists(KOJI_CLIENT_CERT):
-            raise VDTBuildError(
+            raise OSGBuildError(
                 "Unable to find your Koji client cert at " + KOJI_CLIENT_CERT)
 
         subject = backtick(
@@ -580,7 +597,7 @@ class VDTBuild(object):
         elif cn_match:
             cn = cn_match.group(1)
         else:
-            raise VDTBuildError(
+            raise OSGBuildError(
                 "Unable to determine your Koji login. Either pass " +
                 "--kojilogin or verify that " +
                 "'openssl x509 -in %s -noout -subject'" % (KOJI_CLIENT_CERT) +
@@ -589,7 +606,6 @@ class VDTBuild(object):
         koji_cmd = ["koji", "--config", conf_file_dest, "--authtype", "ssl"]
 
         # See if the package needs to be added
-        # TODO Error checking
         # TODO KOJI_TAG should be configurable
         found = False
         package_name = os.path.basename(self.abs_package_dir)
@@ -611,7 +627,7 @@ class VDTBuild(object):
         build_subcmd = ["build", KOJI_TAG, srpm]
         if self.options.get('scratch'):
             build_subcmd += ["--scratch"]
-        err = unchecked_call(koji_cmd + build_subcmd)
+        checked_call(koji_cmd + build_subcmd)
 
 
 
@@ -651,7 +667,7 @@ Valid tasks are:
 prebuild     Preprocess the package, create SRPM to be submitted, and stop.
 rpmbuild     Build using rpmbuild(8) on the local machine.
 mock         Build using mock(1) on the local machine.
-batlab       Submit a build to the NMI Build and Test Lab.
+batlab       Submit a build to the NMI Build and Test Lab (deprecated).
 push         Push the given RPMs to the yum repositories only.
 koji         Build using koji
 """)
@@ -685,10 +701,14 @@ koji         Build using koji
         help="The login you use for koji (most likely your CN, e.g." +
         "'Matyas Selmeci 564109')")
     parser.add_option(
+        "--loglevel",
+        help="The level of logging the script should do. " +
+        "Valid values are: DEBUG,INFO,WARNING,ERROR,CRITICAL")
+    parser.add_option(
         "-m", "--mock-config",
         help="The location of the mock config file. " +
         "defaults to AUTO to use an autogenerated file " +
-        "recommended for vdt builds")
+        "recommended for OSG builds")
     parser.add_option(
         "-p", "--push-to-yum", action="store_true",
         help="Copy completed RPMs to a YUM repostiory.")
@@ -700,9 +720,8 @@ koji         Build using koji
         "--nmi-submit-machine",
         help="The machine in the nmi build and test lab to submit builds to")
     parser.add_option(
-        "-q", "--quiet", type=None, action="callback",
-        callback=(lambda *args: logging.basicConfig(level=logging.WARNING)),
-        help="Display less information.")
+        "-q", "--quiet", action="store_const", const="warning", dest="loglevel",
+        help="Display less information. Equivalent to --loglevel=warning")
     parser.add_option(
         "--scratch", action="store_true",
         help="Perform a scratch build (koji task only)")
@@ -711,9 +730,8 @@ koji         Build using koji
         help="The target architecture to build for " +
         "(rpmbuild and mock tasks only)")
     parser.add_option(
-        "-v", "--verbose", type=None, action="callback",
-        callback=(lambda *args: logging.basicConfig(level=logging.DEBUG)),
-        help="Display more information.")
+        "-v", "--verbose", action="store_const", const="debug", dest="loglevel",
+        help="Display more information. Equivalent to --loglevel=debug")
     parser.add_option(
         "-w", "--working-directory",
         help="The base directory to use for temporary files made by the "+
@@ -738,12 +756,33 @@ def main(argv=None):
     try:
         parser, options, args, optnames = parse_cmdline_args(argv)
 
+        if options.loglevel:
+            try:
+                loglevel = int(getattr(logging, options.loglevel.upper()))
+            except (TypeError, AttributeError):
+                raise UsageError("Invalid log level")
+            logging.basicConfig(level=loglevel)
+        else:
+            logging.basicConfig(level=logging.INFO)
+
         if len(args) < 1:
             raise UsageError('Need task!')
+        task = args[0]
+        # Find task that matches what user entered. Allows user to enter first
+        # few characters if task is unambiguous.
+        valid_tasks = ['batlab', 'prebuild', 'koji', 'mock', 'push', 'rpmbuild']
+
+        matching_tasks = [x for x in valid_tasks if x[0:len(task)] == task]
+
+        if len(matching_tasks) > 1:
+            raise UsageError('Ambiguous task')
+        elif not matching_tasks:
+            raise UsageError('No valid task')
+        else:
+            real_task = matching_tasks[0]
+
         if len(args) < 2:
             raise UsageError('Need packages!')
-
-        task = args[0]
 
         # Defaults
         buildopts = {
@@ -761,7 +800,12 @@ def main(argv=None):
         if options.config_file:
             cfg_file = options.config_file
         else:
-            cfg_file = DEFAULT_CONFIG_FILE
+            if os.path.exists(DEFAULT_CONFIG_FILE):
+                cfg_file = DEFAULT_CONFIG_FILE
+            else:
+                logging.debug("Didn't find default config at %s",
+                              DEFAULT_CONFIG_FILE)
+                cfg_file = ALT_DEFAULT_CONFIG_FILE
 
         if os.path.exists(cfg_file):
             cfg = ConfigParser()
@@ -783,7 +827,7 @@ def main(argv=None):
         # Special case for working_directory being TEMP
         if buildopts.get('working_directory') == 'TEMP':
             buildopts['working_directory'] = (
-                tempfile.mkdtemp(prefix='vdt-build-'))
+                tempfile.mkdtemp(prefix='osg-build-'))
             logging.debug('Working directory is %s',
                           buildopts['working_directory'])
 
@@ -807,19 +851,6 @@ def main(argv=None):
 
 
 
-        # Find task that matches what user entered. Allows user to enter first
-        # few characters if task is unambiguous.
-        valid_tasks = ['batlab', 'prebuild', 'koji', 'mock', 'push', 'rpmbuild']
-
-        matching_tasks = [x for x in valid_tasks if x[0:len(task)] == task]
-
-        if len(matching_tasks) > 1:
-            raise UsageError('Ambiguous task')
-        elif not matching_tasks:
-            raise UsageError('No valid task')
-        else:
-            real_task = matching_tasks[0]
-
         if real_task == 'push':
             push_task(args[1:], buildopts.get('yum_base'))
         else:
@@ -836,7 +867,7 @@ def main(argv=None):
             for p in package_dirs:
                 if not os.path.isdir(p):
                     raise UsageError(p + " isn't a package dir!")
-                builder = VDTBuild(p, buildopts)
+                builder = OSGBuild(p, buildopts)
                 if real_task == 'prebuild':
                     builder.prebuild()
                 elif real_task == 'rpmbuild':
@@ -844,25 +875,36 @@ def main(argv=None):
                 elif real_task == 'mock':
                     builder.mock()
                 elif real_task == 'batlab':
+                    logging.warning("The batlab task has been deprecated in" +
+                                    " favor of the koji task.")
                     builder.batlab()
                 elif real_task == 'koji':
                     builder.koji()
 
     except UsageError, e:
-        print >>sys.stderr, "Usage error: " + str(e) + "\n"
+        print >>sys.stderr, str(e)
         parser.print_help()
         return 2
     except SystemExit, e:
         return e.code
     except KeyboardInterrupt:
-        print >>sys.stderr, "Interrupted\n"
+        print >>sys.stderr, ""
+        print >>sys.stderr, "-" * 79
+        print >>sys.stderr, "Interrupted"
+        print >>sys.stderr, "-" * 79
         return 3
+    except Error, e:
+        print >>sys.stderr, "-" * 79
+        print >>sys.stderr, "\t" + str(e)
+        print >>sys.stderr, "-" * 79
+        # TODO: If debugging, print traceback
+        return 4
     except Exception, e:
-        print >>sys.stderr, "-" * 79 + "\n"
-        print >>sys.stderr, "\tAn exception occurred:\n"
-        print >>sys.stderr, "\t" + str(e) + "\n"
-        print >>sys.stderr, "-" * 79 + "\n"
-        print >>sys.stderr, "Full traceback follows:\n"
+        print >>sys.stderr, "-" * 79
+        print >>sys.stderr, "\tAn exception occurred:"
+        print >>sys.stderr, "\t" + str(e)
+        print >>sys.stderr, "-" * 79
+        print >>sys.stderr, "Full traceback follows:"
         traceback.print_exc()
         return 1
 

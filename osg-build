@@ -26,7 +26,10 @@ __version__ = '@VERSION@'
 
 
 class Error(Exception):
-    """Base class for exceptions"""
+    """Base class for expected exceptions. Caught in main(); may include a
+    traceback but will only print it if debugging is enabled.
+    
+    """
     def __init__(self, msg, tb=None):
         self.msg = msg
         if tb is None:
@@ -40,7 +43,8 @@ class Error(Exception):
 
 
 class OSGBuildError(Error):
-    pass
+    def __init__(self, msg, tb=None):
+        Error.__init__(self, "Error in build step: " + msg, tb)
 
 
 class OSGPrebuildError(Error):
@@ -59,22 +63,30 @@ class UsageError(Error):
 
 
 def verify_yum_repos(yum_base):
+    """Make sure the directory given in yum_base contains the appropriate
+    yum repos, namely the subdirectories 'i386, 'x86_64', and 'src'.
+
+    """
     if not os.path.isdir(yum_base):
-        raise OSGPushError(("Yum repository base directory '%s' doesn't " +
-                           "exist or is not a directory. If it's not a " +
-                           "typo, rerun with --init-repos to create it and " +
-                           "its subdirectories.") % yum_base)
+        raise Error(("Yum repository base directory '%s' doesn't " +
+                     "exist or is not a directory. If it's not a " +
+                     "typo, rerun with --init-repos to create it and " +
+                     "its subdirectories.") % yum_base)
 
     for arch in ['i386', 'x86_64', 'src']:
         subdir = os.path.join(yum_base, arch)
         if not os.path.isdir(subdir):
-            raise OSGPushError(
+            raise Error(
                 ("Yum repository subdirectory '%s' doesn't exist or is not " +
                 "a directory. If it's not a typo, rerun with --init-repos " +
                 "to create it.") % subdir)
 
 
 def copy_to_repo(yum_base, rpms):
+    """Copy a set of RPMs to to the yum repos under yum_base and rebuild the
+    repos. noarch RPMs are copied to both of the arch-specific repos.
+
+    """
     if not yum_base:
         logging.error("Destination yum repo not given.")
         return
@@ -160,28 +172,31 @@ class OSGBuild(object):
         return ['--define=' + d for d in defines]
 
     def make_srpm(self, spec_fn):
-        cmd = "rpmbuild -bs --nodeps".split(' ')
+        """Make an SRPM from a spec function. Raise OSGPrebuildError on
+        failure.
+
+        """
+        cmd = ["rpmbuild", "-bs", "--nodeps"]
         cmd += self.get_rpmbuild_defines(prebuild=True)
         cmd += [spec_fn]
         err_msg_prefix = (("Error making SRPM from %s\n" +
                            "Command used was: %s\n") %
                            (spec_fn, " ".join(cmd)))
-        pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT)
-        output = pipe.communicate()[0]
-        err = pipe.returncode
-        if err:
-            logging.error("Rpmbuild failed. Output follows: " + output)
+        try:
+            output = checked_backtick(cmd, nostrip=True,
+                                      stderr=subprocess.STDOUT)
+        except CalledProcessError, e:
+            logging.error("Rpmbuild failed. Output follows: " + e.output)
             raise OSGPrebuildError(err_msg_prefix +
-                                   "Rpmbuild return code %d" % err)
-        else:
-            match = re.search(r"""(?xms)^Wrote: ([^\n]+.src.rpm)$""", output)
-            if match:
-                srpm = match.group(1).strip()
-                if os.path.isfile(srpm):
-                    return srpm
-            raise OSGPrebuildError(err_msg_prefix +
-                                   "Unable to find result.")
+                                   "Rpmbuild return code %d" % e.returncode)
+
+        match = re.search(r"(?ms)^Wrote: ([^\n]+.src.rpm)$", output)
+        if match:
+            srpm = match.group(1).strip()
+            if os.path.isfile(srpm):
+                return srpm
+        raise OSGPrebuildError(err_msg_prefix +
+                               "Unable to find resulting SRPM.")
 
     def process_dot_source(self, sfilename, destdir):
         """Read a .source file, fetch any files mentioned in it from the
@@ -368,6 +383,34 @@ class OSGBuild(object):
             logging.info("Files have been prepared in %s.", self.prebuild_dir)
             return os.path.abspath(result_srpm)
 
+    def prepare(self):
+        """Runs rpmbuild -bp"""
+        srpm = self.prebuild()
+        safe_makedirs(self.results_dir)
+        shutil.copy(srpm, self.results_dir)
+        for d in ['BUILD', 'tmp']:
+            safe_makedirs(os.path.join(self.results_dir, d))
+        cmd = ["rpm"]
+        cmd += self.get_rpmbuild_defines(prebuild=False)
+        cmd += ["-i", srpm]
+        try:
+            checked_call(cmd)
+        except CalledProcessError:
+            raise Error("Unable to unpack SRPM: error while running rpm -i")
+
+        cmd2 = ["rpmbuild"]
+        cmd2 += self.get_rpmbuild_defines(prebuild=False)
+        cmd2 += ["-bp"] + glob(os.path.join(self.results_dir, "*.spec"))
+        if self.options.has_key('target_arch'):
+            cmd2 += ["--target", self.options['target_arch']]
+        try:
+            checked_call(cmd2)
+        except CalledProcessError:
+            raise Error(
+                "Unable to prepare the package: error running rpmbuild -bp")
+        logging.info("Files prepared in: " +
+                     os.path.join(self.results_dir, "BUILD"))
+
     def rpmbuild(self):
         """Build the package using rpmbuild on the local machine.
         Push results to yum if 'push_to_yum' is true.
@@ -416,16 +459,13 @@ class OSGBuild(object):
                 raise OSGBuildError("The mock group does not exist on this" +
                     " system!")
             if mock_gid not in os.getgroups():
-                print >>sys.stderr, (
+                raise OSGBuildError(
                     "You are not able to do a mock build on this " +
-                    "machine because you are not in the mock group.")
-                print >>sys.stderr, (
+                    "machine because you are not in the mock group.\n" +
                     "/etc/group must be edited and your username " +
-                    "must be added to the mock group.")
-                print >>sys.stderr, (
+                    "must be added to the mock group.\n" +
                     "You might need to log out and log in for the " +
                     "changes to take effect")
-                sys.exit(1)
 
             if mock_config == "AUTO":
                 machine_arch = os.uname()[4]
@@ -495,6 +535,13 @@ class OSGBuild(object):
             copy_to_repo(self.options['yum_base'], rpms + [srpm])
 
     def batlab(self):
+        """Upload a build to the nmi submit machine and submit it to the
+        batlab. Push to yum if push_to_yum is true. Now deprecated in
+        favor of the koji task.
+        
+        """
+        logging.warning("The batlab task is deprecated. " +
+                        "Use the koji task instead.")
         srpm = self.prebuild()
         safe_makedirs(self.results_dir)
         nmi_prebuild_dir = os.path.join(self.working_subdir, '_nmi_prebuild')
@@ -564,6 +611,11 @@ class OSGBuild(object):
 
 
     def koji(self):
+        """koji task. Submit a build to koji; add the package first if
+        necessary. Get the koji login from the CN in the user's koji client
+        cert, or --kojilogin if provided. Raise OSGBuildError on failure.
+
+        """
         if os.system("which koji &>/dev/null"):
             raise OSGBuildError("Can't find koji!")
         srpm = self.prebuild()
@@ -618,6 +670,7 @@ class OSGBuild(object):
                     found = True
             except IndexError:
                 pass
+
         if not found:
             unchecked_call(
                 koji_cmd +
@@ -627,18 +680,25 @@ class OSGBuild(object):
         build_subcmd = ["build", KOJI_TAG, srpm]
         if self.options.get('scratch'):
             build_subcmd += ["--scratch"]
-        checked_call(koji_cmd + build_subcmd)
+        err = unchecked_call(koji_cmd + build_subcmd)
+        if err:
+            raise OSGBuildError("koji build failed with exit code " + str(err))
+            
 
 
 
 
 
 def init_repos(base_repo):
-    for repo in ['i386', 'noarch', 'x86_64', 'src']:
+    for repo in ['i386', 'x86_64', 'src']:
         safe_makedirs(os.path.join(base_repo, repo))
 
 
 def push_task(rpms, yum_base):
+    """Copy rpms, either given directly or via recursing into subdirectories,
+    to the yum repos under yum_base.
+
+    """
     # Push should probably be a separate script entirely.
     if not yum_base:
         raise UsageError(
@@ -659,12 +719,20 @@ def push_task(rpms, yum_base):
     
 
 def parse_cmdline_args(argv):
+    """Parse the arguments given on the command line. Return a tuple containing
+    parser:     the OptionParser, so main() can print help on a UsageError
+    options:    the options object, containing the keyword arguments
+    args:       a list containing the positional arguments left over
+    optnames:   a list of the option names (valid attributes of 'options')
+
+    """
     parser = OptionParser("""
    %prog TASK PACKAGE1 <PACKAGE2..n> [options]
 or %prog push RPM1 <RPM2..n> [options]
 
 Valid tasks are:
 prebuild     Preprocess the package, create SRPM to be submitted, and stop.
+prepare      Use rpmbuild -bp to unpack and patch the package.
 rpmbuild     Build using rpmbuild(8) on the local machine.
 mock         Build using mock(1) on the local machine.
 batlab       Submit a build to the NMI Build and Test Lab (deprecated).
@@ -749,8 +817,108 @@ koji         Build using koji
     return (parser, options, args, optnames)
 
 
+def get_task(args):
+    """Return the task the user specified in the first positional argument,
+    if it is a valid task. Allow the user to enter only the first few
+    characters if the task is unambiguous. Raise UsageError if task is
+    unspecified, invalid, or ambiguous.
+
+    """
+    if len(args) < 1:
+        raise UsageError('Need task!')
+    task = args[0]
+    valid_tasks = ['batlab', 'prepare', 'prebuild', 'koji', 'mock', 'push',
+                   'rpmbuild']
+
+    matching_tasks = [x for x in valid_tasks if x[0:len(task)] == task]
+
+    if len(matching_tasks) > 1:
+        raise UsageError('Ambiguous task. Matching tasks are:' +
+                         ", ".join(matching_tasks))
+    elif not matching_tasks:
+        raise UsageError('No valid task')
+    else:
+        real_task = matching_tasks[0]
+
+    return real_task
+
+
+def get_buildopts(options, args, task, optnames):
+    """Return a dict of the build options to use, based on the config file and
+    command-line arguments.
+
+    """
+    buildopts = {
+        'cache_prefix': 'AUTO',
+        'distro_tag': 'osg',
+        'full_extract': False,
+        'init_repos': False,
+        'mock_config': 'AUTO',
+        'nmi_submit_machine': 'submit-1.batlab.org',
+        'scratch': False,
+        'working_directory': '.',
+        }
+
+    # Read the config file
+    if options.config_file:
+        cfg_file = options.config_file
+    else:
+        if os.path.exists(DEFAULT_CONFIG_FILE):
+            cfg_file = DEFAULT_CONFIG_FILE
+        else:
+            logging.debug("Didn't find default config at %s",
+                          DEFAULT_CONFIG_FILE)
+            cfg_file = ALT_DEFAULT_CONFIG_FILE
+
+    if os.path.exists(cfg_file):
+        cfg = ConfigParser()
+        cfg.read(cfg_file)
+        buildopts.update(cfg.items('options'))
+        logging.debug("Read default config from %s", cfg_file)
+    else:
+        logging.debug("Config file not found at %s", cfg_file)
+
+    # Overrides from command line
+    for optname in optnames:
+        optval = getattr(options, optname, None)
+        if optval is not None:
+            buildopts[optname] = optval
+    if options.yum_base:
+        buildopts['yum_base'] = options.yum_base
+        buildopts['push_to_yum'] = True
+
+    # Special case for working_directory being TEMP
+    if buildopts.get('working_directory') == 'TEMP':
+        buildopts['working_directory'] = (
+            tempfile.mkdtemp(prefix='osg-build-'))
+        logging.debug('Working directory is %s',
+                        buildopts['working_directory'])
+
+    # Special case for cache_prefix being AFS or VDT
+    if buildopts.get('cache_prefix') == 'AFS':
+        buildopts['cache_prefix'] = AFS_CACHE_PREFIX
+    elif buildopts.get('cache_prefix') == 'VDT':
+        buildopts['cache_prefix'] = WEB_CACHE_PREFIX
+    elif buildopts.get('cache_prefix') == 'AUTO':
+        if os.path.exists(AFS_CACHE_PATH):
+            buildopts['cache_prefix'] = AFS_CACHE_PREFIX
+        else:
+            buildopts['cache_prefix'] = WEB_CACHE_PREFIX
+
+    # If push_to_yum not explicitly specified, set it to True for mock/batlab
+    if buildopts.get('push_to_yum') is not None:
+        if task == 'mock' or task == 'batlab':
+            buildopts['push_to_yum'] = True
+        else:
+            buildopts['push_to_yum'] = False
+
+    return buildopts
+
+
 
 def main(argv=None):
+    """Main function."""
+    
     if argv is None: argv=sys.argv
 
     try:
@@ -761,86 +929,14 @@ def main(argv=None):
                 loglevel = int(getattr(logging, options.loglevel.upper()))
             except (TypeError, AttributeError):
                 raise UsageError("Invalid log level")
-            logging.basicConfig(level=loglevel)
         else:
-            logging.basicConfig(level=logging.INFO)
+            loglevel = logging.INFO
+        logging.basicConfig(format="%(levelname)s:osg-build:%(message)s",
+                            level=loglevel)
 
-        if len(args) < 1:
-            raise UsageError('Need task!')
-        task = args[0]
-        # Find task that matches what user entered. Allows user to enter first
-        # few characters if task is unambiguous.
-        valid_tasks = ['batlab', 'prebuild', 'koji', 'mock', 'push', 'rpmbuild']
+        task = get_task(args)
 
-        matching_tasks = [x for x in valid_tasks if x[0:len(task)] == task]
-
-        if len(matching_tasks) > 1:
-            raise UsageError('Ambiguous task')
-        elif not matching_tasks:
-            raise UsageError('No valid task')
-        else:
-            real_task = matching_tasks[0]
-
-        if len(args) < 2:
-            raise UsageError('Need packages!')
-
-        # Defaults
-        buildopts = {
-            'cache_prefix': 'AUTO',
-            'distro_tag': 'osg',
-            'full_extract': False,
-            'init_repos': False,
-            'mock_config': 'AUTO',
-            'nmi_submit_machine': 'submit-1.batlab.org',
-            'scratch': False,
-            'working_directory': '.',
-            }
-
-        # Read the config file
-        if options.config_file:
-            cfg_file = options.config_file
-        else:
-            if os.path.exists(DEFAULT_CONFIG_FILE):
-                cfg_file = DEFAULT_CONFIG_FILE
-            else:
-                logging.debug("Didn't find default config at %s",
-                              DEFAULT_CONFIG_FILE)
-                cfg_file = ALT_DEFAULT_CONFIG_FILE
-
-        if os.path.exists(cfg_file):
-            cfg = ConfigParser()
-            cfg.read(cfg_file)
-            buildopts.update(cfg.items('options'))
-            logging.debug("Read default config from %s", cfg_file)
-        else:
-            logging.debug("Config file not found at %s", cfg_file)
-
-        # Overrides from command line
-        for optname in optnames:
-            optval = getattr(options, optname, None)
-            if optval is not None:
-                buildopts[optname] = optval
-        if options.yum_base:
-            buildopts['yum_base'] = options.yum_base
-            buildopts['push_to_yum'] = True
-
-        # Special case for working_directory being TEMP
-        if buildopts.get('working_directory') == 'TEMP':
-            buildopts['working_directory'] = (
-                tempfile.mkdtemp(prefix='osg-build-'))
-            logging.debug('Working directory is %s',
-                          buildopts['working_directory'])
-
-        # Special case for cache_prefix being AFS or VDT
-        if buildopts.get('cache_prefix') == 'AFS':
-            buildopts['cache_prefix'] = AFS_CACHE_PREFIX
-        elif buildopts.get('cache_prefix') == 'VDT':
-            buildopts['cache_prefix'] = WEB_CACHE_PREFIX
-        elif buildopts.get('cache_prefix') == 'AUTO':
-            if os.path.exists(AFS_CACHE_PATH):
-                buildopts['cache_prefix'] = AFS_CACHE_PREFIX
-            else:
-                buildopts['cache_prefix'] = WEB_CACHE_PREFIX
+        buildopts = get_buildopts(options, args, task, optnames)
 
         if options.init_repos:
             if not buildopts.get('yum_base'):
@@ -849,18 +945,16 @@ def main(argv=None):
             else:
                 init_repos(buildopts['yum_base'])
 
+        if task == 'push':
+            if len(args) < 2:
+                raise UsageError('Need RPMs for push task!')
 
-
-        if real_task == 'push':
             push_task(args[1:], buildopts.get('yum_base'))
         else:
-            package_dirs = args[1:]
-            if buildopts.get('push_to_yum') is not None:
-                if real_task == 'mock' or real_task == 'batlab':
-                    buildopts['push_to_yum'] = True
-                else:
-                    buildopts['push_to_yum'] = False
+            if len(args) < 2:
+                raise UsageError('Need package directories for this task!')
 
+            package_dirs = args[1:]
             if buildopts.get('push_to_yum') and buildopts.get('yum_base'):
                 verify_yum_repos(buildopts['yum_base'])
                     
@@ -868,22 +962,11 @@ def main(argv=None):
                 if not os.path.isdir(p):
                     raise UsageError(p + " isn't a package dir!")
                 builder = OSGBuild(p, buildopts)
-                if real_task == 'prebuild':
-                    builder.prebuild()
-                elif real_task == 'rpmbuild':
-                    builder.rpmbuild()
-                elif real_task == 'mock':
-                    builder.mock()
-                elif real_task == 'batlab':
-                    logging.warning("The batlab task has been deprecated in" +
-                                    " favor of the koji task.")
-                    builder.batlab()
-                elif real_task == 'koji':
-                    builder.koji()
+                getattr(builder, task)()
 
     except UsageError, e:
-        print >>sys.stderr, str(e)
         parser.print_help()
+        print >>sys.stderr, str(e)
         return 2
     except SystemExit, e:
         return e.code
@@ -897,7 +980,8 @@ def main(argv=None):
         print >>sys.stderr, "-" * 79
         print >>sys.stderr, "\t" + str(e)
         print >>sys.stderr, "-" * 79
-        # TODO: If debugging, print traceback
+        logging.debug("Full traceback follows:")
+        logging.debug(e.traceback)
         return 4
     except Exception, e:
         print >>sys.stderr, "-" * 79

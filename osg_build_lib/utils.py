@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import subprocess
@@ -20,7 +21,7 @@ class CalledProcessError(Exception):
 def checked_call(*args, **kwargs):
     """A wrapper around subprocess.call() that raises CalledProcessError on
     a nonzero return code. Similar to subprocess.check_call() in 2.7+, but
-    prints the command to run and the result unless 'quiet=True' is passed.
+    prints the command to run and the result if loglevel is DEBUG.
     Also, if the first argument is a string and shell=False isn't passed,
     then shell=True is passed to subprocess.call().
 
@@ -32,25 +33,22 @@ def checked_call(*args, **kwargs):
 
 def unchecked_call(*args, **kwargs):
     """A wrapper around subprocess.call() with the same semantics as checked_call: 
-    Prints the command to run and the result unless 'quiet=True' is passed.
+    Prints the command to run and the result if loglevel is DEBUG.
     Also, if the first argument is a string and shell=False isn't passed,
     then shell=True is passed to subprocess.call().
 
     """
-    quiet = kwargs.pop('quiet', False)
-    if not quiet:
-        if type(args[0]) == type(''):
-            cmd = args[0]
-        elif type(args[0]) == type([]) or type(args[0]) == type(()):
-            cmd = "'" + "' '".join(args[0]) + "'"
-        print "Running " + cmd
+    if type(args[0]) == type(''):
+        cmd = args[0]
+    elif type(args[0]) == type([]) or type(args[0]) == type(()):
+        cmd = "'" + "' '".join(args[0]) + "'"
+    logging.debug("Running " + cmd)
 
     if type(args[0]) == type('') and 'shell' not in kwargs:
         kwargs['shell'] = True
 
     err = subprocess.call(*args, **kwargs)
-    if not quiet:
-        print "Subprocess returned " + str(err)
+    logging.debug("Subprocess returned " + str(err))
     return err
 
 

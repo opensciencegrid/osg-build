@@ -658,7 +658,6 @@ class OSGBuild(object):
         koji_cmd = ["koji", "--config", conf_file_dest, "--authtype", "ssl"]
 
         # See if the package needs to be added
-        # TODO KOJI_TAG should be configurable
         found = False
         package_name = os.path.basename(self.abs_package_dir)
         list_pkgs = backtick(koji_cmd +
@@ -666,7 +665,7 @@ class OSGBuild(object):
         for line in list_pkgs.split("\n"):
             fields = re.split(r"\s*", line, 2)
             try:
-                if fields[1] == KOJI_TAG:
+                if fields[1] == self.options['koji_tag']:
                     found = True
             except IndexError:
                 pass
@@ -674,10 +673,10 @@ class OSGBuild(object):
         if not found:
             unchecked_call(
                 koji_cmd +
-                ["add-pkg", KOJI_TAG,
+                ["add-pkg", self.options['koji_tag'],
                  os.path.basename(self.abs_package_dir), "--owner",
                  cn])
-        build_subcmd = ["build", KOJI_TAG, srpm]
+        build_subcmd = ["build", self.options['koji_target'], srpm]
         if self.options.get('scratch'):
             build_subcmd += ["--scratch"]
         err = unchecked_call(koji_cmd + build_subcmd)
@@ -765,9 +764,17 @@ koji         Build using koji
         help="Create directories under 'yum_base' to hold the YUM " +
         "repositories in.")
     parser.add_option(
-        "-k", "--kojilogin",
+        "-k", "--kojilogin", "--koji-login", dest="kojilogin",
         help="The login you use for koji (most likely your CN, e.g." +
         "'Matyas Selmeci 564109')")
+    parser.add_option(
+        "--koji-target",
+        help="The koji target to use for building. Default: " +
+        DEFAULT_KOJI_TARGET)
+    parser.add_option(
+        "--koji-tag",
+        help="The koji tag to add packages to. Default: " +
+        DEFAULT_KOJI_TAG)
     parser.add_option(
         "--loglevel",
         help="The level of logging the script should do. " +
@@ -853,6 +860,8 @@ def get_buildopts(options, args, task, optnames):
         'distro_tag': 'osg',
         'full_extract': False,
         'init_repos': False,
+        'koji_tag': DEFAULT_KOJI_TAG,
+        'koji_target': DEFAULT_KOJI_TARGET,
         'mock_config': 'AUTO',
         'nmi_submit_machine': 'submit-1.batlab.org',
         'scratch': False,

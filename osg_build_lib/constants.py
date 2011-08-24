@@ -9,8 +9,10 @@ AFS_CACHE_PREFIX = 'file://' + AFS_CACHE_PATH
 WEB_CACHE_PREFIX = 'http://vdt.cs.wisc.edu/upstream'
 DEFAULT_CONFIG_FILE = os.path.expanduser("~/.osg-build.ini")
 ALT_DEFAULT_CONFIG_FILE = os.path.expanduser("~/.vdt-build.ini")
-KOJI_TAG = "el5-osg" # TODO this should be configurable
-KOJI_CLIENT_CERT = os.path.expanduser("~/.koji/client.crt") # TODO needs to be synced with vdtkoji.conf
+DEFAULT_KOJI_TAG = "el5-osg"
+DEFAULT_KOJI_TARGET = "el5-osg"
+
+KOJI_CLIENT_CERT = os.path.expanduser("~/.koji/client.crt") # TODO needs to be synced with osg-koji.conf
 KOJI_CONF = "osg-koji.conf"
 DATA_DIR = "/usr/share/osg-build"
 

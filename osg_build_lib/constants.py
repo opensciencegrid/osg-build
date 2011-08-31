@@ -13,15 +13,6 @@ DEFAULT_KOJI_TAG = "el5-osg"
 DEFAULT_KOJI_TARGET = "el5-osg"
 
 KOJI_CLIENT_CERT = os.path.expanduser("~/.koji/client.crt") # TODO needs to be synced with osg-koji.conf
-KOJI_SERVER_CA = os.path.expanduser("~/.koji/ca-bundle.crt") # TODO needs to be synced with osg-koji.conf
-
-KOJI_ESNET_CA_HASH = "d1b603c3"
-KOJI_ESNET_CA_SUBJECT = "subject= /DC=net/DC=ES/O=ESnet/OU=Certificate Authorities/CN=ESnet Root CA 1"
-KOJI_DOEGRIDS_CA_HASH = "1c3f2ca8"
-KOJI_DOEGRIDS_CA_SUBJECT = "subject= /DC=org/DC=DOEGrids/OU=Certificate Authorities/CN=DOEGrids CA 1"
-
-GRID_CERTS_DIR = "/etc/grid-security/certificates"
-
 KOJI_CONF = "osg-koji.conf"
 DATA_DIR = "/usr/share/osg-build"
 

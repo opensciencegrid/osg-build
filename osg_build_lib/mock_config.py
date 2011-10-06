@@ -113,7 +113,8 @@ baseurl=http://dev.centos.org/centos/buildsys/5/
 
 [osg-development]
 name=osg-development
-baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$BASEARCH/
+#baseurl=http://vdt.cs.wisc.edu/repos/3.0/el5/development/$BASEARCH/
+mirrorlist=http://repo.grid.iu.edu/mirror/osg-development/$BASEARCH
 priority=98
 
 [epel]

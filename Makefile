@@ -1,4 +1,4 @@
-VERSION = 0.0.20
+VERSION = 0.0.21
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osg_build_lib
@@ -6,6 +6,7 @@ DATAFILES = osg-koji.conf
 INIFILE = sample-osg-build.ini
 MAIN_SCRIPT = $(NAME)
 MAIN_SCRIPT_SYMLINK = vdt-build
+EXTRA_SCRIPTS = osg-import-srpm rpm-ripper
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 BINDIR = /usr/bin
 DOCDIR = /usr/share/doc/$(NAME)
@@ -31,10 +32,11 @@ install:
 
 	mkdir -p $(DESTDIR)/$(DOCDIR)
 	install -p -m 644 $(INIFILE) $(DESTDIR)/$(DOCDIR)/$(INIFILE)
-	    
+
 	mkdir -p $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)
 	ln -s $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)/$(MAIN_SCRIPT_SYMLINK)
+	install -p -m 755 $(EXTRA_SCRIPTS) $(DESTDIR)/$(BINDIR)
 
 	mkdir -p $(DESTDIR)/$(DATADIR)
 	install -p -m 644 $(DATAFILES) $(DESTDIR)/$(DATADIR)
@@ -43,7 +45,7 @@ install:
 
 dist:
 	mkdir -p $(NAME_VERSION)
-	cp -rp $(PYDIR) $(MAIN_SCRIPT) $(DATAFILES) Makefile $(INIFILE) $(NAME_VERSION)/
+	cp -rp $(PYDIR) $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(DATAFILES) Makefile $(INIFILE) $(NAME_VERSION)/
 	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]'
 
 afsdist: dist
@@ -61,4 +63,4 @@ release: dist
 	mv -f $(NAME_VERSION).tar.gz $(DESTDIR)/$(NAME)/$(VERSION)/
 	rm -rf $(NAME_VERSION)
 
-	
+

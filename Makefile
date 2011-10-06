@@ -46,7 +46,7 @@ install:
 dist:
 	mkdir -p $(NAME_VERSION)
 	cp -rp $(PYDIR) $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(DATAFILES) Makefile $(INIFILE) $(NAME_VERSION)/
-	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]'
+	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]' --exclude='*/*~'
 
 afsdist: dist
 	mkdir -p $(AFS_SOFTWARE_DIR)/$(VERSION)

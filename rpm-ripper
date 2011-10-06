@@ -1,0 +1,411 @@
+#!/usr/bin/env python
+# rpm-ripper
+# Create a specfile and tarball from a binary RPM with enough information to
+# allow us to rebuild the RPM.
+
+# TODO: Trigger script handling?
+from datetime import date
+import getpass
+import glob
+import re
+import os
+import shutil
+import subprocess
+import sys
+
+
+# A list of standard directories; packages should not own these.
+STANDARD_DIRS = [
+    '/',
+    '/bin',
+    '/dev',
+    '/etc',
+    '/etc/alternatives',
+    '/etc/cron.d',
+    '/etc/cron.daily',
+    '/etc/cron.hourly',
+    '/etc/cron.monthly',
+    '/etc/cron.weekly',
+    '/etc/default',
+    '/etc/init.d',
+    '/etc/ld.so.conf.d',
+    '/etc/profile.d',
+    '/etc/rc.d',
+    '/etc/rc0.d',
+    '/etc/rc1.d',
+    '/etc/rc2.d',
+    '/etc/rc3.d',
+    '/etc/rc4.d',
+    '/etc/rc5.d',
+    '/etc/rc6.d',
+    '/etc/sysconfig',
+    '/home',
+    '/lib',
+    '/lib64',
+    '/mnt',
+    '/opt',
+    '/proc',
+    '/sbin',
+    '/tmp',
+    '/var',
+    '/var/lib',
+    '/var/local',
+    '/var/lock',
+    '/var/log',
+    '/var/opt',
+    '/var/run',
+    '/var/tmp',
+    '/usr',
+    '/usr/X11R6',
+    '/usr/bin',
+    '/usr/etc',
+    '/usr/include',
+    '/usr/lib',
+    '/usr/lib64',
+    '/usr/libexec',
+    '/usr/local',
+    '/usr/local/bin',
+    '/usr/local/etc',
+    '/usr/local/include',
+    '/usr/local/lib',
+    '/usr/local/lib64',
+    '/usr/local/libexec',
+    '/usr/local/sbin',
+    '/usr/local/share',
+    '/usr/local/src',
+    '/usr/man',
+    '/usr/man/man1',
+    '/usr/man/man2',
+    '/usr/man/man3',
+    '/usr/man/man4',
+    '/usr/man/man5',
+    '/usr/man/man6',
+    '/usr/man/man7',
+    '/usr/man/man8',
+    '/usr/sbin',
+    '/usr/share',
+    '/usr/share/doc',
+    '/usr/src',
+    '/usr/tmp']
+
+# from rpmlib.h
+RPM_FFLAGS_BITS = {
+        1 << 1: '%doc',
+        1 << 2: '%donotuse',
+        1 << 6: '%ghost',
+        1 << 7: '%license',
+        1 << 8: '%readme',
+        1 << 9: '%exclude',
+        1 << 11: '%pubkey',
+        1 << 12: '%policy',
+    }
+RPM_FFLAGS_CONFIG = 1 << 0
+RPM_FFLAGS_CONFIG_BITS = {
+        1 << 3: 'missingok',
+        1 << 4: 'noreplace',
+    }
+# from rpmcli.h
+RPM_VFLAGS_BITS = {
+        1 << 0: 'md5',
+        1 << 1: 'size',
+        1 << 2: 'link',
+        1 << 3: 'user',
+        1 << 4: 'group',
+        1 << 5: 'mtime',
+        1 << 6: 'mode',
+        1 << 7: 'rdev',
+    }
+
+class CalledProcessError(Exception):
+    def __init__(self, process, returncode, output=None):
+        self.process = process
+        self.returncode = returncode
+        self.output = output
+
+    def __str__(self):
+        return ("Error in called process(%s): subprocess returned %s" %
+                (str(self.process), str(self.returncode)))
+
+    def __repr__(self):
+        return (repr(self.process), repr(self.returncode), repr(self.output))
+
+
+
+def checked_backtick(*args, **kwargs):
+    """A wrapper around subprocess.Popen() that returns the stdout of the
+    called process. Raises CalledProcessError if the process has a nonzero
+    exit code. The output field of the CalledProcessError contains the output
+    in that case.
+
+    """
+    if type(args[0]) == type('') and 'shell' not in kwargs:
+        kwargs['shell'] = True
+
+    nostrip = kwargs.pop('nostrip', False)
+    kwargs['stdout'] = subprocess.PIPE
+    proc = subprocess.Popen(*args, **kwargs)
+
+    output = proc.communicate()[0]
+    if not nostrip:
+        output = output.strip()
+    err = proc.returncode
+
+    if err:
+        raise CalledProcessError([args, kwargs], err, output)
+    else:
+        return output
+
+
+
+class RpmRipper(object):
+    def __init__(self, binrpm):
+        self.binrpm = binrpm
+        if not os.path.isfile(binrpm):
+            raise Exception(binrpm + " not found")
+        self.binrpm_root = re.sub(r'\.rpm', '', self.binrpm)
+        self.binrpm_extract_dir = self.binrpm_root + '.extract'
+        self.ripped_source_tgz = self.binrpm_root + '.bin.tar.gz'
+        self.ripped_spec = self.binrpm_root + '.bin.spec'
+        self._rpm_tags = None
+        self._rpmq = {}
+        self._files_dict = {}
+
+    def write_tarball(self):
+        if os.path.exists(self.binrpm_extract_dir):
+            shutil.rmtree(self.binrpm_extract_dir)
+
+        rpm_abspath = os.path.abspath(self.binrpm)
+
+        old_dir = os.getcwd()
+        os.makedirs(self.binrpm_extract_dir)
+        os.chdir(self.binrpm_extract_dir)
+        subprocess.call("rpm2cpio %s | cpio -id" % re.escape(rpm_abspath), shell=True)
+        os.chdir(old_dir)
+
+        subprocess.call(["tar", "czf", self.ripped_source_tgz, self.binrpm_extract_dir])
+        shutil.rmtree(self.binrpm_extract_dir)
+
+    def write_spec(self):
+        fh = open(self.ripped_spec, 'w')
+        try:
+            fh.write(self.spec())
+        finally:
+            fh.close()
+
+
+    def rpmq(self, queryformat):
+        if queryformat not in self._rpmq:
+            self._rpmq[queryformat] = checked_backtick(
+                ["rpm", "-qp", self.binrpm, "--queryformat", queryformat],
+                stderr=subprocess.PIPE)
+
+        return self._rpmq[queryformat]
+
+    def rpm_tags(self):
+        if not self._rpm_tags:
+            tags_list = [x.strip() for x in str.split(
+                checked_backtick(["rpm", "--querytags"]), "\n")]
+            
+            self._rpm_tags = {}
+            for tag in tags_list:
+                value = self.rpmq("[%%{%s}\n]" % tag).strip()
+                if value != "(none)":
+                    self._rpm_tags[tag] = value
+
+        return self._rpm_tags
+
+    def files_dict(self):
+        if not self._files_dict:
+            self._files_dict = {}
+            def _is_dir(mode):
+                return mode & 040000
+
+            def _is_link(mode):
+                return mode == 0120777
+
+            files_list = self.rpmq("[%{FILEFLAGS}:::%{FILEMODES}:::"
+                                   "%{FILEVERIFYFLAGS}:::%{FILEUSERNAME}:::"
+                                   "%{FILEGROUPNAME}:::%{FILENAMES}\n]").split("\n")
+            for f in files_list:
+                fflags, mode, vflags, user, group, name = f.split(":::")
+                fflags, mode, vflags = int(fflags), int(mode), int(vflags)
+                perms = mode & 07777
+
+                if name in STANDARD_DIRS:
+                    continue
+
+                spec_flags = []
+
+                if _is_dir(mode):
+                    spec_flags += ['%dir']
+
+                # Check for nonstandard permissions
+                if ((_is_dir(mode) and perms != 0755) or
+                    (not _is_dir(mode) and not _is_link(mode) and
+                     perms != 0644) or
+                    (user != "root") or (group != "root")):
+                        spec_flags += ["%%attr(%04o,%s,%s)" % (perms, user, group)]
+
+                # Check for other file flags
+                for k in RPM_FFLAGS_BITS:
+                    if k & fflags:
+                        spec_flags += [RPM_FFLAGS_BITS[k]]
+                
+                # Annoying special case for %config
+                if fflags & RPM_FFLAGS_CONFIG:
+                    spec_config = []
+                    for k in RPM_FFLAGS_CONFIG_BITS:
+                        if k & fflags:
+                            spec_config += [RPM_FFLAGS_CONFIG_BITS[k]]
+                    spec_flags += ["%config(" + " ".join(spec_config) + ")"]
+
+                # Check for non-standard verify flags
+                if vflags != -1:
+                    spec_verify = []
+                    for v in RPM_VFLAGS_BITS:
+                        if v & vflags:
+                            spec_verify += [RPM_VFLAGS_BITS[v]]
+                    spec_flags += ["%verify(" + " ".join(spec_verify) + ")"]
+
+                self._files_dict[name] = spec_flags
+        return self._files_dict
+
+
+    def spec_section_files(self):            
+        files = "%files\n%defattr(-,root,root,-)\n"
+
+        for name, flags in sorted(self.files_dict().iteritems()):
+            if flags:
+                files += " ".join(flags) + " "
+            files += name + "\n"
+
+        return files
+
+    def _opt_tag_helper(self, prefix, tagname, postfix="\n"):
+        v = self.rpm_tags().get(tagname.upper())
+        if v:
+            return prefix + v.strip() + postfix
+        else:
+            return ""
+
+    def _array_tag_helper(self, prefix, tagname):
+        part = ""
+        vals = self.rpm_tags().get(tagname.upper())
+        if vals:
+            for v in vals.split("\n"):
+                part += prefix + v.strip() + "\n"
+
+        return part
+
+    def spec_section_preamble(self):
+        preamble = ""
+        for l in ["__os_install_post",
+                  "__spec_install_post",
+                  "__debug_install_post",
+                  "debug_package"]:
+            preamble += "%%global %s %%{nil}\n" % l
+        preamble += ("%undefine __debug_package\n"
+                     "%undefine _enable_debug_packages\n")
+        for t in ['Name', 'Epoch', 'Version']:
+            preamble += self._opt_tag_helper(t + ": ", t)
+        preamble += self._opt_tag_helper("Release: ", "RELEASE", ".1%{?dist}\n")
+        for t in ['Group', 'URL', 'License', 'Summary']:
+            preamble += self._opt_tag_helper(t + ": ", t)
+        preamble += 'Source: ' + self.ripped_source_tgz + "\n"
+        preamble += self._opt_tag_helper("BuildArch: ", "ARCH")
+        preamble += self._array_tag_helper("Prefix: ", "PREFIXES")
+        preamble += self._array_tag_helper("Requires: ", "REQUIRES")
+        preamble += self._array_tag_helper("Provides: ", "PROVIDES")
+        preamble += self._array_tag_helper("Obsoletes: ", "OBSOLETES")
+        preamble += self._array_tag_helper("Conflicts: ", "CONFLICTS")
+        preamble += "BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)\n"
+        preamble += "\n\n%description\n"
+        preamble += self.rpm_tags().get("DESCRIPTION", "") + "\n"
+
+        return preamble
+        
+    def spec_section_prep(self):
+        return """
+%prep
+%setup -n """ + self.binrpm_extract_dir + "\n"
+
+    def spec_section_build(self):
+        return """
+%build
+exit 0
+"""
+
+    def spec_section_install(self):
+        install = """
+%install
+rm -rf $RPM_BUILD_ROOT
+mkdir -p $RPM_BUILD_ROOT
+mv * $RPM_BUILD_ROOT
+pushd $RPM_BUILD_ROOT
+"""
+        for name, flags in self.files_dict().iteritems():
+            if '%ghost' in flags:
+                install += ("mkdir -p $RPM_BUILD_ROOT/$(dirname %s)\n"
+                            "touch $RPM_BUILD_ROOT%s\n" % (name,name))
+        install += """
+popd
+"""
+        return install
+
+    def _scriptlet_helper(self, label, tag):
+        return self._opt_tag_helper(self._opt_tag_helper(label + ' -p ', tag + 'PROG'),
+                               tag)
+
+    def spec_section_scriptlets(self):
+        scriptlets = ""
+
+        for args in [["%pre", "PREIN"],
+                     ["%post", "POSTIN"],
+                     ["%preun", "PREUN"],
+                     ["%postun", "POSTUN"],
+                     ["%pretrans", "PRETRANS"],
+                     ["%posttrans", "POSTTRANS"],
+                     ["%verifyscript", "VERIFYSCRIPT"]]:
+            scriptlets += self._scriptlet_helper(*args) + "\n\n"
+        return scriptlets
+
+    def spec_section_changelog(self):
+        changelog = ("%%changelog\n"
+                     "* %s %s - %s-%s.1\n"
+                     "- Specfile created from binary rpm %s\n" %
+                     (date.today().strftime("%a %b %d %Y"), getpass.getuser(),
+                      self.rpm_tags()['VERSION'], self.rpm_tags()['RELEASE'],
+                      self.binrpm))
+        changelog_out = checked_backtick(["rpm", "-qp", "--changelog",
+                                          self.binrpm],
+                                         stderr=subprocess.PIPE)
+        if changelog_out != "(none)":
+            changelog += changelog_out
+
+        return changelog
+
+    def spec(self):
+        return "\n\n".join([
+            self.spec_section_preamble(),
+            self.spec_section_prep(),
+            self.spec_section_build(),
+            self.spec_section_install(),
+            self.spec_section_files(),
+            self.spec_section_scriptlets(),
+            self.spec_section_changelog()])
+
+
+
+
+# EXECUTION BEGINS HERE
+if len(sys.argv) < 2:
+    print "no rpms given. exiting."
+    sys.exit(1)
+
+for filename in sys.argv[1:]:
+    ripper = RpmRipper(filename)
+    ripper.write_tarball()
+    ripper.write_spec()
+    print "tarball written to " + ripper.ripped_source_tgz
+    print "specfile written to " + ripper.ripped_spec
+

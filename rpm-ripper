@@ -162,7 +162,7 @@ class RpmRipper(object):
         self.binrpm = binrpm
         if not os.path.isfile(binrpm):
             raise Exception(binrpm + " not found")
-        self.binrpm_root = re.sub(r'\.rpm', '', self.binrpm)
+        self.binrpm_root = re.sub(r'\.rpm', '', os.path.basename(self.binrpm))
         self.binrpm_extract_dir = self.binrpm_root + '.extract'
         self.ripped_source_tgz = self.binrpm_root + '.bin.tar.gz'
         self.ripped_spec = self.binrpm_root + '.bin.spec'
@@ -312,7 +312,12 @@ class RpmRipper(object):
         for t in ['Group', 'URL', 'License', 'Summary']:
             preamble += self._opt_tag_helper(t + ": ", t)
         preamble += 'Source: ' + self.ripped_source_tgz + "\n"
-        preamble += self._opt_tag_helper("BuildArch: ", "ARCH")
+        arch = self.rpm_tags().get("ARCH")
+        if arch:
+            if re.match(r'i\d86', arch):
+                arch = 'i386'
+            preamble += "ExclusiveArch: " + arch + "\n"
+        preamble += "AutoReqProv: no\n"
         preamble += self._array_tag_helper("Prefix: ", "PREFIXES")
         preamble += self._array_tag_helper("Requires: ", "REQUIRES")
         preamble += self._array_tag_helper("Provides: ", "PROVIDES")

@@ -20,6 +20,7 @@ import traceback
 from osg_build_lib.constants import *
 from osg_build_lib.mock_config import *
 from osg_build_lib.utils import *
+from osg_build_lib.rpm_utils import *
 
 
 __version__ = '@VERSION@'
@@ -115,32 +116,6 @@ def copy_to_repo(yum_base, rpms):
             subprocess.call(['createrepo', '-p', '--update', '-d', repo[k]])
 
 
-def create_ca_bundle():
-    """Create the ca-bundle.crt file in the user's ~/.koji directory"""
-    # TODO fault-tolerance, also make it work on CSL systems.
-    # also, add a call to it somewhere.
-    if not os.path.isdir(GRID_CERTS_DIR):
-        raise Error("Couldn't find grid certificates directory (%s)" %
-                    GRID_CERTS_DIR)
-    bundle_contents = ""
-    for cert in [["ESnet Root CA", KOJI_ESNET_CA_HASH, KOJI_ESNET_CA_SUBJECT],
-                 ["DOEGrids CA", KOJI_DOEGRIDS_CA_HASH, KOJI_DOEGRIDS_CA_SUBJECT]]:
-        name, expected_hash, expected_subject = cert
-        ca_file = os.path.join(GRID_CERTS_DIR, expected_hash + ".0")
-        real_subject = backtick(["openssl", "x509", "-in", ca_file,
-                                 "-noout", "-subject"])
-        real_hash = backtick(["openssl", "x509", "-in", ca_file,
-                              "-noout", "-hash"])
-        if real_subject != expected_subject or real_hash != expected_hash:
-            raise Error(("Hash or subject for %s doesn't match expected:\n" +
-                         "(expected: '%s', '%s', got: '%s', '%s')") %
-                        (name, expected_hash, expected_subject,
-                         real_hash, real_subject))
-        else:
-            bundle_contents += slurp(ca_file) + "\n"
-
-    safe_makedirs(KOJI_USER_CONFIG_DIR)
-    unslurp(KOJI_SERVER_CERT, bundle_contents)
         
     
     
@@ -188,6 +163,8 @@ class OSGBuild(object):
             defines += [
                 "_srcrpmdir " + self.prebuild_dir,
                 "_specdir " + self.prebuild_dir,
+                "_builddir " + self.prebuild_dir,
+                "_buildrootdir " + self.prebuild_dir,
                 "_sourcedir " + self.prebuild_dir]
         else:
             defines += [
@@ -196,6 +173,7 @@ class OSGBuild(object):
                 "_specdir " + self.results_dir,
                 "_sourcedir " + self.results_dir,
                 "_builddir " + os.path.join(self.results_dir, "BUILD"),
+                "_buildrootdir " + os.path.join(self.results_dir, "BUILDROOT"),
                 "_tmppath " + os.path.join(self.results_dir, "tmp")]
 
         return ['--define=' + d for d in defines]
@@ -690,35 +668,24 @@ class OSGBuild(object):
             unchecked_call(
                 koji_cmd +
                 ["add-pkg", koji_tag,
-                 os.path.basename(self.abs_package_dir), "--owner",
-                 cn])
+                 os.path.basename(self.abs_package_dir), "--owner", cn])
 
 
-    def get_koji_target_and_tag(self, koji_cmd):
-        """For koji task. Return the koji target and tag from what the user
-        specified. If the user specified the koji tag 'TARGET',
-        use the destination tag from the koji target.
-
-        """
-        koji_target = self.options['koji_target']
-        koji_tag = self.options['koji_tag']
-        if koji_tag == 'TARGET':
-            line = backtick(koji_cmd + ["-q", "list-targets",
-                                        "--name", koji_target])
-            if not line:
+    def get_koji_build_and_dest_tags(self, koji_cmd, koji_target):
+        line = backtick(koji_cmd + ["-q", "list-targets",
+                                    "--name", koji_target])
+        if not line:
+            raise OSGBuildError(
+                "Unable to find koji target with the name " + koji_target)
+        else:
+            try:
+                fields = re.split(r"\s*", line, 2)
+                target_build_tag = fields[1]
+                target_dest_tag = fields[2]
+            except IndexError:
                 raise OSGBuildError(
-                    "Unable to find koji target with the name " + koji_target)
-            else:
-                try:
-                    fields = re.split(r"\s*", line, 2)
-                    koji_tag = fields[2]
-                except IndexError:
-                    raise OSGBuildError(
-                        "Unable to determine koji tag from koji target")
-
-        logging.debug("target is %s, tag is %s", koji_target, koji_tag)
-
-        return (koji_target, koji_tag)
+                    "Unable to determine koji tags from koji target")
+        return (target_build_tag, target_dest_tag)
 
 
     def koji(self):
@@ -727,30 +694,42 @@ class OSGBuild(object):
         cert, or --kojilogin if provided. Raise OSGBuildError on failure.
 
         """
-        if os.system("which koji &>/dev/null"):
-            raise OSGBuildError("Can't find koji!")
-        conf_file_search_path = sys.path + [DATA_DIR]
-        conf_file = find_file(KOJI_CONF, conf_file_search_path)
-        if not conf_file:
-            raise OSGBuildError(
-                "Can't find " + KOJI_CONF +
-                "; search path was:\n" + ":".join(conf_file_search_path))
 
-        if not os.path.exists(KOJI_CLIENT_CERT):
-            raise OSGBuildError(
-                "Unable to find your Koji client cert at " + KOJI_CLIENT_CERT)
+        # Check to make sure we're not submitting from a RHEL 6 box--SRPMs made
+        # on a RHEL 6 box get checksum errors in koji.
+        release = backtick("cat /etc/redhat-release")
+        if release and release.lower().find("release 6") != -1:
+            raise OSGBuildError("koji builds cannot be submitted from a RHEL 6-based host!")
 
-        # TODO Give user a way to create this file, then enable the check.
-        #if not os.path.exists(KOJI_SERVER_CERT):
-        #    raise OSGBuildError(
-        #        "Unable to find the Koji server certs at" + KOJI_SERVER_CERT)
+        # Use osg-koji wrapper if available and configured.
+        if os.system("which osg-koji &>/dev/null") == 0 and os.path.exists(OSG_KOJI_USER_CONFIG_DIR) and self.options['koji_wrapper']:
+            koji_cmd = ["osg-koji"]
+        elif os.system("which koji &>/dev/null") == 0:
+            # Not using osg-koji, so we need to find the conf file and do some
+            # checks ourselves.
+            conf_file_search_path = sys.path + [DATA_DIR]
+            conf_file = find_file(KOJI_CONF, conf_file_search_path) or find_file(OLD_KOJI_CONF, conf_file_search_path)
+            if not conf_file:
+                raise OSGBuildError("Can't find " + KOJI_CONF + " or " + OLD_KOJI_CONF + "; search path was:\n" + ":".join(conf_file_search_path))
+
+            koji_cmd = ["koji", "--config", conf_file, "--authtype", "ssl"]
+
+            if not os.path.exists(KOJI_CLIENT_CERT):
+                raise OSGBuildError("Unable to find your Koji client cert at " + KOJI_CLIENT_CERT)
+        else:
+            raise OSGBuildError("Can't find koji or osg-koji!")
 
         cn = self.get_koji_login()
 
         safe_makedirs(self.results_dir)
-        koji_cmd = ["koji", "--config", conf_file, "--authtype", "ssl"]
 
-        koji_target, koji_tag = self.get_koji_target_and_tag(koji_cmd)
+        koji_target = self.options['koji_target']
+        target_build_tag, target_dest_tag = (
+            self.get_koji_build_and_dest_tags(koji_cmd, koji_target))
+        if self.options['koji_tag'] == 'TARGET':
+            koji_tag = target_dest_tag
+        else:
+            koji_tag = self.options['koji_tag']
 
         self.koji_add_package(koji_cmd, cn, koji_tag)
 
@@ -764,6 +743,16 @@ class OSGBuild(object):
         err = unchecked_call(koji_cmd + build_subcmd)
         if err:
             raise OSGBuildError("koji build failed with exit code " + str(err))
+        if self.options.get('regen_repos') and not self.options.get('scratch'):
+            regen_repo_subcmd = ["regen-repo", target_build_tag]
+            if self.options.get('no_wait'):
+                regen_repo_subcmd += ["--nowait"]
+            logging.info("Calling koji to regen " + target_build_tag)
+            err2 = unchecked_call(koji_cmd + regen_repo_subcmd)
+            if err2:
+                raise OSGBuildError("koji regen-repo failed with exit code " + str(err2))
+
+
             
 
 
@@ -859,6 +848,12 @@ koji         Build using koji
         "uses the destination tag defined in the koji target. Default: " +
         DEFAULT_KOJI_TAG)
     parser.add_option(
+        "--koji-wrapper", action="store_true", dest="koji_wrapper",
+        help="Use the 'osg-koji' koji wrapper. (Default)")
+    parser.add_option(
+        "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
+        help="Do not use the 'osg-koji' koji wrapper, even if found.")
+    parser.add_option(
         "--loglevel",
         help="The level of logging the script should do. " +
         "Valid values are: DEBUG,INFO,WARNING,ERROR,CRITICAL")
@@ -883,6 +878,12 @@ koji         Build using koji
     parser.add_option(
         "-q", "--quiet", action="store_const", const="warning", dest="loglevel",
         help="Display less information. Equivalent to --loglevel=warning")
+    parser.add_option(
+        "--regen-repos", action="store_true",
+        help="Perform a regen-repo on the build and destination repos after "
+        "each koji build. Allows doing builds that depend on each other. "
+        "Use sparingly, as this slows down builds and uses more disk space on "
+        "koji-hub.")
     parser.add_option(
         "--scratch", action="store_true",
         help="Perform a scratch build (koji task only)")
@@ -951,8 +952,10 @@ def get_buildopts(options, args, task, optnames):
         'init_repos': False,
         'koji_tag': DEFAULT_KOJI_TAG,
         'koji_target': DEFAULT_KOJI_TARGET,
+        'koji_wrapper': True,
         'mock_config': 'AUTO',
         'nmi_submit_machine': 'submit-1.batlab.org',
+        'regen_repos': False,
         'scratch': False,
         'working_directory': '.',
         }

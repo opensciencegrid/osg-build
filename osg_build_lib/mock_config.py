@@ -176,8 +176,9 @@ config_opts['macros'] = """
 %_topdir /builddir/build
 %_rpmfilename  %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm
 
-%dist    .$DIST
+%dist           .$DIST
 %centos_ver     5
+%rhel           5
 
 #%_smp_mflags   -j1
 """
@@ -188,7 +189,8 @@ config_opts['macros'] = {
     '%_topdir': "/builddir/build",
     '%_rpmfilename': "%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
     '%dist': ".$DIST",
-    '%centos_ver': "5"}
+    '%centos_ver': "5",
+    '%rhel': '5',}
 '''
 
 OLD_MOCK_CFG_TEMPLATE = string.Template(MOCK_CFG_HEADER + MOCK_YUM_CONF +

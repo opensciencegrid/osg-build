@@ -1,0 +1,210 @@
+#!/usr/bin/env python
+
+import glob
+import re
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib2
+from osg_build_lib.utils import *
+
+
+CA_CERTS = [
+    # subject, openssl 0.9.8 hash, openssl 1.x hash
+    ["subject= /DC=net/DC=ES/O=ESnet/OU=Certificate Authorities/CN=ESnet Root CA 1", "d1b603c3", "0119347c"],
+    ["subject= /DC=org/DC=DOEGrids/OU=Certificate Authorities/CN=DOEGrids CA 1", "1c3f2ca8", "12d0da68"]]
+
+CSL_KOJI_PATH="/p/vdt/workspace/koji-1.6.0"
+
+DOEGRIDS_TARBALL_URL = "https://pki1.doegrids.org/Other/doegrids.tar"
+GRID_CERTS_DIR = "/etc/grid-security/certificates"
+
+OLD_USER_CONFIG_DIR = os.path.expanduser("~/.koji")
+OLD_CLIENT_CERT_FILE = os.path.join(OLD_USER_CONFIG_DIR, "client.crt")
+USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")
+GLOBUS_DIR = os.path.expanduser("~/.globus")
+KOJI_CONFIG_FILE = os.path.join(USER_CONFIG_DIR, "config")
+CLIENT_CERT_FILE = os.path.join(USER_CONFIG_DIR, "client.crt")
+SERVER_CERT_FILE = os.path.join(USER_CONFIG_DIR, "osg-ca-bundle.crt")
+
+PROGRAM_NAME = os.path.basename(sys.argv[0])
+DATA_DIR = "/usr/share/osg-build"
+
+
+class Error(Exception):
+    """Base class for expected exceptions."""
+    pass
+
+
+def get_openssl_version():
+    version_output = backtick("openssl version")
+    # TODO could use some error checking
+    version = version_output.strip().split(' ')[1]
+    major, minor, release = version.split('.', 2)
+    return major, minor, release
+
+
+def create_ca_bundle(working_dir="."):
+    """Create the ca-bundle.crt file in working_dir"""
+    if os.path.isdir(GRID_CERTS_DIR):
+        # Use local grid certificates
+        certs_dir = GRID_CERTS_DIR
+    else:
+        # Download grid certificates
+        try:
+            tarball_name = os.path.join(working_dir, os.path.basename(DOEGRIDS_TARBALL_URL))
+            handle = urllib2.urlopen(DOEGRIDS_TARBALL_URL)
+            desthandle = open(tarball_name, 'w')
+            desthandle.write(handle.read())
+            desthandle.close()
+        except Exception, e:
+            raise Error("Error downloading certs tarball: " + str(e))
+        checked_call(["tar", "xf", tarball_name, "-C", working_dir])
+        certs_dir = os.path.join(working_dir, 'doegrids')
+        if not os.path.isdir(certs_dir):
+            raise Error("Certs tarball does not have expected contents")
+
+    bundle_contents = ""
+    openssl_major = int(get_openssl_version()[0])
+    for cert in CA_CERTS:
+        expected_subject = cert[0]
+        if openssl_major == 0:
+            expected_hash = cert[1]
+        else:
+            expected_hash = cert[2]
+        ca_fname = cert[1] + ".0"
+        ca_path = os.path.join(certs_dir, ca_fname)
+        real_subject = backtick(["openssl", "x509", "-in", ca_path, "-noout", "-subject"])
+        real_hash = backtick(["openssl", "x509", "-in", ca_path, "-noout", "-hash"])
+        if real_subject != expected_subject:
+            raise Error(("Subject for %s doesn't match expected:\n"
+                         "Expected: '%s', got: '%s'") %
+                        (ca_fname, expected_subject, real_subject))
+        if real_hash != expected_hash:
+            raise Error(("Hash for %s doesn't match expected:\n"
+                         "Expected: '%s', got: '%s'") %
+                        (ca_fname, expected_hash, real_hash))
+        else:
+            bundle_contents += slurp(ca_path) + "\n"
+    bundle_filename = os.path.join(working_dir, "ca-bundle.crt")
+    unslurp(bundle_filename, bundle_contents)
+    print "wrote ca bundle '%s'" % bundle_filename
+
+    return bundle_filename
+
+
+def run_setup():
+    safe_makedirs(USER_CONFIG_DIR)
+    # koji config file
+    if not os.path.exists(KOJI_CONFIG_FILE) or ask_yn("Koji configuration file '" + KOJI_CONFIG_FILE + "' already exists. Recreate it?"):
+        conf_file_search_path = sys.path + [DATA_DIR]
+        shutil.copy(find_file("osg-koji-home.conf", conf_file_search_path), KOJI_CONFIG_FILE)
+
+    # server cert
+    if not os.path.exists(SERVER_CERT_FILE) or ask_yn("Server cert file '"+SERVER_CERT_FILE+"' already exists. Recreate it?"):
+        working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
+        safe_make_backup(SERVER_CERT_FILE)
+        shutil.copy(create_ca_bundle(working_dir), SERVER_CERT_FILE)
+        shutil.rmtree(working_dir, ignore_errors=True)
+    else:
+        print "not writing server cert file '%s'" % SERVER_CERT_FILE
+
+    # user cert
+    if not os.path.exists(CLIENT_CERT_FILE) or ask_yn("Client cert file '"+CLIENT_CERT_FILE+"' already exists. Recreate it?"):
+        success = False
+
+        if (os.path.exists(OLD_USER_CONFIG_DIR) and
+                (os.path.isdir(USER_CONFIG_DIR) and
+                not os.path.samefile(OLD_USER_CONFIG_DIR, USER_CONFIG_DIR)) and
+                os.path.isfile(OLD_CLIENT_CERT_FILE)):
+            user_choice = ask_yn("Copy client cert from '" + OLD_CLIENT_CERT_FILE + "' ?")
+            if user_choice:
+                old_umask = os.umask(0077)
+                safe_make_backup(CLIENT_CERT_FILE)
+                shutil.copy(OLD_CLIENT_CERT_FILE, CLIENT_CERT_FILE)
+                os.umask(old_umask)
+                success = True
+
+        if not success and os.path.isdir(GLOBUS_DIR):
+            usercert = os.path.join(GLOBUS_DIR, "usercert.pem")
+            userkey = os.path.join(GLOBUS_DIR, "userkey.pem")
+            if os.path.isfile(usercert) and os.path.isfile(userkey):
+                old_umask = os.umask(0077)
+                safe_make_backup(CLIENT_CERT_FILE)
+                os.system("cat '%s' '%s' > '%s'" % (usercert, userkey, CLIENT_CERT_FILE))
+                os.umask(old_umask)
+                print ("'%s' written from '%s' and '%s'" % (CLIENT_CERT_FILE, usercert, userkey))
+                success = True
+
+        if not success:
+            print ("""
+Could not find user key and cert in %s.
+You must manually copy your certs:
+
+    cat usercert.pem userkey.pem > %s
+    chmod 0600 %s
+
+where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
+""" % (GLOBUS_DIR, CLIENT_CERT_FILE, CLIENT_CERT_FILE))
+    else:
+        print "not writing client cert file '%s'" % CLIENT_CERT_FILE
+
+
+def osg_koji_extra_help():
+    return ("\n%s adds the following commands:\n"
+            "\t%-25s %s\n" %
+                (PROGRAM_NAME,
+                 "setup",
+                 "Initialize the configuration in " + USER_CONFIG_DIR))
+
+
+def verify_koji_dir():
+    for path,description in [(USER_CONFIG_DIR, "User configuration directory"),
+                             (KOJI_CONFIG_FILE, "Koji configuration file"),
+                             (CLIENT_CERT_FILE, "User certificate file (client cert)"),
+                             (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
+        if not os.path.exists(path):
+            raise Error(description + "(" + path + ") not found. Run '" + PROGRAM_NAME + " setup' to set up your koji environment.")
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
+    if os.path.exists(CSL_KOJI_PATH):
+        os.environ['PATH'] = os.path.join(CSL_KOJI_PATH, "cli") + os.pathsep + os.environ['PATH']
+        os.environ['PYTHONPATH'] = CSL_KOJI_PATH + os.pathsep + os.environ['PATH']
+
+    try:
+        if len(argv) > 1:
+            if argv[1] == "setup":
+                run_setup()
+            elif argv[1] == "help":
+                os.system("koji " + ' '.join(argv[1:]))
+                print osg_koji_extra_help()
+            else:
+                verify_koji_dir()
+                args = ["--config=" + KOJI_CONFIG_FILE, "--authtype=ssl"] + argv[1:]
+                os.execlp("koji", "koji", *args)
+        else:
+            os.system("koji")
+            print osg_koji_extra_help()
+    except SystemExit, e:
+        return e.code
+    except KeyboardInterrupt:
+        print >>sys.stderr, "Interrupted"
+        return 3
+    except Error, e:
+        print >>sys.stderr, str(e)
+        return 1
+    except Exception, e:
+        print >>sys.stderr, "Unhandled exception: " + str(e)
+        raise
+              
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
+

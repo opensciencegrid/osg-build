@@ -1,0 +1,37 @@
+#!/usr/bin/python
+
+import atexit
+import re
+import os
+import shutil
+import tempfile
+import unittest
+
+from osg_build_lib.constants import SVN_ROOT
+from osg_build_lib.utils import checked_call, sbacktick
+
+class TestLint(unittest.TestCase):
+
+    def setUp(self):
+        self.wd=tempfile.mkdtemp(prefix="osg-build-test-")
+        atexit.register(shutil.rmtree, self.wd)
+        self.olddir = os.getcwd()
+        os.chdir(self.wd)
+        # Check out a specific version of the yum-remove-osg package
+        checked_call(["svn", "export", os.path.join(SVN_ROOT, "native/redhat/trunk/yum-remove-osg"), "-r", "{2011-12-06}", "yum-remove-osg"])
+
+    def tearDown(self):
+        os.chdir(self.olddir)
+
+    def test_lint(self):
+        out, err = sbacktick("osg-build lint " + os.path.join(self.wd, "yum-remove-osg"))
+        self.assertEqual(err, 0, "program exited successfully")
+        self.assertNotEqual(out.find("yum-remove-osg.src:25: E: hardcoded-library-path"), -1, "expected error found")
+        self.assertNotEqual(out.find("1 packages and 0 specfiles checked"), -1, "expected number of packages checked")
+        self.assertNotEqual(out.find("rpmlint found problems with yum-remove-osg"), -1, "expected problems found")
+
+
+
+if __name__ == '__main__':
+    unittest.main()
+

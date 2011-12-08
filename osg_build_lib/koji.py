@@ -119,6 +119,8 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
         if err:
             raise KojiError("koji build failed with exit code " + str(err))
         if self.regen_repos and not self.scratch:
+            target_build_tag, target_dest_tag = (
+                self.get_build_and_dest_tags(koji_target))
             regen_repo_subcmd = ["regen-repo", target_build_tag]
             if self.no_wait:
                 regen_repo_subcmd += ["--nowait"]

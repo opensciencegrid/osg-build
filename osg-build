@@ -673,7 +673,7 @@ def print_version_and_exit():
         else:
             print "SVN info:\n" + out
     else:
-        print "osg-build " + version
+        print "osg-build " + __version__
     sys.exit(0)
 
 
@@ -783,7 +783,7 @@ def main(argv=None):
                 if check_uncommitted(p):
                     choice = ask("Package directory "+p+" has uncommitted changes"
                                  " that will not be included in the SVN build."
-                                 " Continue (yes/no/skip)?")
+                                 " Continue (yes/no/skip)?", ("y", "n", "s"))
                     if choice[0] == "n":
                         print "Exiting."
                         sys.exit(1)

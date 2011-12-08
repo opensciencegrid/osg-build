@@ -151,6 +151,10 @@ where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
     else:
         print "not writing client cert file '%s'" % CLIENT_CERT_FILE
 
+    if not os.path.exists(OLD_USER_CONFIG_DIR) and ask_yn("Create symlink %s -> %s ?" % (OLD_USER_CONFIG_DIR, USER_CONFIG_DIR)):
+        os.symlink(USER_CONFIG_DIR, OLD_USER_CONFIG_DIR)
+        
+
 
 def osg_koji_extra_help():
     return ("\n%s adds the following commands:\n"

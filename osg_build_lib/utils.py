@@ -1,6 +1,8 @@
+#!/usr/bin/python
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -15,19 +17,18 @@ class CalledProcessError(Exception):
         self.output = output
 
     def __str__(self):
+        logging.debug(self.output)
         return ("Error in called process(%s): subprocess returned %s" %
                 (str(self.process), str(self.returncode)))
 
     def __repr__(self):
-        return (repr(self.process), repr(self.returncode), repr(self.output))
+        return str(repr(self.process), repr(self.returncode), repr(self.output))
 
 
 def checked_call(*args, **kwargs):
     """A wrapper around subprocess.call() that raises CalledProcessError on
     a nonzero return code. Similar to subprocess.check_call() in 2.7+, but
     prints the command to run and the result if loglevel is DEBUG.
-    Also, if the first argument is a string and shell=False isn't passed,
-    then shell=True is passed to subprocess.call().
 
     """
     err = unchecked_call(*args, **kwargs)
@@ -38,8 +39,6 @@ def checked_call(*args, **kwargs):
 def unchecked_call(*args, **kwargs):
     """A wrapper around subprocess.call() with the same semantics as checked_call: 
     Prints the command to run and the result if loglevel is DEBUG.
-    Also, if the first argument is a string and shell=False isn't passed,
-    then shell=True is passed to subprocess.call().
 
     """
     if type(args[0]) == type(''):
@@ -48,17 +47,14 @@ def unchecked_call(*args, **kwargs):
         cmd = "'" + "' '".join(args[0]) + "'"
     logging.debug("Running " + cmd)
 
-    if type(args[0]) == type('') and 'shell' not in kwargs:
-        kwargs['shell'] = True
-
     err = subprocess.call(*args, **kwargs)
     logging.debug("Subprocess returned " + str(err))
     return err
 
 
 def backtick(*args, **kwargs):
-    """A wrapper around subprocess.Popen() that returns the stdout of the
-    called process. Ignores errors.
+    """Call a process and return its output, ignoring return code.
+    See checked_backtick() for semantics.
 
     """
     try:
@@ -69,19 +65,45 @@ def backtick(*args, **kwargs):
     return output
 
 
-def checked_backtick(*args, **kwargs):
-    """A wrapper around subprocess.Popen() that returns the stdout of the
-    called process. Raises CalledProcessError if the process has a nonzero
-    exit code. The output field of the CalledProcessError contains the output
-    in that case.
+def sbacktick(*args, **kwargs):
+    """Call a process and return a pair containing its output and exit status.
+    See checked_backtick() for semantics.
 
     """
-    if type(args[0]) == type('') and 'shell' not in kwargs:
-        kwargs['shell'] = True
+    returncode = 0
+    try:
+        output = checked_backtick(*args, **kwargs)
+    except CalledProcessError, e:
+        output = e.output
+        returncode = e.returncode
+
+    return (output, returncode)
+
+
+def checked_backtick(*args, **kwargs):
+    """Call a process and return a string containing its output.
+    This is a wrapper around subprocess.Popen() and passes through arguments
+    to subprocess.Popen().
+
+    Raises CalledProcessError if the process has a nonzero exit code. The
+    'output' field of the CalledProcessError contains the output in that case.
+
+    If the command is a string and 'shell' isn't passed, it's split up
+    according to shell quoting rules using shlex.split()
+
+    The output is stripped unless nostrip=True is specified.
+    If err2out=True is specified, stderr will be included in the output.
+
+    """
+    cmd = args[0]
+    if type(cmd) == type('') and 'shell' not in kwargs:
+        cmd = shlex.split(cmd)
 
     nostrip = kwargs.pop('nostrip', False)
     kwargs['stdout'] = subprocess.PIPE
-    proc = subprocess.Popen(*args, **kwargs)
+    if kwargs.pop('err2out', False):
+        kwargs['stderr'] = subprocess.STDOUT
+    proc = subprocess.Popen(cmd, *args[1:], **kwargs)
 
     output = proc.communicate()[0]
     if not nostrip:
@@ -218,3 +240,19 @@ def safe_make_backup(filename, move=True):
             shutil.copy(filename, newname)
 
 
+# original from rsvprobe.py by Marco Mambelli
+def which(program):
+    """Python replacement for which"""
+    def is_exe(fpath):
+        "is a regular file and is executable"
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+    return None

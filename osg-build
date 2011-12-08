@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+import atexit
 from glob import glob
 import grp
 import fnmatch as fnmatch_
@@ -14,140 +15,94 @@ import sys
 import tempfile
 import time
 import urllib2
-from ConfigParser import *
+from ConfigParser import ConfigParser
 import traceback
 
 from osg_build_lib.constants import *
-from osg_build_lib.mock_config import *
 from osg_build_lib.utils import *
-from osg_build_lib.rpm_utils import *
-
+from osg_build_lib.koji import *
+from osg_build_lib.error import *
+from osg_build_lib.mock import link_mock_extra_config_files, make_mock_config, make_mock_config_from_koji, Mock
 
 __version__ = '@VERSION@'
 
 
-class Error(Exception):
-    """Base class for expected exceptions. Caught in main(); may include a
-    traceback but will only print it if debugging is enabled.
+def check_uncommitted(package_dir):
+    """Return True if there are uncommitted changes in the SVN working dir."""
+    out, err = sbacktick("svn status -q " + package_dir)
+    if err:
+        print >>sys.stderr, "error getting svn status"
+        return None
+    if out:
+        print "The following uncommitted changes exist:"
+        print out
+        return True
+    else:
+        return False
+
+
+def get_package_svn_url_rev(package_dir):
+    out, err = sbacktick("svn info " + package_dir)
+    # TODO better err handling
+    if err:
+        return None
+    url = None
+    rev = None
+    for line in out.split("\n"):
+        label, value = line.split(": ", 1)
+        if label == "URL":
+            url = re.sub("^" + re.escape(SVN_AFS_ROOT), SVN_ROOT, value)
+        elif label == "Revision":
+            rev = value
     
-    """
-    def __init__(self, msg, tb=None):
-        self.msg = msg
-        if tb is None:
-            self.traceback = traceback.format_exc()
-
-    def __repr__(self):
-        return repr((self.msg, self.traceback))
-
-    def __str__(self):
-        return str(self.msg)
-
-
-class OSGBuildError(Error):
-    def __init__(self, msg, tb=None):
-        Error.__init__(self, "Error in build step: " + msg, tb)
-
-
-class OSGPrebuildError(Error):
-    def __init__(self, msg, tb=None):
-        Error.__init__(self, "Error in pre-build step: " + msg, tb)
-
-
-class OSGPushError(Error):
-    def __init__(self, msg, tb=None):
-        Error.__init__(self, "Error in push step: " + msg, tb)
-
-
-class UsageError(Error):
-    def __init__(self, msg, tb=None):
-        Error.__init__(self, "Usage error: " + msg + "\n", tb)
-
-
-def verify_yum_repos(yum_base):
-    """Make sure the directory given in yum_base contains the appropriate
-    yum repos, namely the subdirectories 'i386, 'x86_64', and 'src'.
-
-    """
-    if not os.path.isdir(yum_base):
-        raise Error(("Yum repository base directory '%s' doesn't " +
-                     "exist or is not a directory. If it's not a " +
-                     "typo, rerun with --init-repos to create it and " +
-                     "its subdirectories.") % yum_base)
-
-    for arch in ['i386', 'x86_64', 'src']:
-        subdir = os.path.join(yum_base, arch)
-        if not os.path.isdir(subdir):
-            raise Error(
-                ("Yum repository subdirectory '%s' doesn't exist or is not " +
-                "a directory. If it's not a typo, rerun with --init-repos " +
-                "to create it.") % subdir)
-
-
-def copy_to_repo(yum_base, rpms):
-    """Copy a set of RPMs to to the yum repos under yum_base and rebuild the
-    repos. noarch RPMs are copied to both of the arch-specific repos.
-
-    """
-    if not yum_base:
-        logging.error("Destination yum repo not given.")
-        return
-
-    repo = {}
-    for arch in ['i386', 'x86_64', 'src']:
-        repo[arch] = os.path.join(yum_base, arch)
-
-    for rpm in rpms:
-        bn = os.path.basename(rpm)
-        logging.info("Copying %s to repos in %s", bn, yum_base)
-
-        if fnmatch(rpm, '*.i[3-6]86.rpm'):
-            shutil.copy(rpm, repo['i386'])
-        elif fnmatch(rpm, '*.x86_64.rpm'):
-            shutil.copy(rpm, repo['x86_64'])
-        elif fnmatch(rpm, '*.noarch.rpm'):
-            shutil.copy(rpm, repo['i386'])
-            shutil.copy(rpm, repo['x86_64'])
-        elif fnmatch(rpm, '*.src.rpm'):
-            shutil.copy(rpm, repo['src'])
-
-    logging.info("Updating repos")
-    for k in repo.keys():
-        if k != 'noarch':
-            subprocess.call(['createrepo', '-p', '--update', '-d', repo[k]])
-
-
-        
-    
-    
+    return (url, rev)
 
 
 class OSGBuild(object):
-    def __init__(self, package_dir, opts): 
+    def __init__(self, package_dir, opts, mock_obj=None, koji_obj=None):
         self.package_dir = package_dir
+        self.mock_obj = mock_obj
+        self.koji_obj = koji_obj
 
         self.options = opts.copy()
 
-        self.abs_package_dir = os.path.abspath(self.package_dir)
-        # Unless working_directory is '.', i.e. we want to put the wd's in
-        # the package dir, get rid of any parent or current directory
-        # components so doing "osg-build pre -w TEMP ../foobar" won't put stuff
-        # in "/tmp/foobar"
-        if (os.path.realpath(self.options['working_directory']) !=
-                os.path.realpath('.')):
-            package_dir_no_parent = re.sub(r'^(\.\.?/)+', '', package_dir)
-            self.working_subdir = os.path.abspath(
-                os.path.join(
-                    self.options['working_directory'], package_dir_no_parent))
+        if self.options['svn']:
+            self.abs_package_dir = None
+            self.package_name = os.path.basename(re.sub(r'@\d+$', '', package_dir))
+            self.working_subdir = None
+            self.results_dir = None
+            self.prebuild_dir = None
+            self.unpacked_dir = None
+            self.unpacked_tarball_dir = None
         else:
-            self.working_subdir = os.path.abspath(
-                os.path.join(
-                    self.options['working_directory'], package_dir))
-        safe_makedirs(self.working_subdir)
-        self.results_dir = os.path.join(self.working_subdir, WD_RESULTS)
-        self.prebuild_dir = os.path.join(self.working_subdir, WD_PREBUILD)
-        self.unpacked_dir = os.path.join(self.working_subdir, WD_UNPACKED)
-        self.unpacked_tarball_dir = os.path.join(
-            self.working_subdir, WD_UNPACKED_TARBALL)
+            self.abs_package_dir = os.path.abspath(self.package_dir)
+            self.package_name = os.path.basename(self.abs_package_dir)
+            # Unless working_directory is '.', i.e. we want to put the wd's in
+            # the package dir, get rid of any parent or current directory
+            # components so doing "osg-build pre -w TEMP ../foobar" won't put stuff
+            # in "/tmp/foobar"
+            if (os.path.realpath(self.options['working_directory']) !=
+                    os.path.realpath('.')):
+                package_dir_no_parent = re.sub(r'^(\.\.?/)+', '', package_dir)
+                self.working_subdir = os.path.abspath(
+                    os.path.join(
+                        self.options['working_directory'], package_dir_no_parent))
+            else:
+                self.working_subdir = os.path.abspath(
+                    os.path.join(
+                        self.options['working_directory'], package_dir))
+            safe_makedirs(self.working_subdir)
+            self.results_dir = os.path.join(self.working_subdir, WD_RESULTS)
+            self.prebuild_dir = os.path.join(self.working_subdir, WD_PREBUILD)
+            self.unpacked_dir = os.path.join(self.working_subdir, WD_UNPACKED)
+            self.unpacked_tarball_dir = os.path.join(self.working_subdir, WD_UNPACKED_TARBALL)
+
+            if self.options['autoclean']:
+                for dir in [self.results_dir, self.prebuild_dir, self.unpacked_dir, self.unpacked_tarball_dir]:
+                    if os.path.exists(dir):
+                        logging.debug("autoclean removing " + dir)
+                        shutil.rmtree(dir)
+
     
     def get_rpmbuild_defines(self, prebuild):
         """Get a list of --define arguments to pass to rpmbuild based on the
@@ -161,22 +116,25 @@ class OSGBuild(object):
 
         if prebuild:
             defines += [
-                "_srcrpmdir " + self.prebuild_dir,
-                "_specdir " + self.prebuild_dir,
                 "_builddir " + self.prebuild_dir,
                 "_buildrootdir " + self.prebuild_dir,
-                "_sourcedir " + self.prebuild_dir]
+                "_rpmdir " + self.prebuild_dir,
+                "_sourcedir " + self.prebuild_dir,
+                "_specdir " + self.prebuild_dir,
+                "_srcrpmdir " + self.prebuild_dir,
+                "_tmppath " + self.prebuild_dir]
         else:
             defines += [
-                "_srcrpmdir " + self.results_dir,
-                "_rpmdir " + self.results_dir,
-                "_specdir " + self.results_dir,
-                "_sourcedir " + self.results_dir,
                 "_builddir " + os.path.join(self.results_dir, "BUILD"),
                 "_buildrootdir " + os.path.join(self.results_dir, "BUILDROOT"),
+                "_rpmdir " + self.results_dir,
+                "_sourcedir " + self.results_dir,
+                "_specdir " + self.results_dir,
+                "_srcrpmdir " + self.results_dir,
                 "_tmppath " + os.path.join(self.results_dir, "tmp")]
 
         return ['--define=' + d for d in defines]
+
 
     def make_srpm(self, spec_fn):
         """Make an SRPM from a spec function. Raise OSGPrebuildError on
@@ -190,8 +148,7 @@ class OSGBuild(object):
                            "Command used was: %s\n") %
                            (spec_fn, " ".join(cmd)))
         try:
-            output = checked_backtick(cmd, nostrip=True,
-                                      stderr=subprocess.STDOUT)
+            output = checked_backtick(cmd, nostrip=True, err2out=True)
         except CalledProcessError, e:
             logging.error("Rpmbuild failed. Output follows: " + e.output)
             raise OSGPrebuildError(err_msg_prefix +
@@ -204,6 +161,7 @@ class OSGBuild(object):
                 return srpm
         raise OSGPrebuildError(err_msg_prefix +
                                "Unable to find resulting SRPM.")
+
 
     def process_dot_source(self, sfilename, destdir):
         """Read a .source file, fetch any files mentioned in it from the
@@ -242,53 +200,8 @@ class OSGBuild(object):
 
         return downloaded
 
-    def prebuild_osg(self):
-        """Prebuild osg packages (those with an osg/root directory tree).
 
-        """
-        osg_dir = os.path.join(self.abs_package_dir, 'osg')
-        spec_filenames = glob(os.path.join(osg_dir, '*.spec'))
-        if not spec_filenames:
-            raise OSGPrebuildError('Cannot find a spec file')
-        if not glob(os.path.join(osg_dir, 'root/*')):
-            raise OSGPrebuildError('osg/root empty')
-
-        try:
-            spec_filehandle = open(spec_filenames[0], 'r')
-            spec_contents = spec_filehandle.read()
-        finally:
-            spec_filehandle.close()
-
-        (macro_vars, expanded_spec) = spec_parse(spec_contents)
-
-        tarball_filename = macro_vars['source0']
-
-        old_dir = os.getcwd()
-        os.chdir(os.path.join(osg_dir, 'root'))
-        if re.search(r'\.tar\.gz|\.tgz', tarball_filename):
-            tar_cmd = ['tar', 'czf']
-        elif re.search(r'\.tar\.bz2|\.tbz2', tarball_filename):
-            tar_cmd = ['tar', 'cjf']
-        else:
-            raise OSGPrebuildError(
-                ".tar.gz/.tgz or .tar.bz2/.tbz2 expected for source 0, got: "+
-                tarball_filename)
-
-        tarball_path = os.path.join(self.prebuild_dir, tarball_filename)
-        tar_cmd += [tarball_path, "--exclude",  '*/.svn*']
-        tar_cmd += glob("*")
-
-        logging.info("Creating tarball:\n" + ' '.join(tar_cmd))
-        ret = subprocess.call(tar_cmd)
-        os.chdir(old_dir)
-
-        if ret:
-            raise OSGPrebuildError('Making tarball ' + tarball_path +
-                                   ' failed with return code ' + str(ret))
-
-        shutil.copy(spec_filenames[0], self.prebuild_dir)
-
-    def prebuild_extsrc(self):
+    def prebuild_extsrc(self, destdir=None):
         """Prebuild packages with external sources.
         Process *.source files in upstream/ directory, downloading upstream
         sources mentioned in them from the software cache. Unpack SRPMs if
@@ -296,6 +209,9 @@ class OSGBuild(object):
         directory.
 
         """
+        if destdir is None:
+            destdir = self.prebuild_dir
+
         upstream_dir = os.path.join(self.abs_package_dir, 'upstream')
         osg_dir = os.path.join(self.abs_package_dir, 'osg')
 
@@ -306,7 +222,7 @@ class OSGBuild(object):
             logging.debug('Processing .source file %s', s)
             downloaded += [
                 os.path.abspath(x)
-                for x in self.process_dot_source(s, self.prebuild_dir)]
+                for x in self.process_dot_source(s, destdir)]
 
         # Process downloaded SRPMs
         srpms = fnmatch_.filter(downloaded, '*.src.rpm')
@@ -324,7 +240,7 @@ class OSGBuild(object):
             os.chdir(old_dir)
             for f in glob(os.path.join(self.unpacked_dir, '*')):
                 logging.debug('Copying unpacked file ' + f)
-                shutil.copy(f, self.prebuild_dir)
+                shutil.copy(f, destdir)
 
         # Process other files in upstream
         other_sources = [x for x in glob(os.path.join(upstream_dir, '*'))
@@ -336,7 +252,7 @@ class OSGBuild(object):
                 logging.debug('Skipping other source ' + s)
                 continue
             logging.debug('Copying other source ' + s)
-            shutil.copy(s, self.prebuild_dir)
+            shutil.copy(s, destdir)
 
         if self.options.get('full_extract'):
             # Extract any archives we downloaded plus any archives in the SRPM
@@ -363,9 +279,16 @@ class OSGBuild(object):
                     logging.debug('Skipping ' + f)
                     continue
                 logging.debug('Copying osg file ' + f)
-                shutil.copy(f, self.prebuild_dir)
+                shutil.copy(f, destdir)
 
+        spec_glob = os.path.join(self.prebuild_dir, '*.spec')
+        spec_filenames = glob(spec_glob)
+        if not spec_filenames:
+            raise GlobNotFoundError(spec_glob)
         
+        return spec_filenames
+        
+
     def prebuild(self):
         """Prebuild the package in package_dir: create an SRPM containing
         upstream sources (if any) plus our changes (if any) plus a spec file.
@@ -374,21 +297,31 @@ class OSGBuild(object):
 
         """
         safe_makedirs(self.prebuild_dir)
-        if os.path.isdir(os.path.join(self.abs_package_dir, 'osg/root')):
-            logging.warning("osg/root is deprecated")
-            self.prebuild_osg()
-        else:
-            self.prebuild_extsrc()
+        self.prebuild_extsrc()
 
-        spec_filenames = glob(os.path.join(self.prebuild_dir, '*.spec'))
-        if not spec_filenames:
-            raise OSGPrebuildError("No spec file found in " +
-                                   self.prebuild_dir)
+        spec_filenames = self.prebuild_extsrc()
 
         result_srpm = self.make_srpm(spec_filenames[0])
+
         if result_srpm:
             logging.info("Files have been prepared in %s.", self.prebuild_dir)
             return os.path.abspath(result_srpm)
+
+    
+    def quilt(self):
+        if not which("quilt"):
+            raise ProgramNotFoundError("quilt")
+
+        safe_makedirs(self.prebuild_dir)
+        spec_filenames = self.prebuild_extsrc()
+
+        os.chdir(self.prebuild_dir)
+        ret = unchecked_call(["quilt", "-v", "setup", spec_filenames[0]])
+        if ret != 0:
+            raise OSGBuildError("Error running 'quilt setup' on the spec file.")
+
+        logging.info("quilt files ready in %s", self.prebuild_dir)
+
 
     def prepare(self):
         """Runs rpmbuild -bp"""
@@ -419,11 +352,9 @@ class OSGBuild(object):
         logging.info("Files prepared in: " +
                      os.path.join(self.results_dir, "BUILD"))
 
-    def rpmbuild(self):
-        """Build the package using rpmbuild on the local machine.
-        Push results to yum if 'push_to_yum' is true.
 
-        """
+    def rpmbuild(self):
+        """Build the package using rpmbuild on the local machine."""
         srpm = self.prebuild()
         safe_makedirs(self.results_dir)
         shutil.copy(srpm, self.results_dir)
@@ -445,352 +376,75 @@ class OSGBuild(object):
             logging.info("The following RPM(s) have been created:\n" +
                          "\n".join(rpms))
 
-        if self.options.get('push_to_yum') and self.options.get('yum_base'):
-            copy_to_repo(self.options['yum_base'], rpms + [srpm])
 
     def mock(self):
-        """Build the package using mock on the local machine.
-        Push results to yum if 'push_to_yum' is true.
-
-        """
+        """Build the package using mock on the local machine."""
         srpm = self.prebuild()
         safe_makedirs(self.results_dir)
-        cmd = ['mock']
-        mock_config = self.options.get('mock_config')
-        if mock_config:
-            mock_config = re.sub(r'\.cfg$', '', mock_config)
 
-            mockver = get_mock_version()
-            try:
-                mock_gid = grp.getgrnam('mock').gr_gid
-            except KeyError:
-                raise OSGBuildError("The mock group does not exist on this" +
-                    " system!")
-            if mock_gid not in os.getgroups():
-                raise OSGBuildError(
-                    "You are not able to do a mock build on this " +
-                    "machine because you are not in the mock group.\n" +
-                    "/etc/group must be edited and your username " +
-                    "must be added to the mock group.\n" +
-                    "You might need to log out and log in for the " +
-                    "changes to take effect")
-
-            if mock_config == "AUTO":
-                machine_arch = os.uname()[4]
-                if re.search("i[3-6]86", self.options.get("target_arch", "")):
-                    arch = 'i386'
-                elif (re.search("x86_64", self.options.get("target_arch", ""))
-                        and not re.search("x86_64", machine_arch)):
-                    raise OSGBuildError("Can't do 64-bit build on 32-bit machine")
-                else:
-                    arch = machine_arch
-
-                cfg_dir = self.results_dir
-                cfg_name = make_mock_config(
-                    arch, cfg_dir, mockver,
-                    self.options.get('distro_tag', 'osg'),
-                    str(os.getuid()))
-            elif mock_config.startswith('/'):
-                # Absolute path
-                if not os.path.isfile(mock_config + ".cfg"):
-                    raise OSGBuildError("Couldn't find mock config file " +
-                                        mock_config + ".cfg")
-                cfg_name = os.path.basename(mock_config)
-                cfg_dir = os.path.dirname(mock_config)
-            else:
-            	# Relative path. Can be relative to cwd or /etc/mock. Prefer
-            	# cwd.
-            	cfg_name = os.path.basename(mock_config)
-            	given_cfg_dir = os.path.dirname(mock_config)
-            	cfg_dir1 = os.path.abspath(given_cfg_dir)
-            	cfg_dir2 = os.path.abspath(os.path.join('/etc/mock',
-                                                        given_cfg_dir))
-                if os.path.isfile(os.path.join(cfg_dir1, cfg_name + ".cfg")):
-                    cfg_dir = cfg_dir1
-                elif os.path.isfile(os.path.join(cfg_dir2, cfg_name + ".cfg")):
-                    cfg_dir = cfg_dir2
-                else:
-                    raise OSGBuildError(
-                        ("Couldn't find mock config file %s.cfg (looked in " +
-                         "%s, %s") % (mock_config, cfg_dir1, cfg_dir2))
-
-            cmd += ['--configdir', cfg_dir, '-r', cfg_name]
-            copy_mock_extra_config_files(cfg_dir, mockver, force=False)
-
-        cmd += ['--resultdir', self.results_dir, 'rebuild', srpm]
-
-        if self.options.has_key('target_arch'):
-            cmd += ['--arch', self.options['target_arch']]
-
-        err = subprocess.call(cmd)
-        if err:
-            raise OSGBuildError('Mock build failed (command was: ' +
-                                ' '.join(cmd) + ')')
-        # Clean up after ourselves.
-        if mock_config is not None:
-            subprocess.call(["mock", "--configdir", cfg_dir, "-r", cfg_name,
-                             "clean"])
-        else:
-            subprocess.call(["mock", "clean"])
-
-        # TODO: Parse the mock logs/output instead of using glob.
-        rpms = [x for x in glob(os.path.join(self.results_dir, "*.rpm"))
-                if not fnmatch(x, '*.src.rpm')]
+        rpms = self.mock_obj.rebuild(self.results_dir, srpm)
+        if self.options['mock_clean']:
+            self.mock_obj.clean()
         logging.info("The following RPM(s) have been created:\n" +
                      "\n".join(rpms))
-
-        if self.options.get('push_to_yum') and self.options.get('yum_base'):
-            copy_to_repo(self.options['yum_base'], rpms + [srpm])
-
-    def batlab(self):
-        """Upload a build to the nmi submit machine and submit it to the
-        batlab. Push to yum if push_to_yum is true. Now deprecated in
-        favor of the koji task.
-        
-        """
-        logging.warning("The batlab task is deprecated. " +
-                        "Use the koji task instead.")
-        srpm = self.prebuild()
-        safe_makedirs(self.results_dir)
-        nmi_prebuild_dir = os.path.join(self.working_subdir, '_nmi_prebuild')
-        safe_makedirs(nmi_prebuild_dir)
-        glue_dir = os.path.join(nmi_prebuild_dir, "glue")
-        safe_makedirs(glue_dir)
-
-        name,version,release = subprocess.Popen(
-            ['rpm', '-qp', '--qf', '%{name}\n%{version}\n%{release}', srpm],
-            stdout=subprocess.PIPE).communicate()[0].split("\n")
-
-
-        remote_dirname = ("%s-%s-%s-%s" %
-            (name, version, release, time.strftime("%Y%m%d%H%M",
-                                                   time.localtime())))
-
-        remote_task_args = ["--dist=" + self.options.get('distro_tag', "osg")]
-        platform_post_args = ["--host=" + getfqdn()]
-        platform_post_args += ["--script=" + os.path.abspath(sys.argv[0])]
-        platform_post_args += ["--results-dir=" + self.results_dir]
-        if self.options.get('push_to_yum') and self.options.get('yum_base'):
-            platform_post_args += ["--yum-base=" +
-                                   self.options['yum_base']]
-
-        cmdfile_text = CMDFILE_TEMPLATE.safe_substitute(
-            NAME=name, VERSION=version, RELEASE=release,
-            REMOTE_TASK_ARGS=" ".join(
-                ["'"+x+"'" for x in remote_task_args]),
-            NOTIFY=self.options.get('email') or "",
-            PLATFORM_POST_ARGS=" ".join(
-                ["'"+x+"'" for x in platform_post_args]))
-
-        unslurp(os.path.join(nmi_prebuild_dir, "cmdfile"), cmdfile_text)
-        # Find the glue files under sys.path and copy them to nmi_prebuild_dir
-        dest = os.path.join(glue_dir, "osg_build_lib")
-        shutil.copytree(find_file("osg_build_lib", sys.path),
-                        dest)
-        for f in glob(os.path.join(dest, "*.py")):
-            os.chmod(f, 0755)
-        shutil.rmtree(os.path.join(dest, ".svn"), ignore_errors=True)
-
-        unslurp(os.path.join(nmi_prebuild_dir, "glue.scp"), GLUE_SCP_TEXT)
-        shutil.copy(srpm, nmi_prebuild_dir)
-        srpm_scp_text = SRPM_SCP_TEMPLATE.safe_substitute(
-            SRPM=os.path.basename(srpm))
-        unslurp(os.path.join(nmi_prebuild_dir, "srpm.scp"), srpm_scp_text)
-            
-        # Upload nmi_prebuild_dir to the nmi submit machine
-        os.system("scp -r %s %s:%s" %
-                  (nmi_prebuild_dir,
-                  self.options['nmi_submit_machine'],
-                  remote_dirname))
-        # Submit the build on the nmi submit machine
-        # TODO: HAAACK
-        if self.options['nmi_submit_machine'].endswith('.batlab.org'):
-            nmi_submit_path = "/usr/local/nmi/bin"
-        else:
-            nmi_submit_path = "/nmi/bin"
-        os.system(("""ssh %s 'cd %s;""" +
-                   """sed -i -e "s,@NMIDIR@,`pwd`," *.scp;""" +
-                   nmi_submit_path + """/nmi_submit --must-match cmdfile'""") %
-                  (self.options['nmi_submit_machine'], remote_dirname))
-        # platform-post.py will put the resulting rpms in results_dir, as well
-        # as push them to the yum repo if push_to_yum and yum_base are set.
-        # Put the srpm in the results dir so it'll get pushed as well.
-        shutil.copy(srpm, self.results_dir)
-
-
-    def get_koji_login(self):
-        """Return the user's koji login (their CN, unless otherwise specified
-        on the command line.
-
-        """
-        subject = backtick(
-            ["openssl", "x509", "-in", KOJI_CLIENT_CERT, "-noout", "-subject",
-             "-nameopt", "multiline"])
-        # Get the last commonName
-        cn_match = re.search(r"""(?xms)
-            ^ \s* commonName \s* = \s* ([^\n]+) \s* $
-            (?!.*commonName)""", subject)
-
-        if self.options.has_key('kojilogin'):
-            cn = self.options['kojilogin']
-        elif cn_match:
-            cn = cn_match.group(1)
-        else:
-            raise OSGBuildError(
-                "Unable to determine your Koji login. Either pass " +
-                "--kojilogin or verify that " +
-                "'openssl x509 -in %s -noout -subject'" % (KOJI_CLIENT_CERT) +
-                " gives you a subject with a CN.")
-
-        return cn
-
-
-    def koji_add_package(self, koji_cmd, cn, koji_tag):
-        """Part of koji task. If the package needs to be added to koji_tag,
-        do so.
-
-        """
-        # See if the package needs to be added
-        found = False
-        package_name = os.path.basename(self.abs_package_dir)
-        list_pkgs = backtick(koji_cmd +
-                             ["list-pkgs", "--package", package_name])
-        for line in list_pkgs.split("\n"):
-            fields = re.split(r"\s*", line, 2)
-            try:
-                if fields[1] == koji_tag:
-                    found = True
-            except IndexError:
-                pass
-
-        if not found:
-            logging.info("Calling koji to add the package")
-            unchecked_call(
-                koji_cmd +
-                ["add-pkg", koji_tag,
-                 os.path.basename(self.abs_package_dir), "--owner", cn])
-
-
-    def get_koji_build_and_dest_tags(self, koji_cmd, koji_target):
-        line = backtick(koji_cmd + ["-q", "list-targets",
-                                    "--name", koji_target])
-        if not line:
-            raise OSGBuildError(
-                "Unable to find koji target with the name " + koji_target)
-        else:
-            try:
-                fields = re.split(r"\s*", line, 2)
-                target_build_tag = fields[1]
-                target_dest_tag = fields[2]
-            except IndexError:
-                raise OSGBuildError(
-                    "Unable to determine koji tags from koji target")
-        return (target_build_tag, target_dest_tag)
 
 
     def koji(self):
         """koji task. Submit a build to koji; add the package first if
-        necessary. Get the koji login from the CN in the user's koji client
-        cert, or --kojilogin if provided. Raise OSGBuildError on failure.
+        necessary.
 
         """
-
-        # Check to make sure we're not submitting from a RHEL 6 box--SRPMs made
-        # on a RHEL 6 box get checksum errors in koji.
-        release = backtick("cat /etc/redhat-release")
-        if release and release.lower().find("release 6") != -1:
-            raise OSGBuildError("koji builds cannot be submitted from a RHEL 6-based host!")
-
-        # Use osg-koji wrapper if available and configured.
-        if os.system("which osg-koji &>/dev/null") == 0 and os.path.exists(OSG_KOJI_USER_CONFIG_DIR) and self.options['koji_wrapper']:
-            koji_cmd = ["osg-koji"]
-        elif os.system("which koji &>/dev/null") == 0:
-            # Not using osg-koji, so we need to find the conf file and do some
-            # checks ourselves.
-            conf_file_search_path = sys.path + [DATA_DIR]
-            conf_file = find_file(KOJI_CONF, conf_file_search_path) or find_file(OLD_KOJI_CONF, conf_file_search_path)
-            if not conf_file:
-                raise OSGBuildError("Can't find " + KOJI_CONF + " or " + OLD_KOJI_CONF + "; search path was:\n" + ":".join(conf_file_search_path))
-
-            koji_cmd = ["koji", "--config", conf_file, "--authtype", "ssl"]
-
-            if not os.path.exists(KOJI_CLIENT_CERT):
-                raise OSGBuildError("Unable to find your Koji client cert at " + KOJI_CLIENT_CERT)
-        else:
-            raise OSGBuildError("Can't find koji or osg-koji!")
-
-        cn = self.get_koji_login()
-
-        safe_makedirs(self.results_dir)
+        if not self.options['svn'] and not self.koji_obj.can_build_srpm:
+            raise OSGBuildError(
+"""SRPMs made with rpmbuild 4.8 or newer cannot be submitted to koji.
+Use RHEL 5 or a compatible distribution.""")
 
         koji_target = self.options['koji_target']
         target_build_tag, target_dest_tag = (
-            self.get_koji_build_and_dest_tags(koji_cmd, koji_target))
+            self.koji_obj.get_build_and_dest_tags(koji_target))
         if self.options['koji_tag'] == 'TARGET':
             koji_tag = target_dest_tag
         else:
             koji_tag = self.options['koji_tag']
 
-        self.koji_add_package(koji_cmd, cn, koji_tag)
+        self.koji_obj.add_pkg(koji_tag, self.package_name)
+        if not self.options['svn']:
+            safe_makedirs(self.results_dir)
+            srpm = self.prebuild()
+            self.koji_obj.build_srpm(koji_target, srpm)
+        else:
+            self.koji_obj.build_svn(koji_target, *get_package_svn_url_rev(self.package_dir))
 
+
+    def lint(self):
+        if not which("rpmlint"):
+            raise ProgramNotFoundError("rpmlint")
+        conf_file = find_file("rpmlint.cfg", DATA_FILE_SEARCH_PATH)
+        if not conf_file:
+            raise FileNotFoundError("rpmlint.cfg", DATA_FILE_SEARCH_PATH)
         srpm = self.prebuild()
-        build_subcmd = ["build", koji_target, srpm]
-        if self.options.get('scratch'):
-            build_subcmd += ["--scratch"]
-        if self.options.get('no_wait'):
-            build_subcmd += ["--nowait"]
-        logging.info("Calling koji to build the package")
-        err = unchecked_call(koji_cmd + build_subcmd)
-        if err:
-            raise OSGBuildError("koji build failed with exit code " + str(err))
-        if self.options.get('regen_repos') and not self.options.get('scratch'):
-            regen_repo_subcmd = ["regen-repo", target_build_tag]
-            if self.options.get('no_wait'):
-                regen_repo_subcmd += ["--nowait"]
-            logging.info("Calling koji to regen " + target_build_tag)
-            err2 = unchecked_call(koji_cmd + regen_repo_subcmd)
-            if err2:
-                raise OSGBuildError("koji regen-repo failed with exit code " + str(err2))
+        lint_output, lint_returncode = sbacktick(["rpmlint", "-f", conf_file, srpm])
 
-
+        print lint_output
+        if lint_returncode == 0:
+            print "rpmlint ok for " + self.package_name
+        elif lint_returncode < 64:
+            print "Error running rpmlint for " + self.package_name
+        elif lint_returncode == 64:
+            print "rpmlint found problems with " + self.package_name
+        elif lint_returncode == 66:
+            print "rpmlint found many problems with " + self.package_name
+        else:
+            print "unrecognized return code from rpmlint: " + str(lint_returncode)
             
 
 
 
 
-
-def init_repos(base_repo):
-    for repo in ['i386', 'x86_64', 'src']:
-        safe_makedirs(os.path.join(base_repo, repo))
-
-
-def push_task(rpms, yum_base):
-    """Copy rpms, either given directly or via recursing into subdirectories,
-    to the yum repos under yum_base.
-
-    """
-    # Push should probably be a separate script entirely.
-    if not yum_base:
-        raise UsageError(
-            "No yum repo specified for task push! " +
-            "Must pass -y or specify yum_base in the config file.")
-    real_rpms = []
-    for r in rpms:
-        if os.path.isfile(r) and r.endswith('.rpm'):
-            real_rpms += [r]
-        elif os.path.isdir(r):
-            def _push_os_walk_helper(real_rpms, dirname, files):
-                for f in files:
-                    df = os.path.join(dirname, f)
-                    if df.endswith('.rpm'):
-                        real_rpms += [df]
-            os.path.walk(r, _push_os_walk_helper, real_rpms)
-    copy_to_repo(yum_base, real_rpms)
     
 
 def parse_cmdline_args(argv):
     """Parse the arguments given on the command line. Return a tuple containing
-    parser:     the OptionParser, so main() can print help on a UsageError
     options:    the options object, containing the keyword arguments
     args:       a list containing the positional arguments left over
     optnames:   a list of the option names (valid attributes of 'options')
@@ -798,45 +452,43 @@ def parse_cmdline_args(argv):
     """
     parser = OptionParser("""
    %prog TASK PACKAGE1 <PACKAGE2..n> [options]
-or %prog push RPM1 <RPM2..n> [options]
 
 Valid tasks are:
-prebuild     Preprocess the package, create SRPM to be submitted, and stop.
-prepare      Use rpmbuild -bp to unpack and patch the package.
-rpmbuild     Build using rpmbuild(8) on the local machine.
-mock         Build using mock(1) on the local machine.
-batlab       Submit a build to the NMI Build and Test Lab (deprecated).
-push         Push the given RPMs to the yum repositories only.
 koji         Build using koji
+lint         Discover potential package problems using rpmlint
+mock         Build using mock(1) on the local machine
+prebuild     Preprocess the package, create SRPM to be submitted, and stop
+prepare      Use rpmbuild -bp to unpack and patch the package
+quilt        Preprocess the package and run 'quilt setup' on the spec file to unpack the source files and prepare a quilt(1) series file.
+rpmbuild     Build using rpmbuild(8) on the local machine
 """)
     parser.add_option(
+        "-a", "--autoclean", action="store_true",
+        help="Clean out the following directories before each build: "
+        "'%s', '%s', '%s', '%s'" % (WD_RESULTS, WD_PREBUILD, WD_UNPACKED,
+        WD_UNPACKED_TARBALL))
+    parser.add_option(
+        "--no-autoclean", action="store_false", dest="autoclean",
+        help="Disable autoclean")
+    parser.add_option(
         "-c", "--cache-prefix",
-        help="The prefix for the software cache to take source files " +
-        "from. The following special caches exist: " +
-        "AFS (%s), and " % AFS_CACHE_PREFIX +
-        "VDT (%s). " % WEB_CACHE_PREFIX +
-        "AUTO (AFS if avaliable, VDT if not) " +
-        "The default cache is AUTO.")
+        help="The prefix for the software cache to take source files from. "
+        "The following special caches exist: "
+        "AFS (%s), VDT (%s), and AUTO (AFS if avaliable, VDT if not). "
+        "The default cache is AUTO." % (AFS_CACHE_PREFIX, WEB_CACHE_PREFIX))
     parser.add_option(
         "-C", "--config-file",
         help="The file to get configuration for this script.")
     parser.add_option(
         "--distro-tag",
-        help="The distribution tag to append to the end of the release." +
-        " (Default: osg)")
-    parser.add_option(
-        "-e", "--email",
-        help="The email address to send notifications to (batlab task).")
+        help="The distribution tag to append to the end of the release. "
+        "(Default: osg)")
     parser.add_option(
         "--full-extract", action="store_true",
         help="Fully extract all source files.")
     parser.add_option(
-        "--init-repos", action="store_true",
-        help="Create directories under 'yum_base' to hold the YUM " +
-        "repositories in.")
-    parser.add_option(
         "-k", "--kojilogin", "--koji-login", dest="kojilogin",
-        help="The login you use for koji (most likely your CN, e.g." +
+        help="The login you use for koji (most likely your CN, e.g."
         "'Matyas Selmeci 564109')")
     parser.add_option(
         "--koji-target",
@@ -844,7 +496,7 @@ koji         Build using koji
         DEFAULT_KOJI_TARGET)
     parser.add_option(
         "--koji-tag",
-        help="The koji tag to add packages to. The special value TARGET " +
+        help="The koji tag to add packages to. The special value TARGET "
         "uses the destination tag defined in the koji target. Default: " +
         DEFAULT_KOJI_TAG)
     parser.add_option(
@@ -855,26 +507,23 @@ koji         Build using koji
         help="Do not use the 'osg-koji' koji wrapper, even if found.")
     parser.add_option(
         "--loglevel",
-        help="The level of logging the script should do. " +
+        help="The level of logging the script should do. "
         "Valid values are: DEBUG,INFO,WARNING,ERROR,CRITICAL")
     parser.add_option(
+        "--no-mock-clean", action="store_false", dest="mock_clean",
+        help="Do not clean the mock buildroot after building (mock task)")
+    parser.add_option(
         "-m", "--mock-config",
-        help="The location of the mock config file. " +
-        "defaults to AUTO to use an autogenerated file " +
+        help="The location of the mock config file. "
+        "defaults to AUTO to use an autogenerated file "
         "recommended for OSG builds")
     parser.add_option(
-        "-p", "--push-to-yum", action="store_true",
-        help="Copy completed RPMs to a YUM repostiory.")
-    parser.add_option(
-        "--nop", "--no-push-to-yum", action="store_false",
-        dest="push_to_yum",
-        help="Do not copy completed RPMs to a YUM repository.")
+        "--mock-config-from-koji",
+        help="Use a mock config based on a koji buildroot (build tag, "
+        "such as el5-osg-build).")
     parser.add_option(
         "--no-wait", "--nowait", action="store_true", dest="no_wait",
         help="Do not wait for the build to finish (koji task)")
-    parser.add_option(
-        "--nmi-submit-machine",
-        help="The machine in the nmi build and test lab to submit builds to")
     parser.add_option(
         "-q", "--quiet", action="store_const", const="warning", dest="loglevel",
         help="Display less information. Equivalent to --loglevel=warning")
@@ -888,8 +537,11 @@ koji         Build using koji
         "--scratch", action="store_true",
         help="Perform a scratch build (koji task only)")
     parser.add_option(
+        "--svn", action="store_true",
+        help="Build package directly from SVN (koji task only, required for RHEL6)")
+    parser.add_option(
         "-t", "--target-arch",
-        help="The target architecture to build for " +
+        help="The target architecture to build for "
         "(rpmbuild and mock tasks only)")
     parser.add_option(
         "-v", "--verbose", action="store_const", const="debug", dest="loglevel",
@@ -899,19 +551,15 @@ koji         Build using koji
         help="Show version and exit.")
     parser.add_option(
         "-w", "--working-directory",
-        help="The base directory to use for temporary files made by the "+
-        "script. If it is 'TEMP', a randomly-named directory under /tmp "+
+        help="The base directory to use for temporary files made by the "
+        "script. If it is 'TEMP', a randomly-named directory under /tmp "
         "is used.")
-    parser.add_option(
-        "-y", "--yum-base",
-        help="The base directory containing the YUM repositories to " +
-        "push RPMs to. Passing this implies --push-to-yum")
 
     optnames = [x.dest for x in parser.option_list if x.dest is not None]
 
     options, args = parser.parse_args(argv[1:])
 
-    return (parser, options, args, optnames)
+    return (options, args, optnames)
 
 
 def get_task(args):
@@ -924,8 +572,8 @@ def get_task(args):
     if len(args) < 1:
         raise UsageError('Need task!')
     task = args[0]
-    valid_tasks = ['batlab', 'prepare', 'prebuild', 'koji', 'mock', 'push',
-                   'rpmbuild']
+
+    valid_tasks = ['koji', 'lint', 'mock', 'prebuild', 'prepare', 'quilt', 'rpmbuild']
 
     matching_tasks = [x for x in valid_tasks if x[0:len(task)] == task]
 
@@ -940,23 +588,29 @@ def get_task(args):
     return real_task
 
 
-def get_buildopts(options, args, task, optnames):
+def get_buildopts(options, optnames):
     """Return a dict of the build options to use, based on the config file and
     command-line arguments.
 
     """
     buildopts = {
+        'autoclean': False,
         'cache_prefix': 'AUTO',
         'distro_tag': 'osg',
         'full_extract': False,
         'init_repos': False,
+        'kojilogin': None,
         'koji_tag': DEFAULT_KOJI_TAG,
         'koji_target': DEFAULT_KOJI_TARGET,
         'koji_wrapper': True,
+        'mock_clean': True,
         'mock_config': 'AUTO',
-        'nmi_submit_machine': 'submit-1.batlab.org',
+        'mock_config_from_koji': None,
+        'no_wait': False,
         'regen_repos': False,
         'scratch': False,
+        'svn': False,
+        'target_arch': '',
         'working_directory': '.',
         }
 
@@ -984,56 +638,102 @@ def get_buildopts(options, args, task, optnames):
         optval = getattr(options, optname, None)
         if optval is not None:
             buildopts[optname] = optval
-    if options.yum_base:
-        buildopts['yum_base'] = options.yum_base
-        buildopts['push_to_yum'] = True
 
     # Special case for working_directory being TEMP
-    if buildopts.get('working_directory') == 'TEMP':
+    if buildopts['working_directory'] == 'TEMP':
         buildopts['working_directory'] = (
             tempfile.mkdtemp(prefix='osg-build-'))
         logging.debug('Working directory is %s',
                         buildopts['working_directory'])
 
     # Special case for cache_prefix being AFS or VDT
-    if buildopts.get('cache_prefix') == 'AFS':
+    if buildopts['cache_prefix'] == 'AFS':
         buildopts['cache_prefix'] = AFS_CACHE_PREFIX
-    elif buildopts.get('cache_prefix') == 'VDT':
+    elif buildopts['cache_prefix'] == 'VDT':
         buildopts['cache_prefix'] = WEB_CACHE_PREFIX
-    elif buildopts.get('cache_prefix') == 'AUTO':
+    elif buildopts['cache_prefix'] == 'AUTO':
         if os.path.exists(AFS_CACHE_PATH):
             buildopts['cache_prefix'] = AFS_CACHE_PREFIX
         else:
             buildopts['cache_prefix'] = WEB_CACHE_PREFIX
 
-    # If push_to_yum not explicitly specified, set it to True for mock/batlab
-    if buildopts.get('push_to_yum') is not None:
-        if task == 'mock' or task == 'batlab':
-            buildopts['push_to_yum'] = True
-        else:
-            buildopts['push_to_yum'] = False
+    # --mock-config-from-koji overrides --mock-config
+    if buildopts['mock_config_from_koji']:
+        buildopts['mock_config'] = None
 
     return buildopts
 
 
 def print_version_and_exit():
-    if os.path.exists(os.path.join(os.path.dirname(sys.argv[0]), ".svn")):
-        version = "SVN " + backtick("svn info " + sys.argv[0] + "|grep 'Revision'")
+    if __version__ == '@' + 'VERSION' + '@':
+        print "osg-build SVN"
+        out, ret = sbacktick("svn info " + sys.argv[0], err2out=True)
+        if ret:
+            print "no info"
+        else:
+            print "SVN info:\n" + out
     else:
-        version = __version__
-
-    print "osg-build " + version
+        print "osg-build " + version
     sys.exit(0)
 
+
+def make_mock_obj(distro_tag, mock_config, mock_config_from_koji, koji_obj, target_arch):
+    machine_arch = os.uname()[4]
+    if re.search("i[3-6]86", target_arch):
+        arch = 'i386'
+    elif (re.search("x86_64", target_arch) and not re.search("x86_64", machine_arch)):
+        raise OSGBuildError("Can't do 64-bit build on 32-bit machine")
+    else:
+        arch = machine_arch
+
+    if mock_config:
+        if mock_config == "AUTO":
+            cfg_dir = tempfile.mkdtemp(prefix="osg-build-mock-")
+            atexit.register(shutil.rmtree, cfg_dir)
+            cfg_path = make_mock_config(
+                arch,
+                os.path.join(cfg_dir,"mock-auto-%s.%d.cfg" % (arch, os.getuid())),
+                distro_tag)
+        else:
+            if not mock_config.endswith(".cfg"):
+                given_cfg_path = mock_config + ".cfg"
+            else:   
+                given_cfg_path = mock_config
+                
+            if given_cfg_path.startswith('/'):
+                # Absolute path
+                cfg_path = given_cfg_path
+            else:
+                # Relative path. Can be relative to cwd or /etc/mock. Prefer cwd.
+                given_cfg_dir, given_cfg_file = os.path.split(given_cfg_path)
+                cfg_dir1 = os.path.abspath(given_cfg_dir)
+                cfg_dir2 = os.path.abspath(os.path.join('/etc/mock', given_cfg_dir))
+                cfg_path = find_file(given_cfg_file, [cfg_dir1, cfg_dir2])
+
+            #link_mock_extra_config_files(os.path.dirname(cfg_path))
+
+    elif mock_config_from_koji:
+        cfg_dir = tempfile.mkdtemp(prefix="osg-build-mock-")
+        atexit.register(shutil.rmtree, cfg_dir)
+        cfg_path = make_mock_config_from_koji(
+            koji_obj,
+            arch,
+            os.path.join(cfg_dir,"mock-koji-%s-%s.%d.cfg" % (mock_config_from_koji, arch, os.getuid())),
+            mock_config_from_koji,
+            distro_tag)
+    else:
+        cfg_path = None
+
+    return Mock(cfg_path, target_arch)
 
 
 def main(argv=None):
     """Main function."""
-    
+
     if argv is None: argv=sys.argv
 
     try:
-        parser, options, args, optnames = parse_cmdline_args(argv)
+        options, args, optnames = parse_cmdline_args(argv)
 
         if options.version:
             print_version_and_exit()
@@ -1048,38 +748,57 @@ def main(argv=None):
                             level=loglevel)
 
         task = get_task(args)
+        buildopts = get_buildopts(options, optnames)
 
-        buildopts = get_buildopts(options, args, task, optnames)
+        if buildopts['svn'] and task != 'koji':
+            raise UsageError("--svn only valid for 'koji' task!")
 
-        if options.init_repos:
-            if not buildopts.get('yum_base'):
-                raise UsageError("No yum base specified with --init-repos! " +
-                    "Must pass -y or specify yum_base in the config file.")
-            else:
-                init_repos(buildopts['yum_base'])
+        if len(args) < 2:
+            raise UsageError('Need package directories for this task!')
 
-        if task == 'push':
-            if len(args) < 2:
-                raise UsageError('Need RPMs for push task!')
+        mock_obj = None
+        koji_obj = None
 
-            push_task(args[1:], buildopts.get('yum_base'))
-        else:
-            if len(args) < 2:
-                raise UsageError('Need package directories for this task!')
+        if task == 'koji' or (task == 'mock' and buildopts['mock_config_from_koji']):
+            koji_obj = Koji(
+                koji_wrapper=buildopts['koji_wrapper'],
+                kojilogin=buildopts['kojilogin'],
+                no_wait=buildopts['no_wait'],
+                regen_repos=buildopts['regen_repos'],
+                scratch=buildopts['scratch'])
+        if task == 'mock':
+            mock_obj = make_mock_obj(
+                distro_tag=buildopts['distro_tag'],
+                mock_config=buildopts['mock_config'],
+                mock_config_from_koji=buildopts['mock_config_from_koji'],
+                koji_obj=koji_obj,
+                target_arch=buildopts['target_arch'])
 
-            package_dirs = args[1:]
-            if buildopts.get('push_to_yum') and buildopts.get('yum_base'):
-                verify_yum_repos(buildopts['yum_base'])
-                    
-            for p in package_dirs:
-                if not os.path.isdir(p):
-                    raise UsageError(p + " isn't a package dir!")
-                builder = OSGBuild(p, buildopts)
-                getattr(builder, task)()
+        package_dirs = args[1:]
+
+        for p in package_dirs:
+            if buildopts['svn']:
+                if get_package_svn_url_rev(p) is None:
+                    raise OSGBuildError("Unable to get SVN info for package dir " + p)
+                if check_uncommitted(p):
+                    choice = ask("Package directory "+p+" has uncommitted changes"
+                                 " that will not be included in the SVN build."
+                                 " Continue (yes/no/skip)?")
+                    if choice[0] == "n":
+                        print "Exiting."
+                        sys.exit(1)
+                    elif choice[0] == "s":
+                        print "Skipping."
+                        continue
+            elif not os.path.isdir(p):
+                raise UsageError(p + " isn't a package dir!")
+
+            builder = OSGBuild(p, buildopts, mock_obj=mock_obj, koji_obj=koji_obj)
+            getattr(builder, task)()
 
     except UsageError, e:
-        parser.print_help()
         print >>sys.stderr, str(e)
+        print >>sys.stderr, "Type '" + sys.argv[0] + " --help' for usage info."
         return 2
     except SystemExit, e:
         return e.code
@@ -1091,15 +810,15 @@ def main(argv=None):
         return 3
     except Error, e:
         print >>sys.stderr, "-" * 79
-        print >>sys.stderr, "\t" + str(e)
+        print >>sys.stderr, str(e)
         print >>sys.stderr, "-" * 79
         logging.debug("Full traceback follows:")
         logging.debug(e.traceback)
         return 4
     except Exception, e:
         print >>sys.stderr, "-" * 79
-        print >>sys.stderr, "\tAn exception occurred:"
-        print >>sys.stderr, "\t" + str(e)
+        print >>sys.stderr, "An exception occurred:"
+        print >>sys.stderr, str(e)
         print >>sys.stderr, "-" * 79
         print >>sys.stderr, "Full traceback follows:"
         traceback.print_exc()

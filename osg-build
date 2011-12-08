@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import urllib2
+import ConfigParser as ConfigParser_
 from ConfigParser import ConfigParser
 import traceback
 
@@ -363,9 +364,9 @@ class OSGBuild(object):
         cmd = ["rpmbuild"]
         cmd += self.get_rpmbuild_defines(prebuild=False)
         cmd += ["--rebuild", srpm]
-        if self.options.has_key('target_arch'):
+        if self.options.get('target_arch', ''):
             cmd += ["--target", self.options['target_arch']]
-        err = subprocess.call(cmd)
+        err = unchecked_call(cmd)
 
         # TODO Parse rpmbuild output instead of using glob
         if err:
@@ -373,6 +374,8 @@ class OSGBuild(object):
         else:
             rpms = [x for x in glob(os.path.join(self.results_dir, "*.rpm"))
                     if not fnmatch(x, '*.src.rpm')]
+            if not rpms:
+                raise OSGBuildError("No RPMs found. Making RPMs failed?")
             logging.info("The following RPM(s) have been created:\n" +
                          "\n".join(rpms))
 
@@ -626,12 +629,15 @@ def get_buildopts(options, optnames):
             cfg_file = ALT_DEFAULT_CONFIG_FILE
 
     if os.path.exists(cfg_file):
-        cfg = ConfigParser()
-        cfg.read(cfg_file)
-        buildopts.update(cfg.items('options'))
-        logging.debug("Read default config from %s", cfg_file)
+        try:
+            cfg = ConfigParser()
+            cfg.read(cfg_file)
+            buildopts.update(cfg.items('options'))
+            logging.debug("Read default config from %s", cfg_file)
+        except ConfigParser_.Error, e:
+            logging.warning("Error reading configuration from %s: %s", cfg_file, str(e))
     else:
-        logging.debug("Config file not found at %s", cfg_file)
+        logging.warning("Config file not found at %s", cfg_file)
 
     # Overrides from command line
     for optname in optnames:

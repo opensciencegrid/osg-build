@@ -1,70 +1,147 @@
 #!/usr/bin/python
+# pylint: disable-msg=C0103,C0111
 
 import atexit
 import re
 import os
+from os.path import join as opj
 import shutil
 import tempfile
 import unittest
 import sys
 
-from osg_build_lib.constants import SVN_ROOT
-from osg_build_lib.utils import checked_call, checked_backtick, sbacktick, CalledProcessError
+from osg_build_lib.constants import (
+    SVN_ROOT,
+    WD_PREBUILD,
+    WD_UNPACKED,
+    WD_UNPACKED_TARBALL)
+from osg_build_lib.utils import (
+    checked_backtick,
+    CalledProcessError)
 
 OSG_BUILD_COMMAND = "osg-build --config-file=/dev/null"
+TRUNK = "native/redhat/trunk"
 
+initial_wd = os.getcwd()
+
+def common_setUp(path, rev):
+    '''Create a temporary directory, ensure it gets deleted on exit, cd to it,
+    and check out a specific revision of a path from our SVN.
+
+    '''
+    working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
+    atexit.register(shutil.rmtree, working_dir)
+    os.chdir(working_dir)
+    svn_export(path, rev, os.path.basename(path))
+    return opj(working_dir, os.path.basename(path))
 
 def svn_export(path, rev, destpath):
+    '''Run svn export on a revision rev of path into destpath'''
     try:
-        out = checked_backtick(["svn", "export", os.path.join(SVN_ROOT, path), "-r", rev, destpath], err2out=True)
-    except CalledProcessError, e:
+        checked_backtick(
+            ["svn", "export", opj(SVN_ROOT, path), "-r", rev, destpath],
+            err2out=True)
+    except CalledProcessError, err:
         print >> sys.stderr, "Error in svn export:"
-        print >> sys.stderr, out
+        print >> sys.stderr, err.output
         raise
 
 
 class TestLint(unittest.TestCase):
 
     def setUp(self):
-        self.working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
-        atexit.register(shutil.rmtree, self.working_dir)
-        self.old_dir = os.getcwd()
-        os.chdir(self.working_dir)
-        # Check out a specific version of the yum-remove-osg package
-        svn_export("native/redhat/trunk/yum-remove-osg", "{2011-12-06}", "yum-remove-osg")
-
-    def tearDown(self):
-        os.chdir(self.old_dir)
+        self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
+                                    "{2011-12-06}")
 
     def test_lint(self):
-        out, err = sbacktick(OSG_BUILD_COMMAND + " lint " + os.path.join(self.working_dir, "yum-remove-osg"), err2out=True)
-        self.assertEqual(err, 0, "program exited successfully")
-        self.assertNotEqual(out.find("yum-remove-osg.src:25: E: hardcoded-library-path"), -1, "expected error found")
-        self.assertNotEqual(out.find("1 packages and 0 specfiles checked"), -1, "expected number of packages checked")
-        self.assertNotEqual(out.find("rpmlint found problems with yum-remove-osg"), -1, "expected problems found")
+        out = checked_backtick(OSG_BUILD_COMMAND + " lint " + self.pkg_dir,
+                               err2out=True)
+        self.assertNotEqual(
+            out.find("yum-remove-osg.src:25: E: hardcoded-library-path"),
+            -1,
+            "expected error not found")
+        self.assertNotEqual(
+            out.find("1 packages and 0 specfiles checked"),
+            -1,
+            "unexpected number of packages checked")
+        self.assertNotEqual(
+            out.find("rpmlint found problems with yum-remove-osg"),
+            -1,
+            "expected problems not found")
 
 
 class TestRpmbuild(unittest.TestCase):
 
     def setUp(self):
-        self.working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
-        atexit.register(shutil.rmtree, self.working_dir)
-        self.old_dir = os.getcwd()
-        os.chdir(self.working_dir)
-        svn_export("native/redhat/trunk/yum-remove-osg", "{2011-12-06}", "yum-remove-osg")
-
-    def tearDown(self):
-        os.chdir(self.old_dir)
+        self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
+                                    "{2011-12-06}")
 
     def test_rpmbuild(self):
-        out, err = sbacktick(OSG_BUILD_COMMAND + " rpmbuild --loglevel=INFO " + os.path.join(self.working_dir, "yum-remove-osg"), err2out=True)
-        self.assertEqual(err, 0, "program exited successfully")
-        self.assertTrue(re.search(r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'# +
-                        r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.noarch.rpm"),
-                        out), "rpm created message found")
+        out = checked_backtick(OSG_BUILD_COMMAND + " rpmbuild " + self.pkg_dir,
+                               err2out=True)
+        self.assertTrue(
+            re.search(r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
+                      r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.noarch.rpm"),
+                      out),
+            "rpm created message not found")
 
 
+class TestPrebuild(unittest.TestCase):
 
+    def setUp(self):
+        self.pkg_dir = common_setUp(opj(TRUNK, "mash"),
+                                    "{2011-12-08}")
+
+    # TODO add test case for only one of {osg,upstream}
+    def test_prebuild(self):
+        out = checked_backtick(OSG_BUILD_COMMAND + " prebuild " + self.pkg_dir,
+                               err2out=True)
+        upstream_contents = checked_backtick(
+            ["ls", opj(self.pkg_dir, WD_UNPACKED)]).split("\n")
+        final_contents = checked_backtick(
+            ["ls", opj(self.pkg_dir, WD_PREBUILD)]).split("\n")
+
+        self.assertTrue(
+            "mash.spec" in upstream_contents,
+            "spec file not in upstream contents")
+        self.assertTrue(
+            "mash-0.5.22.tar.gz" in upstream_contents,
+            "source tarball not in upstream contents")
+        self.assertTrue(
+            "mash.spec" in final_contents,
+            "spec file not in final contents")
+        self.assertTrue(
+            "multilib-python.patch" in final_contents,
+            "osg patch not in final contents")
+        self.assertTrue(
+            "mash-0.5.22-2.osg.src.rpm" in final_contents,
+            "srpm not successfully built")
+
+    def test_prebuild_full_extract(self):
+        out = checked_backtick(OSG_BUILD_COMMAND +
+                               " prebuild --full-extract " +
+                               self.pkg_dir,
+                               err2out=True)
+        ut_contents = checked_backtick(
+            ["ls", opj(self.pkg_dir, WD_UNPACKED_TARBALL)]
+            ).split("\n")
+        tarball_contents = checked_backtick(
+            ["ls", opj(self.pkg_dir, WD_UNPACKED_TARBALL, "mash-0.5.22")]
+            ).split("\n")
+
+        self.assertEqual(
+            out.find("cpio: premature end of archive"),
+            -1,
+            "file unreadable by cpio")
+        self.assertTrue(
+            "mash.spec" in ut_contents,
+            "spec file not in unpacked tarball dir")
+        self.assertTrue(
+            "README" in tarball_contents,
+            "expected file not in unpacked sources")
+
+        
+        
 
 if __name__ == '__main__':
     unittest.main()

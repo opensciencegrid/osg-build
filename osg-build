@@ -1,38 +1,50 @@
 #!/usr/bin/env python2
 import atexit
 from glob import glob
-import grp
-import fnmatch as fnmatch_
 from fnmatch import fnmatch
+from fnmatch import filter as fnmatch_filter
 import logging
 from optparse import OptionParser
 import os
 import re
 import shutil
-from socket import getfqdn
-import subprocess
 import sys
 import tempfile
-import time
 import urllib2
-import ConfigParser as ConfigParser_
-from ConfigParser import ConfigParser
+import ConfigParser
 import traceback
 
 from osg_build_lib.constants import *
 from osg_build_lib.utils import *
 from osg_build_lib.koji import *
 from osg_build_lib.error import *
-from osg_build_lib.mock import link_mock_extra_config_files, make_mock_config, make_mock_config_from_koji, Mock
+from osg_build_lib.mock import make_mock_config, make_mock_config_from_koji, Mock
 
 __version__ = '@VERSION@'
 
+# Wishlist:
+# - Better message printing. Should distinguish between when to use logging.*
+#   versus print.
+# - Better support for multiple packages. If a single build runs into an error,
+#   the user should be given a choice to skip that package. Some kind of report
+#   afterward showing successful/failed packages should be printed.
+#   Should be some sanity checks on all packages before any work on any of them
+#   is done.
+# - Better exceptions. Should review where they should _really_ be used.
+# - Split up main(), it's a bit long and unwieldly.
+# - Split up OSGBuild, especially with the large difference between SVN and
+#   working directory builds. Also, it has too many class variables, leading
+#   to too much action-at-a-distance.
+# - SVN build should print out a warning if building from an outdated working
+#   dir, i.e. revision != whatever HEAD is.
+# - Have unit tests for every chunk of code I change.
+# - Get rid of wildcard imports
 
 def check_uncommitted(package_dir):
     """Return True if there are uncommitted changes in the SVN working dir."""
     out, err = sbacktick("svn status -q " + package_dir)
     if err:
-        print >>sys.stderr, "error getting svn status"
+        print >> sys.stderr, "error getting svn status"
         return None
     if out:
         print "The following uncommitted changes exist:"
@@ -138,10 +150,7 @@ class OSGBuild(object):
 
 
     def make_srpm(self, spec_fn):
-        """Make an SRPM from a spec function. Raise OSGPrebuildError on
-        failure.
-
-        """
+        """Make an SRPM from a spec file. Raise OSGPrebuildError on failure"""
         cmd = ["rpmbuild", "-bs", "--nodeps"]
         cmd += self.get_rpmbuild_defines(prebuild=True)
         cmd += [spec_fn]
@@ -150,10 +159,10 @@ class OSGBuild(object):
                            (spec_fn, " ".join(cmd)))
         try:
             output = checked_backtick(cmd, nostrip=True, err2out=True)
-        except CalledProcessError, e:
-            logging.error("Rpmbuild failed. Output follows: " + e.output)
+        except CalledProcessError, err:
+            logging.error("Rpmbuild failed. Output follows: " + err.output)
             raise OSGPrebuildError(err_msg_prefix +
-                                   "Rpmbuild return code %d" % e.returncode)
+                                   "Rpmbuild return code %d" % err.returncode)
 
         match = re.search(r"(?ms)^Wrote: ([^\n]+.src.rpm)$", output)
         if match:
@@ -175,8 +184,10 @@ class OSGBuild(object):
             sfile = open(sfilename, 'r')
             for lineno, line in enumerate(sfile):
                 line = line.strip()
-                if line.startswith('#'): continue
-                if line == '': continue
+                if line.startswith('#'):
+                    continue
+                if line == '':
+                    continue
                 basename = os.path.basename(line)
                 if line.startswith('/'):
                     uri = "file://" + line
@@ -202,7 +213,61 @@ class OSGBuild(object):
         return downloaded
 
 
-    def prebuild_extsrc(self, destdir=None):
+    def prebuild_full_extract(self, archives_downloaded, destdir):
+        """Extract downloaded archives plus archives inside downloaded SRPMs"""
+        archives_in_srpm = []
+        if os.path.isdir(self.unpacked_dir):
+            archives_in_srpm += [
+                os.path.abspath(x)
+                for x in glob(os.path.join(self.unpacked_dir, '*'))
+                if os.path.isfile(x)]
+        safe_makedirs(destdir)
+        old_dir = os.getcwd()
+        os.chdir(destdir)
+        for fname in archives_downloaded + archives_in_srpm:
+            logging.info("Extracting " + fname)
+            super_unpack(fname)
+        os.chdir(old_dir)
+        logging.info('Extracted files to ' + destdir)
+
+
+    def prebuild_extract_srpms(self, srpms_downloaded, destdir):
+        """Extract SRPMs"""
+        safe_makedirs(self.unpacked_dir)
+        for srpm in srpms_downloaded:
+            shutil.copy(srpm, self.unpacked_dir)
+        srpms_moved = glob(os.path.join(self.unpacked_dir, "*.src.rpm"))
+        old_dir = os.getcwd()
+        os.chdir(self.unpacked_dir)
+        for srpm in srpms_moved:
+            logging.info("Unpacking SRPM " + srpm)
+            super_unpack(srpm)
+            os.unlink(srpm)
+        os.chdir(old_dir)
+        for f in glob(os.path.join(self.unpacked_dir, '*')):
+            logging.debug('Copying unpacked file ' + f)
+            shutil.copy(f, destdir)
+
+
+    def prebuild_copy(self, files_list, destdir):
+        """Copy files in files_list to destdir, skipping backup files and
+        the underscore directories.
+
+        """
+        for fname in files_list:
+            base = os.path.basename(fname)
+            if (base in [WD_RESULTS,
+                         WD_PREBUILD,
+                         WD_UNPACKED,
+                         WD_UNPACKED_TARBALL] or
+                    base.endswith('~')):
+                logging.debug("Skipping file " + fname)
+            else:
+                logging.debug("Copying file " + fname)
+                shutil.copy(fname, destdir)
+
+
+    def prebuild_extsrc(self):
         """Prebuild packages with external sources.
         Process *.source files in upstream/ directory, downloading upstream
         sources mentioned in them from the software cache. Unpack SRPMs if
@@ -210,8 +275,6 @@ class OSGBuild(object):
         directory.
 
         """
-        if destdir is None:
-            destdir = self.prebuild_dir
 
         upstream_dir = os.path.join(self.abs_package_dir, 'upstream')
         osg_dir = os.path.join(self.abs_package_dir, 'osg')
@@ -219,69 +282,30 @@ class OSGBuild(object):
         # Process upstream/*.source files
         dot_sources = glob(os.path.join(upstream_dir, '*.source'))
         downloaded = []
-        for s in dot_sources:
-            logging.debug('Processing .source file %s', s)
+        for src in dot_sources:
+            logging.debug('Processing .source file %s', src)
             downloaded += [
                 os.path.abspath(x)
-                for x in self.process_dot_source(s, destdir)]
+                for x in self.process_dot_source(src, self.prebuild_dir)]
 
         # Process downloaded SRPMs
-        srpms = fnmatch_.filter(downloaded, '*.src.rpm')
+        srpms = fnmatch_filter(downloaded, '*.src.rpm')
         if srpms:
-            safe_makedirs(self.unpacked_dir)
-            for s in srpms:
-                shutil.move(s, self.unpacked_dir)
-            moved_srpms = glob(os.path.join(self.unpacked_dir, "*.src.rpm"))
-            old_dir = os.getcwd()
-            os.chdir(self.unpacked_dir)
-            for s in moved_srpms:
-                logging.info("Unpacking SRPM " + s)
-                super_unpack(s)
-                os.unlink(s)
-            os.chdir(old_dir)
-            for f in glob(os.path.join(self.unpacked_dir, '*')):
-                logging.debug('Copying unpacked file ' + f)
-                shutil.copy(f, destdir)
+            self.prebuild_extract_srpms(srpms, self.prebuild_dir)
 
         # Process other files in upstream
         other_sources = [x for x in glob(os.path.join(upstream_dir, '*'))
                          if not fnmatch(x, '*.source')]
-        for s in other_sources:
-            bn = os.path.basename(s)
-            if bn in [WD_RESULTS, WD_PREBUILD, WD_UNPACKED,
-                      WD_UNPACKED_TARBALL] or bn.endswith('~'):
-                logging.debug('Skipping other source ' + s)
-                continue
-            logging.debug('Copying other source ' + s)
-            shutil.copy(s, destdir)
+        self.prebuild_copy(other_sources, self.prebuild_dir)
 
+        # Extract any archives we downloaded plus any archives in the SRPM
         if self.options.get('full_extract'):
-            # Extract any archives we downloaded plus any archives in the SRPM
-            if os.path.isdir(self.unpacked_dir):
-                downloaded += [
-                    os.path.abspath(x)
-                    for x in glob(os.path.join(self.unpacked_dir,'*'))
-                    if os.path.isfile(x)]
-            safe_makedirs(self.unpacked_tarball_dir)
-            old_dir = os.getcwd()
-            os.chdir(self.unpacked_tarball_dir)
-            for f in downloaded:
-                logging.info("Extracting " + f)
-                super_unpack(f)
-            os.chdir(old_dir)
-            logging.info('Extracted files to ' + self.unpacked_tarball_dir)
+            self.prebuild_full_extract(downloaded, self.unpacked_tarball_dir)
 
         # Override downloaded files with what's in osg/
-        if os.path.isdir(osg_dir):
-            for f in glob(os.path.join(osg_dir, '*')):
-                bn = os.path.basename(f)
-                if bn in [WD_RESULTS, WD_PREBUILD, WD_UNPACKED,
-                          WD_UNPACKED_TARBALL] or bn.endswith('~'):
-                    logging.debug('Skipping ' + f)
-                    continue
-                logging.debug('Copying osg file ' + f)
-                shutil.copy(f, destdir)
+        self.prebuild_copy(glob(os.path.join(osg_dir, '*')), self.prebuild_dir)
 
+        # Return list of spec files
         spec_glob = os.path.join(self.prebuild_dir, '*.spec')
         spec_filenames = glob(spec_glob)
         if not spec_filenames:
@@ -298,8 +322,6 @@ class OSGBuild(object):
 
         """
         safe_makedirs(self.prebuild_dir)
-        self.prebuild_extsrc()
-
         spec_filenames = self.prebuild_extsrc()
 
         result_srpm = self.make_srpm(spec_filenames[0])
@@ -308,7 +330,7 @@ class OSGBuild(object):
             logging.info("Files have been prepared in %s.", self.prebuild_dir)
             return os.path.abspath(result_srpm)
 
-    
+
     def quilt(self):
         if not which("quilt"):
             raise ProgramNotFoundError("quilt")
@@ -329,8 +351,8 @@ class OSGBuild(object):
         srpm = self.prebuild()
         safe_makedirs(self.results_dir)
         shutil.copy(srpm, self.results_dir)
-        for d in ['BUILD', 'tmp']:
-            safe_makedirs(os.path.join(self.results_dir, d))
+        for dname in ['BUILD', 'tmp']:
+            safe_makedirs(os.path.join(self.results_dir, dname))
         cmd = ["rpm"]
         cmd += self.get_rpmbuild_defines(prebuild=False)
         cmd += ["-i", srpm]
@@ -630,12 +652,12 @@ def get_buildopts(options, optnames):
 
     if os.path.exists(cfg_file):
         try:
-            cfg = ConfigParser()
+            cfg = ConfigParser.ConfigParser()
             cfg.read(cfg_file)
             buildopts.update(cfg.items('options'))
             logging.debug("Read default config from %s", cfg_file)
-        except ConfigParser_.Error, e:
-            logging.warning("Error reading configuration from %s: %s", cfg_file, str(e))
+        except ConfigParser.Error, err:
+            logging.warning("Error reading configuration from %s: %s", cfg_file, str(err))
     else:
         logging.warning("Config file not found at %s", cfg_file)
 
@@ -716,8 +738,6 @@ def make_mock_obj(distro_tag, mock_config, mock_config_from_koji, koji_obj, targ
                 cfg_dir2 = os.path.abspath(os.path.join('/etc/mock', given_cfg_dir))
                 cfg_path = find_file(given_cfg_file, [cfg_dir1, cfg_dir2])
 
-            #link_mock_extra_config_files(os.path.dirname(cfg_path))
-
     elif mock_config_from_koji:
         cfg_dir = tempfile.mkdtemp(prefix="osg-build-mock-")
         atexit.register(shutil.rmtree, cfg_dir)
@@ -736,7 +756,8 @@ def make_mock_obj(distro_tag, mock_config, mock_config_from_koji, koji_obj, targ
 def main(argv=None):
     """Main function."""
 
-    if argv is None: argv=sys.argv
+    if argv is None:
+        argv = sys.argv
 
     try:
         options, args, optnames = parse_cmdline_args(argv)
@@ -782,13 +803,14 @@ def main(argv=None):
 
         package_dirs = args[1:]
 
-        for p in package_dirs:
+        for pkg in package_dirs:
             if buildopts['svn']:
-                if get_package_svn_url_rev(p) is None:
-                    raise OSGBuildError("Unable to get SVN info for package dir " + p)
-                if check_uncommitted(p):
-                    choice = ask("Package directory "+p+" has uncommitted changes"
-                                 " that will not be included in the SVN build."
+                if get_package_svn_url_rev(pkg) is None:
+                    raise OSGBuildError("Unable to get SVN info for package dir " + pkg)
+                if check_uncommitted(pkg):
+                    choice = ask("Package directory " + pkg + " has"
+                                 " uncommitted changes that will not be"
+                                 " included in the SVN build."
                                  " Continue (yes/no/skip)?", ("y", "n", "s"))
                     if choice[0] == "n":
                         print "Exiting."
@@ -796,37 +818,37 @@ def main(argv=None):
                     elif choice[0] == "s":
                         print "Skipping."
                         continue
-            elif not os.path.isdir(p):
-                raise UsageError(p + " isn't a package dir!")
+            elif not os.path.isdir(pkg):
+                raise UsageError(pkg + " isn't a package dir!")
 
-            builder = OSGBuild(p, buildopts, mock_obj=mock_obj, koji_obj=koji_obj)
+            builder = OSGBuild(pkg, buildopts, mock_obj=mock_obj, koji_obj=koji_obj)
             getattr(builder, task)()
 
-    except UsageError, e:
-        print >>sys.stderr, str(e)
-        print >>sys.stderr, "Type '" + sys.argv[0] + " --help' for usage info."
+    except UsageError, err:
+        print >> sys.stderr, str(err)
+        print >> sys.stderr, "Type '" + sys.argv[0] + " --help' for usage info."
         return 2
-    except SystemExit, e:
-        return e.code
+    except SystemExit, err:
+        return err.code
     except KeyboardInterrupt:
-        print >>sys.stderr, ""
-        print >>sys.stderr, "-" * 79
-        print >>sys.stderr, "Interrupted"
-        print >>sys.stderr, "-" * 79
+        print >> sys.stderr, ""
+        print >> sys.stderr, "-" * 79
+        print >> sys.stderr, "Interrupted"
+        print >> sys.stderr, "-" * 79
         return 3
-    except Error, e:
-        print >>sys.stderr, "-" * 79
-        print >>sys.stderr, str(e)
-        print >>sys.stderr, "-" * 79
+    except Error, err:
+        print >> sys.stderr, "-" * 79
+        print >> sys.stderr, str(err)
+        print >> sys.stderr, "-" * 79
         logging.debug("Full traceback follows:")
-        logging.debug(e.traceback)
+        logging.debug(err.traceback)
         return 4
-    except Exception, e:
-        print >>sys.stderr, "-" * 79
-        print >>sys.stderr, "An exception occurred:"
-        print >>sys.stderr, str(e)
-        print >>sys.stderr, "-" * 79
-        print >>sys.stderr, "Full traceback follows:"
+    except Exception, err:
+        print >> sys.stderr, "-" * 79
+        print >> sys.stderr, "An exception occurred:"
+        print >> sys.stderr, str(err)
+        print >> sys.stderr, "-" * 79
+        print >> sys.stderr, "Full traceback follows:"
         traceback.print_exc()
         return 1
 

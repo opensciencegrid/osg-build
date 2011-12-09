@@ -1,14 +1,24 @@
 #!/usr/bin/env python
 
-import glob
-import re
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import urllib2
-from osg_build_lib.utils import *
+
+from osg_build_lib.constants import (
+    DATA_FILE_SEARCH_PATH,
+    KOJI_USER_CONFIG_DIR,     # old koji config dir
+    OSG_KOJI_USER_CONFIG_DIR) # new koji config dir (osg-koji setup creates this)
+from osg_build_lib.utils import (
+    ask_yn,
+    backtick,
+    find_file,
+    checked_call,
+    safe_make_backup,
+    safe_makedirs,
+    slurp,
+    unslurp)
 
 
 CA_CERTS = [
@@ -16,21 +26,18 @@ CA_CERTS = [
     ["subject= /DC=net/DC=ES/O=ESnet/OU=Certificate Authorities/CN=ESnet Root CA 1", "d1b603c3", "0119347c"],
     ["subject= /DC=org/DC=DOEGrids/OU=Certificate Authorities/CN=DOEGrids CA 1", "1c3f2ca8", "12d0da68"]]
 
-CSL_KOJI_PATH="/p/vdt/workspace/koji-1.6.0"
+CSL_KOJI_PATH = "/p/vdt/workspace/koji-1.6.0"
 
 DOEGRIDS_TARBALL_URL = "https://pki1.doegrids.org/Other/doegrids.tar"
 GRID_CERTS_DIR = "/etc/grid-security/certificates"
 
-OLD_USER_CONFIG_DIR = os.path.expanduser("~/.koji")
-OLD_CLIENT_CERT_FILE = os.path.join(OLD_USER_CONFIG_DIR, "client.crt")
-USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")
+OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
 GLOBUS_DIR = os.path.expanduser("~/.globus")
-KOJI_CONFIG_FILE = os.path.join(USER_CONFIG_DIR, "config")
-CLIENT_CERT_FILE = os.path.join(USER_CONFIG_DIR, "client.crt")
-SERVER_CERT_FILE = os.path.join(USER_CONFIG_DIR, "osg-ca-bundle.crt")
+KOJI_CONFIG_FILE = "config"
+CLIENT_CERT_FILE = "client.crt"
+SERVER_CERT_FILE = "osg-ca-bundle.crt"
 
 PROGRAM_NAME = os.path.basename(sys.argv[0])
-DATA_DIR = "/usr/share/osg-build"
 
 
 class Error(Exception):
@@ -39,6 +46,7 @@ class Error(Exception):
 
 
 def get_openssl_version():
+    """Return the version of OpenSSL as a (major, minor, release) tuple"""
     version_output = backtick("openssl version")
     # TODO could use some error checking
     version = version_output.strip().split(' ')[1]
@@ -95,35 +103,52 @@ def create_ca_bundle(working_dir="."):
     return bundle_filename
 
 
-def run_setup():
-    safe_makedirs(USER_CONFIG_DIR)
-    # koji config file
-    if not os.path.exists(KOJI_CONFIG_FILE) or ask_yn("Koji configuration file '" + KOJI_CONFIG_FILE + "' already exists. Recreate it?"):
-        conf_file_search_path = sys.path + [DATA_DIR]
-        shutil.copy(find_file("osg-koji-home.conf", conf_file_search_path), KOJI_CONFIG_FILE)
+def setup_koji_config_file():
+    """Create the koji config file (if needed)."""
+    new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
+    if (not os.path.exists(new_koji_config_path) or
+            ask_yn("Koji configuration file '" +
+                   new_koji_config_path +
+                   "' already exists. Recreate it?")):
+        shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH),
+                    new_koji_config_path)
 
-    # server cert
-    if not os.path.exists(SERVER_CERT_FILE) or ask_yn("Server cert file '"+SERVER_CERT_FILE+"' already exists. Recreate it?"):
+
+def setup_koji_server_cert():
+    """Create the koji server cert file (if needed)."""
+    new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, SERVER_CERT_FILE)
+    if (not os.path.exists(new_server_cert_path) or
+            ask_yn("Server cert file '" +
+                   new_server_cert_path +
+                   "' already exists. Recreate it?")):
         working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
-        safe_make_backup(SERVER_CERT_FILE)
-        shutil.copy(create_ca_bundle(working_dir), SERVER_CERT_FILE)
+        safe_make_backup(new_server_cert_path)
+        shutil.copy(create_ca_bundle(working_dir), new_server_cert_path)
         shutil.rmtree(working_dir, ignore_errors=True)
     else:
-        print "not writing server cert file '%s'" % SERVER_CERT_FILE
+        print "not writing server cert file '%s'" % new_server_cert_path
 
-    # user cert
-    if not os.path.exists(CLIENT_CERT_FILE) or ask_yn("Client cert file '"+CLIENT_CERT_FILE+"' already exists. Recreate it?"):
+
+def setup_koji_client_cert():
+    """Create or copy the client cert file (if needed)."""
+    new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
+    if (not os.path.exists(new_client_cert_path) or
+            ask_yn("Client cert file '" +
+                   new_client_cert_path +
+                   "' already exists. Recreate it?")):
         success = False
 
-        if (os.path.exists(OLD_USER_CONFIG_DIR) and
-                (os.path.isdir(USER_CONFIG_DIR) and
-                not os.path.samefile(OLD_USER_CONFIG_DIR, USER_CONFIG_DIR)) and
+        if (os.path.exists(KOJI_USER_CONFIG_DIR) and
+                (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
+                not os.path.samefile(KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR)) and
                 os.path.isfile(OLD_CLIENT_CERT_FILE)):
-            user_choice = ask_yn("Copy client cert from '" + OLD_CLIENT_CERT_FILE + "' ?")
+            user_choice = ask_yn("Copy client cert from '" +
+                                 OLD_CLIENT_CERT_FILE +
+                                 "' ?")
             if user_choice:
                 old_umask = os.umask(0077)
-                safe_make_backup(CLIENT_CERT_FILE)
-                shutil.copy(OLD_CLIENT_CERT_FILE, CLIENT_CERT_FILE)
+                safe_make_backup(new_client_cert_path)
+                shutil.copy(OLD_CLIENT_CERT_FILE, new_client_cert_path)
                 os.umask(old_umask)
                 success = True
 
@@ -132,10 +157,10 @@ def run_setup():
             userkey = os.path.join(GLOBUS_DIR, "userkey.pem")
             if os.path.isfile(usercert) and os.path.isfile(userkey):
                 old_umask = os.umask(0077)
-                safe_make_backup(CLIENT_CERT_FILE)
-                os.system("cat '%s' '%s' > '%s'" % (usercert, userkey, CLIENT_CERT_FILE))
+                safe_make_backup(new_client_cert_path)
+                os.system("cat '%s' '%s' > '%s'" % (usercert, userkey, new_client_cert_path))
                 os.umask(old_umask)
-                print ("'%s' written from '%s' and '%s'" % (CLIENT_CERT_FILE, usercert, userkey))
+                print ("'%s' written from '%s' and '%s'" % (new_client_cert_path, usercert, userkey))
                 success = True
 
         if not success:
@@ -147,12 +172,21 @@ You must manually copy your certs:
     chmod 0600 %s
 
 where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
-""" % (GLOBUS_DIR, CLIENT_CERT_FILE, CLIENT_CERT_FILE))
+""" % (GLOBUS_DIR, new_client_cert_path, new_client_cert_path))
     else:
-        print "not writing client cert file '%s'" % CLIENT_CERT_FILE
+        print "not writing client cert file '%s'" % new_client_cert_path
+    
 
-    if not os.path.exists(OLD_USER_CONFIG_DIR) and ask_yn("Create symlink %s -> %s ?" % (OLD_USER_CONFIG_DIR, USER_CONFIG_DIR)):
-        os.symlink(USER_CONFIG_DIR, OLD_USER_CONFIG_DIR)
+def run_setup():
+    safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
+    setup_koji_config_file()
+    setup_koji_server_cert()
+    setup_koji_client_cert()
+
+    if (not os.path.exists(KOJI_USER_CONFIG_DIR) and
+            ask_yn("Create symlink %s -> %s ?" %
+                   (KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR))):
+        os.symlink(OSG_KOJI_USER_CONFIG_DIR, KOJI_USER_CONFIG_DIR)
         
 
 
@@ -161,22 +195,22 @@ def osg_koji_extra_help():
             "\t%-25s %s\n" %
                 (PROGRAM_NAME,
                  "setup",
-                 "Initialize the configuration in " + USER_CONFIG_DIR))
+                 "Initialize the configuration in " + OSG_KOJI_USER_CONFIG_DIR))
 
 
-def verify_koji_dir():
-    for path,description in [(USER_CONFIG_DIR, "User configuration directory"),
-                             (KOJI_CONFIG_FILE, "Koji configuration file"),
-                             (CLIENT_CERT_FILE, "User certificate file (client cert)"),
-                             (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
-        if not os.path.exists(path):
-            raise Error(description + "(" + path + ") not found. Run '" + PROGRAM_NAME + " setup' to set up your koji environment.")
+def verify_koji_dir(config_dir):
+    for path, description in [(KOJI_CONFIG_FILE, "Koji configuration file"),
+                              (CLIENT_CERT_FILE, "User certificate file (client cert)"),
+                              (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
+        if not os.path.exists(os.path.join(config_dir, path)):
+            raise Error(description + "(" + path + ") not found in config directory (" + path + "). Run '" + PROGRAM_NAME + " setup' to set up a koji environment containing the necessary files in " + OSG_KOJI_USER_CONFIG_DIR + ".")
 
 
 def main(argv=None):
     if argv is None:
         argv = sys.argv
 
+    # Kind of a hack
     if os.path.exists(CSL_KOJI_PATH):
         os.environ['PATH'] = os.path.join(CSL_KOJI_PATH, "cli") + os.pathsep + os.environ['PATH']
         os.environ['PYTHONPATH'] = CSL_KOJI_PATH + os.pathsep + os.environ['PATH']
@@ -189,8 +223,14 @@ def main(argv=None):
                 os.system("koji " + ' '.join(argv[1:]))
                 print osg_koji_extra_help()
             else:
-                verify_koji_dir()
-                args = ["--config=" + KOJI_CONFIG_FILE, "--authtype=ssl"] + argv[1:]
+                if os.path.exists(OSG_KOJI_USER_CONFIG_DIR):
+                    config_dir = OSG_KOJI_USER_CONFIG_DIR
+                elif os.path.exists(KOJI_USER_CONFIG_DIR):
+                    config_dir = KOJI_USER_CONFIG_DIR
+                else:
+                    raise Error("No koji config directory found. Run '" + PROGRAM_NAME + " setup' to set up a koji environment containing the necessary files in " + OSG_KOJI_USER_CONFIG_DIR + ".")
+                verify_koji_dir(config_dir)
+                args = ["--config=" + os.path.join(config_dir, KOJI_CONFIG_FILE), "--authtype=ssl"] + argv[1:]
                 os.execlp("koji", "koji", *args)
         else:
             os.system("koji")
@@ -198,13 +238,13 @@ def main(argv=None):
     except SystemExit, e:
         return e.code
     except KeyboardInterrupt:
-        print >>sys.stderr, "Interrupted"
+        print >> sys.stderr, "Interrupted"
         return 3
     except Error, e:
-        print >>sys.stderr, str(e)
+        print >> sys.stderr, str(e)
         return 1
     except Exception, e:
-        print >>sys.stderr, "Unhandled exception: " + str(e)
+        print >> sys.stderr, "Unhandled exception: " + str(e)
         raise
               
     return 0

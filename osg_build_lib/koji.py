@@ -1,10 +1,22 @@
 #!/usr/bin/python
+"""koji wrapper class for osg-build"""
 import logging
 import re
 import os
 
-from osg_build_lib.constants import DATA_FILE_SEARCH_PATH, KOJI_CLIENT_CERT, KOJI_CONF, KOJI_HUB, OLD_KOJI_CONF
-from osg_build_lib.utils import backtick, checked_backtick, checked_call, find_file, unchecked_call, which
+from osg_build_lib.constants import (
+    DATA_FILE_SEARCH_PATH,
+    KOJI_CLIENT_CERT,
+    KOJI_CONF,
+    KOJI_HUB,
+    OLD_KOJI_CONF)
+from osg_build_lib.utils import (
+    backtick,
+    checked_backtick,
+    checked_call,
+    find_file,
+    unchecked_call,
+    which)
 from osg_build_lib.error import KojiError
 
 def get_koji_cmd(koji_wrapper):
@@ -127,7 +139,7 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
         if err:
             raise KojiError("koji build failed with exit code " + str(err))
         if self.regen_repos and not self.scratch:
-            target_build_tag, target_dest_tag = (
+            target_build_tag, _ = (
                 self.get_build_and_dest_tags(koji_target))
             regen_repo_subcmd = ["regen-repo", target_build_tag]
             if self.no_wait:

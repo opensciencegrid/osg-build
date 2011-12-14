@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""Exception classes for osg-build"""
 import os
 import traceback
 
@@ -14,6 +15,11 @@ class Error(Exception):
 
     def __str__(self):
         return str(self.msg)
+
+
+class SVNError(Error):
+    def __init__(self, msg):
+        Error.__init__(self, "SVN error: %s" % msg)
 
 
 class GlobNotFoundError(Error):

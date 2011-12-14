@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""mock wrapper class and functions for osg-build"""
 from fnmatch import fnmatch
 from glob import glob
 import grp
@@ -18,8 +19,8 @@ def get_mock_version():
     query, ret = sbacktick("rpm -q mock")
     match = re.match(r'''mock-((?:\d+\.?)+)-''', query)
     if ret != 0 or not match:
-        print >>sys.stderr,"Unable to determine the mock version"
-        print >>sys.stderr,"Make sure mock is installed (yum install mock)"
+        print >> sys.stderr,"Unable to determine the mock version"
+        print >> sys.stderr,"Make sure mock is installed (yum install mock)"
         raise MockError(query)
     version = [int(x) for x in match.group(1).split(".")]
     return tuple(version)

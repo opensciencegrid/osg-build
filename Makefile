@@ -1,4 +1,4 @@
-VERSION = 0.3.1
+VERSION = 1.0.0
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osg_build_lib
@@ -6,7 +6,7 @@ DATAFILES = osg-koji-site.conf osg-koji-home.conf
 INIFILE = sample-osg-build.ini
 MAIN_SCRIPT = $(NAME)
 MAIN_SCRIPT_SYMLINK = vdt-build
-EXTRA_SCRIPTS = osg-import-srpm rpm-ripper osg-koji koji-tag-diff
+EXTRA_SCRIPTS = osg-import-srpm rpm-ripper osg-koji koji-tag-diff osg-build-test
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 BINDIR = /usr/bin
 DOCDIR = /usr/share/doc/$(NAME)

@@ -1,4 +1,12 @@
 #!/usr/bin/python
+"""unit tests for the osg-build tasks
+
+Wishlist:
+
+* Automatically print command output if tests fail
+* Be consistent about catching/not catching CalledProcessError
+
+"""
 # pylint: disable-msg=C0103,C0111
 
 import atexit
@@ -13,6 +21,7 @@ import sys
 from osg_build_lib.constants import (
     SVN_ROOT,
     WD_PREBUILD,
+    WD_RESULTS,
     WD_UNPACKED,
     WD_UNPACKED_TARBALL)
 from osg_build_lib.utils import (
@@ -47,30 +56,57 @@ def svn_export(path, rev, destpath):
         raise
 
 
-class TestLint(unittest.TestCase):
+class XTestCase(unittest.TestCase):
+    """XTestCase (extended test case) adds some useful assertions to
+    unittest.TestCase
+
+    """
+
+    def assertReSearch(self, regex, text, message):
+        """Assert that a regex search on text succeeds"""
+        return self.assertTrue(re.search(regex, text), message)
+
+    def assertNoReSearch(self, regex, text, message):
+        """Assert that a regex search on text fails"""
+        return self.assertFalse(re.search(regex, text), message)
+
+
+class TestLint(XTestCase):
+    """Tests for 'lint' task"""
 
     def setUp(self):
         self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
                                     "{2011-12-06}")
 
     def test_lint(self):
-        out = checked_backtick(OSG_BUILD_COMMAND + " lint " + self.pkg_dir,
-                               err2out=True)
-        self.assertNotEqual(
-            out.find("yum-remove-osg.src:25: E: hardcoded-library-path"),
-            -1,
+        try:
+            out = checked_backtick(OSG_BUILD_COMMAND + " lint " + self.pkg_dir,
+                                   clocale=True,
+                                   err2out=True)
+        except CalledProcessError, err:
+            print >> sys.stderr, "Error in osg-build. Output:"
+            print >> sys.stderr, err.output
+            raise
+        self.assertReSearch(
+            re.escape("yum-remove-osg.src:25: E: hardcoded-library-path"),
+            out,
             "expected error not found")
-        self.assertNotEqual(
-            out.find("1 packages and 0 specfiles checked"),
-            -1,
+        self.assertReSearch(
+            re.escape("yum-remove-osg.src:25: E: hardcoded-library-path"),
+            out,
+            "expected error not found")
+        self.assertReSearch(
+            re.escape("1 packages and 0 specfiles checked"),
+            out,
             "unexpected number of packages checked")
-        self.assertNotEqual(
-            out.find("rpmlint found problems with yum-remove-osg"),
-            -1,
+        self.assertReSearch(
+            re.escape("rpmlint found problems with yum-remove-osg"),
+            out,
             "expected problems not found")
 
 
-class TestRpmbuild(unittest.TestCase):
+class TestRpmbuild(XTestCase):
+    """Tests for 'rpmbuild' task"""
 
     def setUp(self):
         self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
@@ -78,15 +114,17 @@ class TestRpmbuild(unittest.TestCase):
 
     def test_rpmbuild(self):
         out = checked_backtick(OSG_BUILD_COMMAND + " rpmbuild " + self.pkg_dir,
+                               clocale=True,
                                err2out=True)
-        self.assertTrue(
-            re.search(r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
-                      r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.noarch.rpm"),
-                      out),
+        self.assertReSearch(
+            r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
+            r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.noarch.rpm"),
+            out,
             "rpm created message not found")
 
 
-class TestPrebuild(unittest.TestCase):
+class TestPrebuild(XTestCase):
+    """Tests for 'prebuild' task"""
 
     def setUp(self):
         self.pkg_dir = common_setUp(opj(TRUNK, "mash"),
@@ -121,6 +159,7 @@ class TestPrebuild(unittest.TestCase):
         out = checked_backtick(OSG_BUILD_COMMAND +
                                " prebuild --full-extract " +
                                self.pkg_dir,
+                               clocale=True,
                                err2out=True)
         ut_contents = checked_backtick(
             ["ls", opj(self.pkg_dir, WD_UNPACKED_TARBALL)]
@@ -129,9 +168,9 @@ class TestPrebuild(unittest.TestCase):
             ["ls", opj(self.pkg_dir, WD_UNPACKED_TARBALL, "mash-0.5.22")]
             ).split("\n")
 
-        self.assertEqual(
-            out.find("cpio: premature end of archive"),
-            -1,
+        self.assertNoReSearch(
+            re.escape("cpio: premature end of archive"),
+            out,
             "file unreadable by cpio")
         self.assertTrue(
             "mash.spec" in ut_contents,
@@ -141,6 +180,26 @@ class TestPrebuild(unittest.TestCase):
             "expected file not in unpacked sources")
 
         
+class TestPrepare(XTestCase):
+    """Tests for 'prepare' task"""
+
+    def setUp(self):
+        self.pkg_dir = common_setUp(opj(TRUNK, "globus-gatekeeper"),
+                                    "{2011-12-14}")
+
+    def test_prepare(self):
+        out = checked_backtick(OSG_BUILD_COMMAND + " prepare " + self.pkg_dir,
+                               clocale=True,
+                               err2out=True)
+        self.assertTrue(os.path.exists(opj(self.pkg_dir, WD_RESULTS, "BUILD",
+                        "globus_gatekeeper-8.1")), "SRPM unpacked")
+        head_out = checked_backtick(
+            ["head", "-n", "10", opj(self.pkg_dir, WD_RESULTS, "BUILD",
+            "globus_gatekeeper-8.1", "init", "globus-gatekeeper-lsb.in")])
+        self.assertReSearch(
+            r"Default-Stop:\s+0 1 2 3 4 5 6",
+            head_out,
+            "Patches not applied")
         
 
 if __name__ == '__main__':

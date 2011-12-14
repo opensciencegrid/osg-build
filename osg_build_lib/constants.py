@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""Global constants for osg-build"""
 import os
 import sys
 

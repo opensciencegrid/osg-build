@@ -78,9 +78,9 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
     base_srpm = basename(srpm)
     
     if not exists(name):
-        checked_call("svn mkdir " + name)
+        checked_call(["svn", "mkdir", name])
     if not exists(upstream_dir):
-        checked_call("svn mkdir " + upstream_dir)
+        checked_call(["svn", "mkdir", upstream_dir])
 #    safe_makedirs(name)
 #    safe_makedirs(opj(name, "upstream"))
 
@@ -96,7 +96,7 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
         unslurp(source_filename, source_contents)
     else:
         unslurp(source_filename, source_contents)
-        checked_call("svn add " + source_filename)
+        checked_call(["svn", "add", source_filename])
     if len(glob.glob(opj(upstream_dir, "*.source"))) > 1:
         print "More than one .source file found in upstream dir."
         print "Examine them to make sure there aren't duplicates."
@@ -113,7 +113,7 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
         unslurp(
             readme_filename,
             readme_contents)
-        checked_call("svn add " + readme_filename)
+        checked_call(["svn", "add", readme_filename])
 
     osg_dir = opj(name, "osg")
     if diff_spec:
@@ -125,22 +125,22 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
             chdir(osg_dir)
             for s in glob.glob("*.spec"):
                 move(s, s + ".old")
-            checked_call("rpm2cpio %s | cpio -ivd '*.spec'" % abs_srpm)
+            checked_call("rpm2cpio %s | cpio -ivd '*.spec'" % abs_srpm, shell=True)
             if exists(s + ".old"):
                 for s in glob.glob("*.spec"):
                     move(s, s + ".new")
                     print ("Old spec file found. Examine difference " +
                            "between %s.old and %s.new and manually merge " +
                            "changes.\nDiff follows:\n") % (s, s)
-                    unchecked_call("diff %s.old %s.new" % (s, s))
+                    unchecked_call(["diff", s + ".old", s + ".new"])
             chdir(old_dir) # popd
     elif extract_spec:
         if not isdir(osg_dir):
-            checked_call("svn mkdir " + osg_dir)
+            checked_call(["svn", "mkdir", osg_dir])
         old_dir = getcwd() # pushd
         chdir(osg_dir)
-        checked_call("rpm2cpio %s | cpio -ivd '*.spec'" % abs_srpm)
-        checked_call("svn add *.spec")
+        checked_call("rpm2cpio %s | cpio -ivd '*.spec'" % abs_srpm, shell=True)
+        checked_call("svn add *.spec", shell=True)
         chdir(old_dir) # popd
 
 
@@ -206,7 +206,7 @@ downloading and putting the SRPM into the upstream cache.
         except IndexError:
             raise UsageError("Required argument <upstream-url> not provided")
 
-        if unchecked_call("svn info &>/dev/null"):
+        if unchecked_call("svn info &>/dev/null", shell=True):
             raise Error("Must be called from an svn checkout!")
         
         srpm = download_srpm(upstream_url, options.output)

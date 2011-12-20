@@ -903,7 +903,7 @@ def main(argv=None):
                 no_wait=buildopts['no_wait'],
                 regen_repos=buildopts['regen_repos'],
                 scratch=buildopts['scratch'])
-            if buildopts['scratch'] and not buildopts['svn']:
+            if not buildopts['scratch'] and not buildopts['svn']:
                 logging.warning("Non-scratch Koji builds should be from SVN!")
         if task == 'mock':
             mock_obj = make_mock_obj(

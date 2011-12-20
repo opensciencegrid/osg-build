@@ -17,7 +17,7 @@ from osg_build_lib.utils import (checked_call, safe_makedirs,
 # Constants:
 VDT_WWW = "/p/vdt/public/html"
 DEFAULT_UPSTREAM_ROOT = opj(VDT_WWW, "upstream")
-DEFAULT_LOG_LEVEL = logging.DEBUG
+DEFAULT_LOG_LEVEL = logging.INFO
 
 class Error(Exception):
     """Base class for expected exceptions. Caught in main(); may include a

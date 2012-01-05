@@ -37,7 +37,6 @@ from osg_build_lib.constants import (
     DEFAULT_CONFIG_FILE,
     DEFAULT_KOJI_TAG,
     DEFAULT_KOJI_TARGET,
-    SVN_AFS_ROOT,
     SVN_ROOT,
     WD_PREBUILD,
     WD_RESULTS,
@@ -104,10 +103,16 @@ def get_package_svn_url_rev(package_dir):
         raise SVNError("Exit code %d getting SVN info. Output:\n%s" % (err, out))
     url = None
     rev = None
+    # Make a pass to find out the repository root of this checkout
+    for line in out.split("\n"):
+        label, value = line.split(": ", 1)
+        if label == "Repository Root":
+            repo_root = value
+    # Get the canonical url and revision
     for line in out.split("\n"):
         label, value = line.split(": ", 1)
         if label == "URL":
-            url = re.sub("^" + re.escape(SVN_AFS_ROOT), SVN_ROOT, value)
+            url = re.sub("^" + re.escape(repo_root), SVN_ROOT, value)
         elif label == "Revision":
             rev = value
 
@@ -751,9 +756,10 @@ def get_buildopts(options, optnames):
         else:
             logging.debug("Didn't find default config at %s",
                           DEFAULT_CONFIG_FILE)
-            cfg_file = ALT_DEFAULT_CONFIG_FILE
+            if os.path.exists(ALT_DEFAULT_CONFIG_FILE):
+                cfg_file = ALT_DEFAULT_CONFIG_FILE
 
-    if os.path.exists(cfg_file):
+    if cfg_file and os.path.exists(cfg_file):
         try:
             cfg = ConfigParser.ConfigParser()
             cfg.read(cfg_file)
@@ -761,8 +767,6 @@ def get_buildopts(options, optnames):
             logging.debug("Read default config from %s", cfg_file)
         except ConfigParser.Error, err:
             logging.warning("Error reading configuration from %s: %s", cfg_file, str(err))
-    else:
-        logging.warning("Config file not found at %s", cfg_file)
 
     # Overrides from command line
     for optname in optnames:

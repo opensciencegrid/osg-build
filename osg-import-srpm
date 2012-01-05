@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+
+# TODO This is a fairly rough script that I haven't gotten around to cleaning up.
 import glob
 from optparse import OptionParser
 import logging

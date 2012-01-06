@@ -35,7 +35,6 @@ def make_mock_config(arch, cfg_path, dist):
     
     cfg_abspath = os.path.abspath(cfg_path)
     cfg_name = re.sub(r'\.cfg$', '', os.path.basename(cfg_abspath))
-    #cfg_dir = os.path.dirname(cfg_abspath)
 
     mockver = get_mock_version()
     if mockver < (0, 8):
@@ -50,9 +49,6 @@ def make_mock_config(arch, cfg_path, dist):
                 BASEARCH=basearch,
                 DIST=dist))
     
-    #if mockver >= (0, 8):
-    #    link_mock_extra_config_files(cfg_dir)
-
     return cfg_abspath
 
 
@@ -63,21 +59,10 @@ def make_mock_config_from_koji(koji_obj, arch, cfg_path, tag, dist):
 
     cfg_abspath = os.path.abspath(cfg_path)
     cfg_name = re.sub(r'\.cfg$', '', os.path.basename(cfg_abspath))
-    #cfg_dir = os.path.dirname(cfg_abspath)
 
     koji_obj.mock_config(arch, tag, dist, cfg_abspath, cfg_name)
 
-    #link_mock_extra_config_files(cfg_dir)
-
     return cfg_abspath
-
-
-def link_mock_extra_config_files(cfg_dir):
-    for filename in ['site-defaults.cfg', 'logging.ini']:
-        system_filepath = os.path.join("/etc/mock", filename)
-        local_filepath = os.path.join(cfg_dir, filename)
-        if os.path.exists(system_filepath) and not os.path.exists(local_filepath):
-            os.symlink(system_filepath, local_filepath)
 
 
 class Mock(object):
@@ -87,13 +72,11 @@ class Mock(object):
         if cfg_path:
             cfg_abspath = os.path.abspath(cfg_path)
             cfg_abspath_no_ext = re.sub(r'\.cfg$', '', cfg_abspath)
-            #self.cfg_dir = os.path.dirname(cfg_abspath_no_ext)
             self.cfg_name = os.path.basename(cfg_abspath_no_ext)
 
             if not os.path.isfile(cfg_abspath):
                 raise MockError("Couldn't find mock config file at " + cfg_abspath)
 
-            #self.mock_cmd += ['--configdir', self.cfg_dir, '-r', self.cfg_name]
             # The cfg file passed to mock is always relative to /etc/mock
             self.mock_cmd += ['-r', "../../"+cfg_abspath_no_ext]
         else:

@@ -748,6 +748,7 @@ def get_buildopts(options, optnames):
         }
 
     # Read the config file
+    cfg_file = None
     if options.config_file:
         cfg_file = options.config_file
     else:

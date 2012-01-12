@@ -1,25 +1,44 @@
 #!/usr/bin/python
+"""koji wrapper class for osg-build"""
 import logging
 import re
 import os
 
-from osg_build_lib.constants import DATA_FILE_SEARCH_PATH, KOJI_CLIENT_CERT, KOJI_CONF, KOJI_HUB, OLD_KOJI_CONF, OSG_KOJI_USER_CONFIG_DIR
-from osg_build_lib.utils import backtick, checked_backtick, checked_call, find_file, unchecked_call, which
+from osg_build_lib.constants import (
+    DATA_FILE_SEARCH_PATH,
+    KOJI_CLIENT_CERT,
+    KOJI_CONF,
+    KOJI_HUB,
+    OLD_KOJI_CONF)
+from osg_build_lib.utils import (
+    backtick,
+    checked_backtick,
+    checked_call,
+    find_file,
+    unchecked_call,
+    which)
 from osg_build_lib.error import KojiError
 
 def get_koji_cmd(koji_wrapper):
     # Use osg-koji wrapper if available and configured.
-    if which("osg-koji") and os.path.exists(OSG_KOJI_USER_CONFIG_DIR) and koji_wrapper:
+    if which("osg-koji") and koji_wrapper:
         return ["osg-koji"]
     elif which("koji"):
         # Not using osg-koji, so we need to find the conf file and do some
         # checks ourselves.
-        conf_file = find_file(KOJI_CONF, DATA_FILE_SEARCH_PATH) or find_file(OLD_KOJI_CONF, DATA_FILE_SEARCH_PATH)
+        conf_file = (find_file(KOJI_CONF, DATA_FILE_SEARCH_PATH) or
+                     find_file(OLD_KOJI_CONF, DATA_FILE_SEARCH_PATH))
         if not conf_file:
-            raise KojiError("Can't find " + KOJI_CONF + " or " + OLD_KOJI_CONF + "; search path was:\n" + os.pathsep.join(DATA_FILE_SEARCH_PATH))
+            raise KojiError("Can't find " +
+                            KOJI_CONF +
+                            " or " +
+                            OLD_KOJI_CONF +
+                            "; search path was:\n" +
+                            os.pathsep.join(DATA_FILE_SEARCH_PATH))
 
         if not os.path.exists(KOJI_CLIENT_CERT):
-            raise KojiError("Unable to find your Koji client cert at " + KOJI_CLIENT_CERT)
+            raise KojiError("Unable to find your Koji client cert at "
+                            + KOJI_CLIENT_CERT)
 
         return ["koji", "--config", conf_file, "--authtype", "ssl"]
     else:
@@ -31,7 +50,8 @@ def get_cn():
     on the command line.
 
     """
-    subject = checked_backtick("openssl x509 -in '%s' -noout -subject -nameopt multiline" % KOJI_CLIENT_CERT)
+    subject = checked_backtick("openssl x509 -in '%s' -noout -subject"
+                               " -nameopt multiline" % KOJI_CLIENT_CERT)
     # Get the last commonName
     cn_match = re.search(r"""(?xms)
         ^ \s* commonName \s* = \s* ([^\n]+) \s* $
@@ -119,13 +139,16 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
         if err:
             raise KojiError("koji build failed with exit code " + str(err))
         if self.regen_repos and not self.scratch:
+            target_build_tag, _ = (
+                self.get_build_and_dest_tags(koji_target))
             regen_repo_subcmd = ["regen-repo", target_build_tag]
             if self.no_wait:
                 regen_repo_subcmd += ["--nowait"]
             logging.info("Calling koji to regen " + target_build_tag)
             err2 = unchecked_call(self.koji_cmd + regen_repo_subcmd)
             if err2:
-                raise KojiError("koji regen-repo failed with exit code " + str(err2))
+                raise KojiError("koji regen-repo failed with exit code "
+                                + str(err2))
 
 
     def build_srpm(self, koji_target, srpm):
@@ -148,5 +171,6 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
         
         err = unchecked_call(self.koji_cmd + mock_config_subcmd)
         if err:
-            raise KojiError("koji mock-config failed with exit code " + str(err))
+            raise KojiError("koji mock-config failed with exit code " +
+                            str(err))
 

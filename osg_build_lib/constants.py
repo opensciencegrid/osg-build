@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""Global constants for osg-build"""
 import os
 import sys
 
@@ -27,5 +28,4 @@ KOJI_HUB = "http://koji-hub.batlab.org"
 DATA_FILE_SEARCH_PATH = [sys.path[0], DATA_DIR]
 
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
-SVN_AFS_ROOT = "file:///p/vdt/workspace/svn"
 

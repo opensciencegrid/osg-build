@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""utilities for osg-build"""
 import logging
 import os
 import re
@@ -94,16 +95,24 @@ def checked_backtick(*args, **kwargs):
     The output is stripped unless nostrip=True is specified.
     If err2out=True is specified, stderr will be included in the output.
 
+    If clocale=True is specified, LC_ALL=C will be added to the subprocess's
+    environment, forcing the 'C' locale for program output.
+
     """
     cmd = args[0]
     if type(cmd) == type('') and 'shell' not in kwargs:
         cmd = shlex.split(cmd)
 
-    nostrip = kwargs.pop('nostrip', False)
-    kwargs['stdout'] = subprocess.PIPE
-    if kwargs.pop('err2out', False):
-        kwargs['stderr'] = subprocess.STDOUT
-    proc = subprocess.Popen(cmd, *args[1:], **kwargs)
+    sp_kwargs = kwargs.copy()
+
+    nostrip = sp_kwargs.pop('nostrip', False)
+    sp_kwargs['stdout'] = subprocess.PIPE
+    if sp_kwargs.pop('err2out', False):
+        sp_kwargs['stderr'] = subprocess.STDOUT
+    if sp_kwargs.pop('clocale', False):
+        sp_kwargs['env'] = dict(sp_kwargs.pop('env', os.environ), LC_ALL='C')
+
+    proc = subprocess.Popen(cmd, *args[1:], **sp_kwargs)
 
     output = proc.communicate()[0]
     if not nostrip:

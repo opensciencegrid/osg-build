@@ -28,7 +28,7 @@ from osg_build_lib.utils import (
     checked_backtick,
     CalledProcessError)
 
-OSG_BUILD_COMMAND = "osg-build --config-file=/dev/null"
+OSG_BUILD_COMMAND = "osg-build --config-file=/dev/null --el5"
 TRUNK = "native/redhat/trunk"
 
 initial_wd = os.getcwd()
@@ -118,7 +118,7 @@ class TestRpmbuild(XTestCase):
                                err2out=True)
         self.assertReSearch(
             r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
-            r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.noarch.rpm"),
+            r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.el5.noarch.rpm"),
             out,
             "rpm created message not found")
 
@@ -152,7 +152,7 @@ class TestPrebuild(XTestCase):
             "multilib-python.patch" in final_contents,
             "osg patch not in final contents")
         self.assertTrue(
-            "mash-0.5.22-2.osg.src.rpm" in final_contents,
+            "mash-0.5.22-2.osg.el5.src.rpm" in final_contents,
             "srpm not successfully built")
 
     def test_prebuild_full_extract(self):

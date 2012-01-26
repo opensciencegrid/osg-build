@@ -43,7 +43,7 @@ install:
 
 dist:
 	mkdir -p $(NAME_VERSION)
-	cp -rp $(SVNBINDIR) $(PYDIR) $(SVNDATADIR) $(SVNDOCDIR) Makefile $(NAME_VERSION)/
+	cp -rp $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(PYDIR) $(SVNDATADIR) $(SVNDOCDIR) Makefile $(NAME_VERSION)/
 	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(NAME_VERSION)/$(PYDIR)/main.py
 	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]' --exclude='*/*~'
 

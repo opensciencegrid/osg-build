@@ -12,8 +12,6 @@ AFS_CACHE_PREFIX = 'file://' + AFS_CACHE_PATH
 WEB_CACHE_PREFIX = 'http://vdt.cs.wisc.edu/upstream'
 DEFAULT_CONFIG_FILE = os.path.expanduser("~/.osg-build.ini")
 ALT_DEFAULT_CONFIG_FILE = os.path.expanduser("~/.vdt-build.ini")
-DEFAULT_KOJI_TAG = "el5-osg"
-DEFAULT_KOJI_TARGET = "el5-osg"
 
 KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.koji")
 OSG_KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")

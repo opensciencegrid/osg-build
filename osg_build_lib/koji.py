@@ -66,16 +66,6 @@ def get_cn():
 class Koji(object):
 
     def __init__(self, koji_wrapper=True, kojilogin=None, no_wait=False, regen_repos=False, scratch=False):
-        # See if we can submit from this box. rpmbuild versions >= 4.8 can't be submitted to our koji.
-        # TODO Add possibility of using rpmbuild from non-standard location.
-        rpmbuild_version_string = checked_backtick("rpmbuild --version")
-        re_groups = re.search(r'''RPM version (\d+)\.(\d+)''', rpmbuild_version_string).groups()
-        rpmbuild_version_major, rpmbuild_version_minor = int(re_groups[0]), int(re_groups[1])
-        if (rpmbuild_version_major, rpmbuild_version_minor) >= (4, 8):
-            self.can_build_srpm = False
-        else:
-            self.can_build_srpm = True
-
         self.no_wait = no_wait
         self.regen_repos = regen_repos
         self.scratch = scratch

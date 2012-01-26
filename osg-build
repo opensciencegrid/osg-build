@@ -35,8 +35,6 @@ from osg_build_lib.constants import (
     ALT_DEFAULT_CONFIG_FILE,
     DATA_FILE_SEARCH_PATH,
     DEFAULT_CONFIG_FILE,
-    DEFAULT_KOJI_TAG,
-    DEFAULT_KOJI_TARGET,
     SVN_ROOT,
     WD_PREBUILD,
     WD_RESULTS,
@@ -208,10 +206,22 @@ class SRPMBuild(object):
         working dir and the subdirectories specified in the WD_* constants.
 
         """
+        rhel = self.options.get('redhat_release', '5')
         defines = [
             "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
             "_topdir " + self.working_subdir,
-            "dist ." + self.options.get('distro_tag', 'osg')]
+            "rhel " + rhel,
+            "dist ." + self.options.get('distro_tag', 'osg.el' + rhel),
+            "el" + rhel + " 1",
+            ]
+        if rhel == '5':
+            defines += [
+                "_source_filedigest_algorithm 1",
+                "_binary_filedigest_algorithm 1",
+                "_binary_payload w9.gzdio",
+                "_source_payload w9.gzdio",
+                "_default_patch_fuzz 2",
+            ]
 
         if prebuild:
             defines += [
@@ -510,10 +520,6 @@ class SRPMBuild(object):
 
         """
         # TODO some duplication between this and SVNBuild.koji
-        if not self.koji_obj.can_build_srpm:
-            raise OSGBuildError(
-"""SRPMs made with rpmbuild 4.8 or newer cannot be submitted to koji.
-Use RHEL 5 or a compatible distribution.""")
 
         koji_target = self.options['koji_target']
         _, target_dest_tag = (
@@ -595,12 +601,22 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "-C", "--config-file",
         help="The file to get configuration for this script.")
     parser.add_option(
+        "--el5", action="store_const", const="5", dest="redhat_release",
+        help="Build for RHEL 5-compatible. Equivalent to --redhat-release=5")
+    parser.add_option(
+        "--el6", action="store_const", const="6", dest="redhat_release",
+        help="Build for RHEL 6-compatible. Equivalent to --redhat-release=6")
+    parser.add_option(
         "--loglevel",
         help="The level of logging the script should do. "
         "Valid values are: DEBUG,INFO,WARNING,ERROR,CRITICAL")
     parser.add_option(
         "-q", "--quiet", action="store_const", const="warning", dest="loglevel",
         help="Display less information. Equivalent to --loglevel=warning")
+    parser.add_option(
+        "--redhat-release",
+        help="The version of the distribution to build the package for. "
+        "Valid values are: 5 (for RHEL 5), 6 (for RHEL 6). Default: 5.")
     parser.add_option(
         "-v", "--verbose", action="store_const", const="debug", dest="loglevel",
         help="Display more information. Equivalent to --loglevel=debug")
@@ -624,7 +640,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     rpmbuild_mock_group.add_option(
         "--distro-tag",
         help="The distribution tag to append to the end of the release. "
-        "(Default: osg)")
+        "(Default: osg.el5 or osg.el6, depending on --redhat-release)")
     rpmbuild_mock_group.add_option(
         "-t", "--target-arch",
         help="The target architecture to build for ")
@@ -656,12 +672,12 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     koji_group.add_option(
         "--koji-target",
         help="The koji target to use for building. Default: " +
-        DEFAULT_KOJI_TARGET)
+        "el5-osg or el6-osg depending on --redhat-release")
     koji_group.add_option(
         "--koji-tag",
         help="The koji tag to add packages to. The special value TARGET "
         "uses the destination tag defined in the koji target. Default: " +
-        DEFAULT_KOJI_TAG)
+        "el5-osg or el6-osg depending on --redhat-release")
     koji_group.add_option(
         "--koji-wrapper", action="store_true", dest="koji_wrapper",
         help="Use the 'osg-koji' koji wrapper. (Default)")
@@ -729,23 +745,36 @@ def get_buildopts(options, optnames):
     buildopts = {
         'autoclean': False,
         'cache_prefix': 'AUTO',
-        'distro_tag': 'osg',
+        #'distro_tag': 'osg',
         'full_extract': False,
         'init_repos': False,
         'kojilogin': None,
-        'koji_tag': DEFAULT_KOJI_TAG,
-        'koji_target': DEFAULT_KOJI_TARGET,
+        #'koji_tag': DEFAULT_KOJI_TAG,
+        #'koji_target': DEFAULT_KOJI_TARGET,
         'koji_wrapper': True,
         'mock_clean': True,
         'mock_config': 'AUTO',
         'mock_config_from_koji': None,
         'no_wait': False,
+        'redhat_release': '5',
         'regen_repos': False,
         'scratch': False,
         'svn': False,
         'target_arch': None,
         'working_directory': '.',
         }
+    defaults_by_redhat_release = {
+        '5': {
+            'distro_tag': 'osg.el5',
+            'koji_tag': 'el5-osg',
+            'koji_target': 'el5-osg',
+        },
+        '6': {
+            'distro_tag': 'osg.el6',
+            'koji_tag': 'el6-osg',
+            'koji_target': 'el6-osg',
+        }
+    }
 
     # Read the config file
     cfg_file = None
@@ -792,6 +821,16 @@ def get_buildopts(options, optnames):
             buildopts['cache_prefix'] = AFS_CACHE_PREFIX
         else:
             buildopts['cache_prefix'] = WEB_CACHE_PREFIX
+
+    # Handle --redhat-release
+    rh_rel = buildopts['redhat_release']
+    valid_rh_rel = defaults_by_redhat_release.keys()
+    if rh_rel in valid_rh_rel:
+        for k in defaults_by_redhat_release[rh_rel].keys():
+            if not buildopts.get(k, None):
+                buildopts[k] = defaults_by_redhat_release[rh_rel][k]
+    else:
+        raise UsageError('Invalid redhat-release: must be one of ' + ','.join(valid_rh_rel))
 
     # --mock-config-from-koji overrides --mock-config
     # TODO this will cause mock_config_from_koji from the cfg file to override

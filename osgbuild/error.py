@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """Exception classes for osg-build"""
 import os
 import traceback

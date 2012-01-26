@@ -7,7 +7,7 @@ Wishlist:
 * Be consistent about catching/not catching CalledProcessError
 
 """
-# pylint: disable-msg=C0103,C0111
+# pylint: disable=C0103,R0904
 
 import atexit
 import re
@@ -16,22 +16,34 @@ from os.path import join as opj
 import shutil
 import tempfile
 import unittest
+from unittest import makeSuite
 import sys
 
-from osg_build_lib.constants import (
+from osgbuild.constants import (
     SVN_ROOT,
     WD_PREBUILD,
     WD_RESULTS,
     WD_UNPACKED,
     WD_UNPACKED_TARBALL)
-from osg_build_lib.utils import (
+from osgbuild import main
+from osgbuild import utils
+from osgbuild.utils import (
     checked_backtick,
-    CalledProcessError)
+    checked_call,
+    CalledProcessError,
+    find_file)
 
-OSG_BUILD_COMMAND = "osg-build --config-file=/dev/null --el5"
 TRUNK = "native/redhat/trunk"
 
 initial_wd = os.getcwd()
+osg_build_path = find_file('osg-build', [initial_wd,
+                                         '/usr/bin'])
+
+if not osg_build_path:
+    print >> sys.stderr, "osg-build script not found!"
+    sys.exit(255)
+
+osg_build_command = [osg_build_path, "--config-file=/dev/null"]
 
 def common_setUp(path, rev):
     '''Create a temporary directory, ensure it gets deleted on exit, cd to it,
@@ -44,6 +56,14 @@ def common_setUp(path, rev):
     svn_export(path, rev, os.path.basename(path))
     return opj(working_dir, os.path.basename(path))
 
+def backtick_osg_build(cmd_args, *args, **kwargs):
+    kwargs['clocale'] = True
+    kwargs['err2out'] = True
+    return checked_backtick(osg_build_command + cmd_args, *args, **kwargs)
+
+def checked_osg_build(cmd_args, *args, **kwargs):
+    return checked_call(osg_build_command + cmd_args, *args, **kwargs)
+
 def svn_export(path, rev, destpath):
     '''Run svn export on a revision rev of path into destpath'''
     try:
@@ -55,6 +75,11 @@ def svn_export(path, rev, destpath):
         print >> sys.stderr, err.output
         raise
 
+def get_listing(directory):
+    return checked_backtick(
+            ["ls", directory]).split("\n")
+
+
 
 class XTestCase(unittest.TestCase):
     """XTestCase (extended test case) adds some useful assertions to
@@ -62,13 +87,27 @@ class XTestCase(unittest.TestCase):
 
     """
 
-    def assertReSearch(self, regex, text, message):
+    def assertReSearch(self, regex, text, message, verbose=False):
         """Assert that a regex search on text succeeds"""
-        return self.assertTrue(re.search(regex, text), message)
+        try:
+            return self.assertTrue(re.search(regex, text), message)
+        except AssertionError:
+            if verbose:
+                print >> sys.stderr, (
+                    "Regex search '%s' failed on text '%s'" %
+                    (regex, text))
+            raise
 
-    def assertNoReSearch(self, regex, text, message):
+    def assertNoReSearch(self, regex, text, message, verbose=False):
         """Assert that a regex search on text fails"""
-        return self.assertFalse(re.search(regex, text), message)
+        try:
+            return self.assertFalse(re.search(regex, text), message)
+        except AssertionError:
+            if verbose:
+                print >> sys.stderr, (
+                    "Negative regex search '%s' failed on text '%s'" %
+                    (regex, text))
+            raise
 
 
 class TestLint(XTestCase):
@@ -79,30 +118,23 @@ class TestLint(XTestCase):
                                     "{2011-12-06}")
 
     def test_lint(self):
+        out = backtick_osg_build(["lint", self.pkg_dir])
         try:
-            out = checked_backtick(OSG_BUILD_COMMAND + " lint " + self.pkg_dir,
-                                   clocale=True,
-                                   err2out=True)
-        except CalledProcessError, err:
-            print >> sys.stderr, "Error in osg-build. Output:"
-            print >> sys.stderr, err.output
+            self.assertReSearch(
+                re.escape("yum-remove-osg.src:25: E: hardcoded-library-path"),
+                out,
+                "expected error not found")
+            self.assertReSearch(
+                re.escape("1 packages and 0 specfiles checked"),
+                out,
+                "unexpected number of packages checked")
+            self.assertReSearch(
+                re.escape("rpmlint found problems with yum-remove-osg"),
+                out,
+                "expected problems not found")
+        except:
+            print >> sys.stderr, "Problems found. Output:\n", out
             raise
-        self.assertReSearch(
-            re.escape("yum-remove-osg.src:25: E: hardcoded-library-path"),
-            out,
-            "expected error not found")
-        self.assertReSearch(
-            re.escape("yum-remove-osg.src:25: E: hardcoded-library-path"),
-            out,
-            "expected error not found")
-        self.assertReSearch(
-            re.escape("1 packages and 0 specfiles checked"),
-            out,
-            "unexpected number of packages checked")
-        self.assertReSearch(
-            re.escape("rpmlint found problems with yum-remove-osg"),
-            out,
-            "expected problems not found")
 
 
 class TestRpmbuild(XTestCase):
@@ -113,31 +145,27 @@ class TestRpmbuild(XTestCase):
                                     "{2011-12-06}")
 
     def test_rpmbuild(self):
-        out = checked_backtick(OSG_BUILD_COMMAND + " rpmbuild " + self.pkg_dir,
-                               clocale=True,
-                               err2out=True)
-        self.assertReSearch(
-            r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
-            r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.el5.noarch.rpm"),
-            out,
-            "rpm created message not found")
+        out = backtick_osg_build(["rpmbuild", self.pkg_dir])
+        try:
+            self.assertReSearch(
+                r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
+                r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.el5.noarch.rpm"),
+                out,
+                "rpm created message not found")
+        except:
+            print >> sys.stderr, "Problems found. Output:\n", out
+            raise
 
 
 class TestPrebuild(XTestCase):
     """Tests for 'prebuild' task"""
 
-    def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "mash"),
-                                    "{2011-12-08}")
-
-    # TODO add test case for only one of {osg,upstream}
     def test_prebuild(self):
-        out = checked_backtick(OSG_BUILD_COMMAND + " prebuild " + self.pkg_dir,
-                               err2out=True)
-        upstream_contents = checked_backtick(
-            ["ls", opj(self.pkg_dir, WD_UNPACKED)]).split("\n")
-        final_contents = checked_backtick(
-            ["ls", opj(self.pkg_dir, WD_PREBUILD)]).split("\n")
+        pkg_dir = common_setUp(opj(TRUNK, "mash"),
+                               "{2011-12-08}")
+        checked_osg_build(["prebuild", pkg_dir])
+        upstream_contents = get_listing(opj(pkg_dir, WD_UNPACKED))
+        final_contents = get_listing(opj(pkg_dir, WD_PREBUILD))
 
         self.assertTrue(
             "mash.spec" in upstream_contents,
@@ -155,17 +183,35 @@ class TestPrebuild(XTestCase):
             "mash-0.5.22-2.osg.el5.src.rpm" in final_contents,
             "srpm not successfully built")
 
+    def test_prebuild_osgonly(self):
+        pkg_osgonly_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
+                                       "{2012-01-26}")
+        checked_osg_build(["prebuild", pkg_osgonly_dir])
+        final_contents = get_listing(opj(pkg_osgonly_dir, WD_PREBUILD))
+
+        self.assertTrue(
+            "yum-remove-osg-1.0-0.2.osg.el5.src.rpm" in final_contents,
+            "srpm not successfully built")
+
+    def test_prebuild_passthrough(self):
+        pkg_passthrough_dir = common_setUp(opj(TRUNK, "globus-core"),
+                                           "{2012-01-26}")
+        checked_osg_build(["prebuild", pkg_passthrough_dir])
+        final_contents = get_listing(opj(pkg_passthrough_dir, WD_PREBUILD))
+
+        self.assertTrue(
+            "globus-core-8.5-2.osg.el5.src.rpm" in final_contents,
+            "srpm not successfully built")
+
     def test_prebuild_full_extract(self):
-        out = checked_backtick(OSG_BUILD_COMMAND +
-                               " prebuild --full-extract " +
-                               self.pkg_dir,
-                               clocale=True,
-                               err2out=True)
+        pkg_dir = common_setUp(opj(TRUNK, "mash"),
+                               "{2011-12-08}")
+        out = backtick_osg_build(["prebuild", "--full-extract", pkg_dir])
         ut_contents = checked_backtick(
-            ["ls", opj(self.pkg_dir, WD_UNPACKED_TARBALL)]
+            ["ls", opj(pkg_dir, WD_UNPACKED_TARBALL)]
             ).split("\n")
         tarball_contents = checked_backtick(
-            ["ls", opj(self.pkg_dir, WD_UNPACKED_TARBALL, "mash-0.5.22")]
+            ["ls", opj(pkg_dir, WD_UNPACKED_TARBALL, "mash-0.5.22")]
             ).split("\n")
 
         self.assertNoReSearch(
@@ -178,8 +224,9 @@ class TestPrebuild(XTestCase):
         self.assertTrue(
             "README" in tarball_contents,
             "expected file not in unpacked sources")
+# end of TestPrebuild
 
-        
+
 class TestPrepare(XTestCase):
     """Tests for 'prepare' task"""
 
@@ -188,9 +235,7 @@ class TestPrepare(XTestCase):
                                     "{2011-12-14}")
 
     def test_prepare(self):
-        out = checked_backtick(OSG_BUILD_COMMAND + " prepare " + self.pkg_dir,
-                               clocale=True,
-                               err2out=True)
+        checked_osg_build(["prepare", self.pkg_dir])
         self.assertTrue(os.path.exists(opj(self.pkg_dir, WD_RESULTS, "BUILD",
                         "globus_gatekeeper-8.1")), "SRPM unpacked")
         head_out = checked_backtick(
@@ -200,8 +245,94 @@ class TestPrepare(XTestCase):
             r"Default-Stop:\s+0 1 2 3 4 5 6",
             head_out,
             "Patches not applied")
+
+
+class TestFetch(XTestCase):
+    """Tests for fetch-sources"""
+
+    def setUp(self):
+        self.pkg_dir = common_setUp(opj(TRUNK, "mash"),
+                                    "{2011-12-08}")
+        utils.unslurp("fetch-sources", """\
+#!%(python)s
+import sys
+sys.path.insert(0, "%(pkgdatadir)s")
+from osgbuild import fetch_sources
+fetch_sources.fetch('.')
+""" % {'python': sys.executable, 'pkgdatadir': sys.path[0]})
+        os.chmod("fetch-sources", 0755)
+
+    def test_fetch(self):
+        os.chdir('mash')
+        checked_call("../fetch-sources")
+        contents = checked_backtick(["ls"]).split("\n")
+
+        self.assertTrue(
+            "mash.spec" in contents,
+            "spec file not found")
+        self.assertTrue(
+            "mash-0.5.22.tar.gz" in contents,
+            "source tarball not found")
+        head_out = checked_backtick(
+            ["head", "-n", "15", "mash.spec"])
+        self.assertReSearch(
+            r"Patch0:\s+multilib-python.patch",
+            head_out,
+            "Spec file not overridden")
+
+
+class TestMock(XTestCase):
+    """Tests for mock"""
+
+    def setUp(self):
+        self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
+                                    "{2012-01-25}")
+        
+    def test_mock_auto_cfg(self):
+        checked_osg_build(["mock", self.pkg_dir])
+
+    def test_mock_koji_cfg(self):
+        checked_osg_build(["mock", self.pkg_dir,
+                           "--mock-config-from-koji=el5-osg-build"])
         
 
+class TestKoji(XTestCase):
+    """Tests for koji"""
+
+    def setUp(self):
+        self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
+                                    "{2012-01-25}")
+
+    def test_koji_basic(self):
+        checked_osg_build(["koji", "--scratch", self.pkg_dir])
+
+
+class TestCmdline(XTestCase):
+    """Tests for command-line argument handling"""
+
+    def test_scratch_svn(self):
+        buildopts = main.init(
+            ["osg-build", "-C", "/dev/null", "koji", "--scratch", "."])[0]
+        self.assertFalse(buildopts['svn'],
+                         "svn not false for scratch build")
+
+        buildopts = main.init(
+            ["osg-build", "-C", "/dev/null", "koji", "."])[0]
+        self.assertTrue(buildopts['svn'],
+                        "svn not true for non-scratch build")
+                        
+
+short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestCmdline)
+TestSuiteShort = unittest.TestSuite()
+TestSuiteShort.addTests([makeSuite(t) for t in short_test_cases])
+# Make sure TestKoji comes first since it requires user interaction.
+TestSuiteAll = unittest.TestSuite((makeSuite(TestKoji), TestSuiteShort, makeSuite(TestMock)))
+
 if __name__ == '__main__':
-    unittest.main()
+    try:
+        print >> sys.stderr, "testing " + osg_build_path
+        unittest.main()
+    except CalledProcessError, e:
+        print >> sys.stderr, "output: " + e.output
+        raise
 

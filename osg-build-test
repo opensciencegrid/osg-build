@@ -7,7 +7,7 @@ Wishlist:
 * Be consistent about catching/not catching CalledProcessError
 
 """
-# pylint: disable=C0103,R0904
+# pylint: disable=C0103,R0904,W0614
 
 import atexit
 import re
@@ -19,13 +19,9 @@ import unittest
 from unittest import makeSuite
 import sys
 
-from osgbuild.constants import (
-    SVN_ROOT,
-    WD_PREBUILD,
-    WD_RESULTS,
-    WD_UNPACKED,
-    WD_UNPACKED_TARBALL)
+from osgbuild.constants import *
 from osgbuild import main
+from osgbuild import srpm
 from osgbuild import utils
 from osgbuild.utils import (
     checked_backtick,
@@ -307,10 +303,10 @@ class TestKoji(XTestCase):
         checked_osg_build(["koji", "--scratch", self.pkg_dir])
 
 
-class TestCmdline(XTestCase):
-    """Tests for command-line argument handling"""
+class TestMisc(XTestCase):
+    """Other tests"""
 
-    def test_scratch_svn(self):
+    def test_cmdline_scratch_svn(self):
         buildopts = main.init(
             ["osg-build", "-C", "/dev/null", "koji", "--scratch", "."])[0]
         self.assertFalse(buildopts['svn'],
@@ -320,9 +316,36 @@ class TestCmdline(XTestCase):
             ["osg-build", "-C", "/dev/null", "koji", "."])[0]
         self.assertTrue(buildopts['svn'],
                         "svn not true for non-scratch build")
+
+    def test_rpmbuild_defines(self):
+        buildopts_el = dict()
+        build_el = dict()
+        defines_el = dict()
+        for rhel in ['5', '6']:
+            buildopts_el[rhel] = DEFAULT_BUILDOPTS_COMMON.copy()
+            buildopts_el[rhel]['redhat_release'] = rhel
+            buildopts_el[rhel].update(DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE[rhel])
+            build_el[rhel] = srpm.SRPMBuild(".", buildopts_el[rhel], None, None)
+            defines_el[rhel] = build_el[rhel].get_rpmbuild_defines(True)
+            self.assertTrue("--define=rhel %s" % rhel in defines_el[rhel],
+                            "%%rhel not set correctly for el%s build" % rhel)
+
+        self.assertTrue('--define=el5 1' in defines_el['5'],
+                        "%el5 not set for el5 build")
+        self.assertTrue('--define=el6 0' in defines_el['5'],
+                        "%el6 not unset for el5 build")
+                        
+        self.assertTrue('--define=el6 1' in defines_el['6'],
+                        "%el6 not set for el6 build")
+        self.assertTrue('--define=el5 0' in defines_el['6'],
+                        "%el5 not unset for el6 build")
+        
+        self.assertTrue('--define=_source_filedigest_algorithm 1' in
+                        defines_el['5'],
+                        "filedigest algorithm not set for el5 build")
                         
 
-short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestCmdline)
+short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc)
 TestSuiteShort = unittest.TestSuite()
 TestSuiteShort.addTests([makeSuite(t) for t in short_test_cases])
 # Make sure TestKoji comes first since it requires user interaction.

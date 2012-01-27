@@ -70,6 +70,9 @@ def get_package_info(package_dir, rev=None):
     command = ["svn", "info", package_dir]
     if rev:
         command += ["-r", rev]
+    else:
+        command += ["-r", "HEAD"]
+
     out, err = utils.sbacktick(command,
                                clocale=True, err2out=True)
     if err:

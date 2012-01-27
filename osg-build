@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 "Load and run the main osg-build script"
 # pylint: disable=C0103
-import os
 import sys
 import logging
 import traceback

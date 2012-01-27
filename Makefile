@@ -66,4 +66,7 @@ test:
 	pylint -E osg-build osg-build-test $(PYDIR)/*.py
 	python osg-build-test -v TestSuiteAll
 
+lint:
+	-pylint osg-build osg-build-test $(PYDIR)/*.py
+# ignore return code in above
 

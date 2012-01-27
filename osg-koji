@@ -6,11 +6,11 @@ import sys
 import tempfile
 import urllib2
 
-from osg_build_lib.constants import (
+from osgbuild.constants import (
     DATA_FILE_SEARCH_PATH,
     KOJI_USER_CONFIG_DIR,     # old koji config dir
-    OSG_KOJI_USER_CONFIG_DIR) # new koji config dir (osg-koji setup creates this)
-from osg_build_lib.utils import (
+    OSG_KOJI_USER_CONFIG_DIR) # new koji config dir (created by this script)
+from osgbuild.utils import (
     ask_yn,
     backtick,
     find_file,
@@ -23,8 +23,10 @@ from osg_build_lib.utils import (
 
 CA_CERTS = [
     # subject, openssl 0.9.8 hash, openssl 1.x hash
-    ["subject= /DC=net/DC=ES/O=ESnet/OU=Certificate Authorities/CN=ESnet Root CA 1", "d1b603c3", "0119347c"],
-    ["subject= /DC=org/DC=DOEGrids/OU=Certificate Authorities/CN=DOEGrids CA 1", "1c3f2ca8", "12d0da68"]]
+    ["subject= /DC=net/DC=ES/O=ESnet/OU=Certificate Authorities/CN=ESnet Root CA 1",
+     "d1b603c3", "0119347c"],
+    ["subject= /DC=org/DC=DOEGrids/OU=Certificate Authorities/CN=DOEGrids CA 1",
+     "1c3f2ca8", "12d0da68"]]
 
 CSL_KOJI_PATH = "/p/vdt/workspace/koji-1.6.0"
 
@@ -38,6 +40,10 @@ CLIENT_CERT_FILE = "client.crt"
 SERVER_CERT_FILE = "osg-ca-bundle.crt"
 
 PROGRAM_NAME = os.path.basename(sys.argv[0])
+
+RUN_SETUP_MSG = """\
+Run '%s setup' to set up a koji environment containing the
+necessary files in %s.""" % (PROGRAM_NAME, OSG_KOJI_USER_CONFIG_DIR)
 
 
 class Error(Exception):
@@ -62,7 +68,8 @@ def create_ca_bundle(working_dir="."):
     else:
         # Download grid certificates
         try:
-            tarball_name = os.path.join(working_dir, os.path.basename(DOEGRIDS_TARBALL_URL))
+            tarball_name = os.path.join(working_dir,
+                                        os.path.basename(DOEGRIDS_TARBALL_URL))
             handle = urllib2.urlopen(DOEGRIDS_TARBALL_URL)
             desthandle = open(tarball_name, 'w')
             desthandle.write(handle.read())
@@ -84,8 +91,10 @@ def create_ca_bundle(working_dir="."):
             expected_hash = cert[2]
         ca_fname = cert[1] + ".0"
         ca_path = os.path.join(certs_dir, ca_fname)
-        real_subject = backtick(["openssl", "x509", "-in", ca_path, "-noout", "-subject"])
-        real_hash = backtick(["openssl", "x509", "-in", ca_path, "-noout", "-hash"])
+        real_subject = backtick(["openssl", "x509", "-in", ca_path, "-noout",
+                                 "-subject"])
+        real_hash = backtick(["openssl", "x509", "-in", ca_path, "-noout",
+                              "-hash"])
         if real_subject != expected_subject:
             raise Error(("Subject for %s doesn't match expected:\n"
                          "Expected: '%s', got: '%s'") %
@@ -105,7 +114,8 @@ def create_ca_bundle(working_dir="."):
 
 def setup_koji_config_file():
     """Create the koji config file (if needed)."""
-    new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
+    new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
+                                        KOJI_CONFIG_FILE)
     if (not os.path.exists(new_koji_config_path) or
             ask_yn("Koji configuration file '" +
                    new_koji_config_path +
@@ -116,7 +126,8 @@ def setup_koji_config_file():
 
 def setup_koji_server_cert():
     """Create the koji server cert file (if needed)."""
-    new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, SERVER_CERT_FILE)
+    new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
+                                        SERVER_CERT_FILE)
     if (not os.path.exists(new_server_cert_path) or
             ask_yn("Server cert file '" +
                    new_server_cert_path +
@@ -131,7 +142,8 @@ def setup_koji_server_cert():
 
 def setup_koji_client_cert():
     """Create or copy the client cert file (if needed)."""
-    new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
+    new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
+                                        CLIENT_CERT_FILE)
     if (not os.path.exists(new_client_cert_path) or
             ask_yn("Client cert file '" +
                    new_client_cert_path +
@@ -140,7 +152,8 @@ def setup_koji_client_cert():
 
         if (os.path.exists(KOJI_USER_CONFIG_DIR) and
                 (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
-                not os.path.samefile(KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR)) and
+                not os.path.samefile(KOJI_USER_CONFIG_DIR,
+                                     OSG_KOJI_USER_CONFIG_DIR)) and
                 os.path.isfile(OLD_CLIENT_CERT_FILE)):
             user_choice = ask_yn("Copy client cert from '" +
                                  OLD_CLIENT_CERT_FILE +
@@ -158,9 +171,11 @@ def setup_koji_client_cert():
             if os.path.isfile(usercert) and os.path.isfile(userkey):
                 old_umask = os.umask(0077)
                 safe_make_backup(new_client_cert_path)
-                os.system("cat '%s' '%s' > '%s'" % (usercert, userkey, new_client_cert_path))
+                os.system("cat '%s' '%s' > '%s'" %
+                    (usercert, userkey, new_client_cert_path))
                 os.umask(old_umask)
-                print ("'%s' written from '%s' and '%s'" % (new_client_cert_path, usercert, userkey))
+                print ("'%s' written from '%s' and '%s'" %
+                    (new_client_cert_path, usercert, userkey))
                 success = True
 
         if not success:
@@ -195,15 +210,18 @@ def osg_koji_extra_help():
             "\t%-25s %s\n" %
                 (PROGRAM_NAME,
                  "setup",
-                 "Initialize the configuration in " + OSG_KOJI_USER_CONFIG_DIR))
+                 "Initialize the configuration in " +
+                     OSG_KOJI_USER_CONFIG_DIR))
 
 
 def verify_koji_dir(config_dir):
-    for path, description in [(KOJI_CONFIG_FILE, "Koji configuration file"),
-                              (CLIENT_CERT_FILE, "User certificate file (client cert)"),
-                              (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
+    for path, description in [
+            (KOJI_CONFIG_FILE, "Koji configuration file"),
+            (CLIENT_CERT_FILE, "User certificate file (client cert)"),
+            (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
         if not os.path.exists(os.path.join(config_dir, path)):
-            raise Error(description + "(" + path + ") not found in config directory (" + path + "). Run '" + PROGRAM_NAME + " setup' to set up a koji environment containing the necessary files in " + OSG_KOJI_USER_CONFIG_DIR + ".")
+            raise Error("%s (%s) not found in config directory (%s).\n%s" %
+                        (description, path, config_dir, RUN_SETUP_MSG))
 
 
 def main(argv=None):
@@ -212,8 +230,10 @@ def main(argv=None):
 
     # Kind of a hack
     if os.path.exists(CSL_KOJI_PATH):
-        os.environ['PATH'] = os.path.join(CSL_KOJI_PATH, "cli") + os.pathsep + os.environ['PATH']
-        os.environ['PYTHONPATH'] = CSL_KOJI_PATH + os.pathsep + os.environ['PATH']
+        os.environ['PATH'] = (os.path.join(CSL_KOJI_PATH, "cli") +
+                              os.pathsep + os.environ['PATH'])
+        os.environ['PYTHONPATH'] = (CSL_KOJI_PATH +
+                                    os.pathsep + os.environ['PYTHONPATH'])
 
     try:
         if len(argv) > 1:
@@ -228,9 +248,12 @@ def main(argv=None):
                 elif os.path.exists(KOJI_USER_CONFIG_DIR):
                     config_dir = KOJI_USER_CONFIG_DIR
                 else:
-                    raise Error("No koji config directory found. Run '" + PROGRAM_NAME + " setup' to set up a koji environment containing the necessary files in " + OSG_KOJI_USER_CONFIG_DIR + ".")
+                    raise Error("No koji config directory found.\n" +
+                                RUN_SETUP_MSG)
                 verify_koji_dir(config_dir)
-                args = ["--config=" + os.path.join(config_dir, KOJI_CONFIG_FILE), "--authtype=ssl"] + argv[1:]
+                args = ["--config=" + os.path.join(config_dir,
+                                                   KOJI_CONFIG_FILE),
+                        "--authtype=ssl"] + argv[1:]
                 os.execlp("koji", "koji", *args)
         else:
             os.system("koji")

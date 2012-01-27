@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """utilities for osg-build"""
 import logging
 import os
@@ -12,6 +11,10 @@ from datetime import datetime
 
 
 class CalledProcessError(Exception):
+    """Returned by checked_call and checked_backtick if the subprocess exits
+    nonzero.
+
+    """
     def __init__(self, process, returncode, output=None):
         self.process = process
         self.returncode = returncode
@@ -19,11 +22,13 @@ class CalledProcessError(Exception):
 
     def __str__(self):
         logging.debug(self.output)
-        return ("Error in called process(%s): subprocess returned %s" %
-                (str(self.process), str(self.returncode)))
+        return ("Error in called process(%s): subprocess returned %s.\nOutput: %s" %
+                (str(self.process), str(self.returncode), str(self.output)))
 
     def __repr__(self):
-        return str(repr(self.process), repr(self.returncode), repr(self.output))
+        return str(repr(self.process),
+                   repr(self.returncode),
+                   repr(self.output))
 
 
 def checked_call(*args, **kwargs):
@@ -126,6 +131,7 @@ def checked_backtick(*args, **kwargs):
 
 
 def slurp(filename):
+    """Return the contents of a file as a single string."""
     try:
         fh = open(filename, 'r')
         contents = fh.read()
@@ -135,6 +141,7 @@ def slurp(filename):
 
 
 def unslurp(filename, contents):
+    """Write a string to a file."""
     try:
         fh = open(filename, 'w')
         fh.write(contents)
@@ -214,11 +221,16 @@ def super_unpack(*compressed_files):
 
 
 def safe_makedirs(directory, mode=0777):
+    """Create a directory and all its parent directories, unless it already
+    exists.
+
+    """
     if not os.path.isdir(directory):
         os.makedirs(directory, mode)
         
 
 def ask(question, choices):
+    """Prompt user for a choice from a list. Return the choice."""
     choices_lc = [x.lower() for x in choices]
     user_choice = ""
     match = False
@@ -233,6 +245,7 @@ def ask(question, choices):
 
 
 def ask_yn(question):
+    """Prompt user for a yes/no question. Return True or False for yes or no"""
     user_choice = ask(question, ("y", "n"))
     if user_choice.startswith("y"):
         return True
@@ -241,6 +254,7 @@ def ask_yn(question):
 
 
 def safe_make_backup(filename, move=True):
+    """Back up a file if it exists (either copy or move)"""
     if os.path.exists(filename):
         newname = filename + datetime.now().strftime(".%y%m%d%H%M%S~")
         if move:

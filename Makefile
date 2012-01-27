@@ -1,12 +1,12 @@
-VERSION = 1.0.4
+VERSION = 1.1.0
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
-PYDIR = osg_build_lib
-DATAFILES = osg-koji-site.conf osg-koji-home.conf
-INIFILE = sample-osg-build.ini
+PYDIR = osgbuild
+SVNDATADIR = data
+SVNDOCDIR = doc
 MAIN_SCRIPT = $(NAME)
 MAIN_SCRIPT_SYMLINK = vdt-build
-EXTRA_SCRIPTS = osg-import-srpm rpm-ripper osg-koji koji-tag-diff osg-build-test
+EXTRA_SCRIPTS = koji-tag-diff osg-build-test osg-import-srpm osg-koji rpm-ripper
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 BINDIR = /usr/bin
 DOCDIR = /usr/share/doc/$(NAME)
@@ -26,26 +26,25 @@ install:
 		exit 1;                                                        \
 	fi
 
-	mkdir -p $(DESTDIR)/$(PYTHON_SITELIB)
-	cp -rp $(PYDIR) $(DESTDIR)/$(PYTHON_SITELIB)/
-	chmod 0755 $(DESTDIR)/$(PYTHON_SITELIB)/$(PYDIR)/*
+	mkdir -p $(DESTDIR)/$(PYTHON_SITELIB)/$(PYDIR)
+	install -p -m 644 $(PYDIR)/* $(DESTDIR)/$(PYTHON_SITELIB)/$(PYDIR)
 
 	mkdir -p $(DESTDIR)/$(DOCDIR)
-	install -p -m 644 $(INIFILE) $(DESTDIR)/$(DOCDIR)/$(INIFILE)
+	install -p -m 644 $(SVNDOCDIR)/* $(DESTDIR)/$(DOCDIR)
 
 	mkdir -p $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)
-	ln -s $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)/$(MAIN_SCRIPT_SYMLINK)
 	install -p -m 755 $(EXTRA_SCRIPTS) $(DESTDIR)/$(BINDIR)
+	ln -s $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)/$(MAIN_SCRIPT_SYMLINK)
 
 	mkdir -p $(DESTDIR)/$(DATADIR)
-	install -p -m 644 $(DATAFILES) $(DESTDIR)/$(DATADIR)
+	install -p -m 644 $(SVNDATADIR)/* $(DESTDIR)/$(DATADIR)
 
-	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(DESTDIR)/$(BINDIR)/$(MAIN_SCRIPT)
 
 dist:
 	mkdir -p $(NAME_VERSION)
-	cp -rp $(PYDIR) $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(DATAFILES) Makefile $(INIFILE) $(NAME_VERSION)/
+	cp -rp $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(PYDIR) $(SVNDATADIR) $(SVNDOCDIR) Makefile $(NAME_VERSION)/
+	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(NAME_VERSION)/$(PYDIR)/main.py
 	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]' --exclude='*/*~'
 
 afsdist: dist
@@ -62,5 +61,9 @@ release: dist
 	mkdir -p $(DESTDIR)/$(NAME)/$(VERSION)
 	mv -f $(NAME_VERSION).tar.gz $(DESTDIR)/$(NAME)/$(VERSION)/
 	rm -rf $(NAME_VERSION)
+
+test:
+	pylint -E osg-build osg-build-test $(PYDIR)/*.py
+	python osg-build-test -v TestSuiteAll
 
 

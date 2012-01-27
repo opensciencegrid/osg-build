@@ -1,5 +1,4 @@
 """Helper functions for an SVN build."""
-# pylint: disable=W0614
 import re
 import os
 
@@ -26,12 +25,24 @@ def is_outdated(package_dir):
     SVN working dir.
 
     """
-    info = get_package_info(package_dir)
-    head_info = get_package_info(package_dir, 'HEAD')
-    rev = int(info['revision'])
-    last_changed = int(head_info['last_changed_rev'])
-
-    return rev < last_changed
+    out, err = utils.sbacktick("svn status -u -q" + package_dir)
+    if err:
+        raise SVNError("Exit code %d getting SVN status. Output:\n%s" %
+                       (err, out))
+    outdated_files = []
+    for line in out.split("\n"):
+        try:
+            outdated_flag = line[8]
+        except IndexError:
+            continue
+        if outdated_flag == "*":
+            outdated_files.append(line)
+    if outdated_files:
+        print "The following outdated files exist:"
+        print "\n".join(outdated_files)
+        return True
+    else:
+        return False
 
 
 def verify_working_dir(pkg):
@@ -49,8 +60,6 @@ Continue (yes/no)?""" % pkg):
         if not utils.ask_yn("""\
 Package working directory %s is out of date and its contents may not reflect
 what will be built.
-Note: You may get this message if you have committed the directory
-without doing 'svn update' afterward, in which case it is safe to ignore.
 Continue (yes/no)?""" % pkg):
             return False
     return True

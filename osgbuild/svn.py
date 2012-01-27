@@ -25,7 +25,7 @@ def is_outdated(package_dir):
     SVN working dir.
 
     """
-    out, err = utils.sbacktick("svn status -u -q" + package_dir)
+    out, err = utils.sbacktick("svn status -u -q " + package_dir)
     if err:
         raise SVNError("Exit code %d getting SVN status. Output:\n%s" %
                        (err, out))

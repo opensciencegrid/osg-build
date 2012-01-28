@@ -391,6 +391,7 @@ def read_config_file(given_cfg_file=None):
     is None, uses one of the default config file locations.
 
     """
+    cfg_file = None
     if given_cfg_file:
         cfg_file = given_cfg_file
     else:

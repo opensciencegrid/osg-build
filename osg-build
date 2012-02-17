@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 "Load and run the main osg-build script"
 # pylint: disable=C0103
+import os
 import sys
 import logging
 import traceback
@@ -8,12 +9,41 @@ import traceback
 from osgbuild import main
 from osgbuild.error import Error, UsageError
 
+log = main.log
 
 try:
     sys.exit(main.main(sys.argv))
 except UsageError, err:
     print >> sys.stderr, str(err)
-    print >> sys.stderr, "Type '" + sys.argv[0] + " --help' for usage info."
+    print >> sys.stderr, """\
+Type %(prog)s --help for usage info.
+
+Common usage patterns follow:
+
+To extract and patch the sources without building:
+    %(prog)s prepare PACKAGE1 <PACKAGE2..n>
+
+To look for potential errors in package(s):
+    %(prog)s lint PACKAGE1 <PACKAGE2..n>
+
+To build on the local machine:
+    %(prog)s rpmbuild PACKAGE1 <PACKAGE2..n>
+        OR
+    %(prog)s mock PACKAGE1 <PACKAGE2..n>
+
+To submit test build(s):
+    %(prog)s koji --scratch PACKAGE1 <PACKAGE2..n>
+
+To submit final build(s):
+    %(prog)s koji PACKAGE1 <PACKAGE2..n>
+
+To submit build(s) for EL5 or EL6 only:
+    %(prog)s koji --el5 PACKAGE1 <PACKAGE2..n>
+    %(prog)s koji --el6 PACKAGE1 <PACKAGE2..n>
+
+Also see the documentation at:
+    https://twiki.grid.iu.edu/bin/view/SoftwareTeam/OSGBuildTools
+""" % {'prog': os.path.basename(sys.argv[0])}
     sys.exit(2)
 except SystemExit, err:
     raise
@@ -27,8 +57,8 @@ except Error, err:
     print >> sys.stderr, "-" * 79
     print >> sys.stderr, str(err)
     print >> sys.stderr, "-" * 79
-    logging.debug("Full traceback follows:")
-    logging.debug(err.traceback)
+    log.debug("Full traceback follows:")
+    log.debug(err.traceback)
     sys.exit(4)
 except Exception, err:
     print >> sys.stderr, "-" * 79

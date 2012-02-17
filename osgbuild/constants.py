@@ -32,14 +32,15 @@ SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
 DEFAULT_BUILDOPTS_COMMON = {
     'autoclean': False,
     'cache_prefix': 'AUTO',
+    'dry_run': False,
     'full_extract': False,
     'kojilogin': None,
     'koji_wrapper': True,
     'mock_clean': True,
     'mock_config': 'AUTO',
     'mock_config_from_koji': None,
-    'no_wait': False,
-    'redhat_release': '5',
+    'no_wait': True,
+    'redhat_releases': None,
     'regen_repos': False,
     'scratch': False,
     'svn': None,
@@ -63,11 +64,13 @@ DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE = {
         'distro_tag': 'osg.el5',
         'koji_tag': 'el5-osg',
         'koji_target': 'el5-osg',
+        'redhat_release': '5',
     },
     '6': {
         'distro_tag': 'osg.el6',
         'koji_tag': 'el6-osg',
         'koji_target': 'el6-osg',
+        'redhat_release': '6',
     }
 }
 

@@ -1,10 +1,12 @@
 """Exception classes for osg-build"""
+# pylint: disable=C0103,C0111
 import os
 import traceback
 
 class Error(Exception):
     """Base class for expected exceptions"""
     def __init__(self, msg, tb=None):
+        Exception.__init__(self)
         self.msg = msg
         if tb is None:
             self.traceback = traceback.format_exc()
@@ -31,7 +33,8 @@ class FileNotFoundError(Error):
     def __init__(self, fname, searchpath=None):
         msg = "Couldn't find file named '%s'." % fname
         if searchpath:
-            Error.__init__(self, msg + " Search path was:\n%s" % os.pathsep.join(searchpath))
+            Error.__init__(self, msg + " Search path was:\n%s" %
+                           os.pathsep.join(searchpath))
         else:
             Error.__init__(self, msg)
 

@@ -50,7 +50,7 @@ def main(argv):
     mock_obj = None
 
     # checks
-    if task == 'allbuild' or buildopts['svn']:
+    if task == 'allbuild' or (task == 'koji' and buildopts['svn']):
         # verify svn working dirs
         for pkg in package_dirs:
             if not svn.verify_working_dir(pkg):
@@ -505,7 +505,7 @@ def get_buildopts(options, optnames, task):
     if buildopts['mock_config_from_koji']:
         buildopts['mock_config'] = None
 
-    if buildopts['svn'] is None:
+    if buildopts['svn'] is None and task == 'koji':
         if buildopts['scratch']:
             buildopts['svn'] = False
         else:

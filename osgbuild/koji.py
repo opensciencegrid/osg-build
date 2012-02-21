@@ -9,6 +9,7 @@ from osgbuild import utils
 from osgbuild.error import KojiError
 
 log = logging.getLogger('osgbuild')
+log.propagate = False
 
 def get_koji_cmd(koji_wrapper):
     """Get the command used to call koji."""

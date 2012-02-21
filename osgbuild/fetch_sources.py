@@ -17,6 +17,7 @@ from osgbuild.error import GlobNotFoundError
 from osgbuild import utils
 
 log = logging.getLogger('osgbuild')
+log.propagate = False
 
 def process_dot_source(cache_prefix, sfilename, destdir):
     """Read a .source file, fetch any files mentioned in it from the

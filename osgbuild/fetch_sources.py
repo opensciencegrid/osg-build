@@ -16,6 +16,9 @@ from osgbuild.constants import *
 from osgbuild.error import GlobNotFoundError
 from osgbuild import utils
 
+log = logging.getLogger('osgbuild')
+log.propagate = False
+
 def process_dot_source(cache_prefix, sfilename, destdir):
     """Read a .source file, fetch any files mentioned in it from the
     cache.
@@ -34,7 +37,7 @@ def process_dot_source(cache_prefix, sfilename, destdir):
             basename = os.path.basename(line)
             if line.startswith('/'):
                 uri = "file://" + line
-                logging.warning(
+                log.warning(
                     "An absolute path has been given in %s line %d. "
                     "It is recommended to use only paths relative to %s"
                     "in your source files.", sfilename, lineno+1,
@@ -44,7 +47,7 @@ def process_dot_source(cache_prefix, sfilename, destdir):
             else:
                 uri = line
 
-            logging.info('Retrieving ' + uri)
+            log.info('Retrieving ' + uri)
             handle = urllib2.urlopen(uri)
             filename = os.path.join(destdir, basename)
             desthandle = open(filename, 'w')
@@ -68,10 +71,10 @@ def full_extract(unpacked_dir, archives_downloaded, destdir):
     old_dir = os.getcwd()
     os.chdir(destdir)
     for fname in archives_downloaded + archives_in_srpm:
-        logging.info("Extracting " + fname)
+        log.info("Extracting " + fname)
         utils.super_unpack(fname)
     os.chdir(old_dir)
-    logging.info('Extracted files to ' + destdir)
+    log.info('Extracted files to ' + destdir)
 
 
 def extract_srpms(srpms_downloaded, destdir):
@@ -81,7 +84,7 @@ def extract_srpms(srpms_downloaded, destdir):
     old_dir = os.getcwd()
     os.chdir(destdir)
     for srpm in abs_srpms_downloaded:
-        logging.info("Unpacking SRPM " + srpm)
+        log.info("Unpacking SRPM " + srpm)
         utils.super_unpack(srpm)
     os.chdir(old_dir)
 
@@ -98,9 +101,9 @@ def copy_with_filter(files_list, destdir):
                      WD_UNPACKED,
                      WD_UNPACKED_TARBALL] or
                 base.endswith('~')):
-            logging.debug("Skipping file " + fname)
+            log.debug("Skipping file " + fname)
         else:
-            logging.debug("Copying file " + fname)
+            log.debug("Copying file " + fname)
             shutil.copy(fname, destdir)
 
 
@@ -132,7 +135,7 @@ def fetch(package_dir,
     dot_sources = glob.glob(os.path.join(upstream_dir, '*.source'))
     downloaded = []
     for src in dot_sources:
-        logging.debug('Processing .source file %s', src)
+        log.debug('Processing .source file %s', src)
         for fname in process_dot_source(cache_prefix, src, destdir):
             downloaded.append(os.path.abspath(fname))
 
@@ -142,7 +145,7 @@ def fetch(package_dir,
         extract_srpms(srpms, unpacked_dir)
     if unpacked_dir != destdir:
         for f in glob.glob(os.path.join(unpacked_dir, '*')):
-            logging.debug('Copying unpacked file ' + f)
+            log.debug('Copying unpacked file ' + f)
             shutil.copy(f, destdir)
 
     # Copy non *.source files in upstream

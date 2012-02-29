@@ -8,6 +8,9 @@ from osgbuild.constants import *
 from osgbuild import utils
 from osgbuild.error import KojiError
 
+log = logging.getLogger('osgbuild')
+log.propagate = False
+
 def get_koji_cmd(koji_wrapper):
     """Get the command used to call koji."""
     # Use osg-koji wrapper if available and configured.
@@ -77,6 +80,8 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
         else:
             self.tag = opts['koji_tag']
 
+        self.dry_run = opts['dry_run']
+
 
     def add_pkg(self, package_name):
         """Part of koji task. If the package needs to be added to koji_tag,
@@ -96,10 +101,13 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
                 pass
 
         if not found:
-            logging.info("Calling koji to add the package")
-            utils.checked_call(
-                self.koji_cmd +
-                ["add-pkg", self.tag, package_name, "--owner", self.cn])
+            cmd = (self.koji_cmd +
+                   ["add-pkg", self.tag, package_name, "--owner", self.cn])
+            log.info("Calling koji to add the package to tag %s", self.tag)
+            if not self.dry_run:
+                utils.checked_call(cmd)
+            else:
+                print " ".join(cmd)
 
 
     def _get_build_and_dest_tags(self):
@@ -122,22 +130,32 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
 
     def _build_common(self, url):
         """Submit a build"""
-        logging.debug("building " + url)
+        log.debug("building " + url)
         build_subcmd = ["build", self.target, url]
         if self.scratch:
             build_subcmd += ["--scratch"]
         if self.no_wait:
             build_subcmd += ["--nowait"]
-        logging.info("Calling koji to build the package")
-        err = utils.unchecked_call(self.koji_cmd + build_subcmd)
+        log.info("Calling koji to build the package for target %s", self.target)
+
+        if not self.dry_run:
+            err = utils.unchecked_call(self.koji_cmd + build_subcmd)
+        else:
+            print " ".join(self.koji_cmd + build_subcmd)
+            err = 0
+
         if err:
             raise KojiError("koji build failed with exit code " + str(err))
         if self.regen_repos and not self.scratch:
             regen_repo_subcmd = ["regen-repo", self.build_tag]
             if self.no_wait:
                 regen_repo_subcmd += ["--nowait"]
-            logging.info("Calling koji to regen " + self.build_tag)
-            err2 = utils.unchecked_call(self.koji_cmd + regen_repo_subcmd)
+            log.info("Calling koji to regen " + self.build_tag)
+            if not self.dry_run:
+                err2 = utils.unchecked_call(self.koji_cmd + regen_repo_subcmd)
+            else:
+                print " ".join(self.koji_cmd + regen_repo_subcmd)
+                err2 = 0
             if err2:
                 raise KojiError("koji regen-repo failed with exit code "
                                 + str(err2))

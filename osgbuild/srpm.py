@@ -15,6 +15,10 @@ from osgbuild import utils
 from osgbuild.error import *
 
 
+log = logging.getLogger('osgbuild')
+log.propagate = False
+
+
 class SRPMBuild(object):
     """Tasks for an SPRM build and helper functions."""
 
@@ -64,7 +68,7 @@ class SRPMBuild(object):
                          self.unpacked_dir,
                          self.unpacked_tarball_dir]:
                 if os.path.exists(udir):
-                    logging.debug("autoclean removing " + udir)
+                    log.debug("autoclean removing " + udir)
                     shutil.rmtree(udir)
 
     
@@ -78,8 +82,12 @@ class SRPMBuild(object):
             "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
             "rhel " + rhel,
             "dist ." + self.buildopts.get('distro_tag', 'osg.el' + rhel),
-            "el" + rhel + " 1",
         ]
+        for rel in REDHAT_RELEASES:
+            if rel == rhel:
+                defines.append("el%s 1" % rel)
+            else:
+                defines.append("el%s 0" % rel)
         if rhel == '5':
             defines += [
                 "_source_filedigest_algorithm 1",
@@ -126,7 +134,7 @@ class SRPMBuild(object):
                           (spec_fn, " ".join(cmd)))
         out, err = utils.sbacktick(cmd, nostrip=True, clocale=True, err2out=True)
         if err:
-            logging.error("Rpmbuild failed. Output follows: " + out)
+            log.error("Rpmbuild failed. Output follows: " + out)
             raise OSGPrebuildError(err_msg_prefix +
                                    "Rpmbuild return code %d" % err)
 
@@ -166,7 +174,7 @@ class SRPMBuild(object):
         result_srpm = self.make_srpm(spec_filename)
 
         if result_srpm:
-            logging.info("Files have been prepared in %s.", self.prebuild_dir)
+            log.info("Files have been prepared in %s.", self.prebuild_dir)
             return os.path.abspath(result_srpm)
 
 
@@ -186,7 +194,7 @@ class SRPMBuild(object):
         if ret != 0:
             raise Error("Error running 'quilt setup' on the spec file.")
 
-        logging.info("quilt files ready in %s", self.prebuild_dir)
+        log.info("quilt files ready in %s", self.prebuild_dir)
 
 
     def prepare(self):
@@ -212,7 +220,7 @@ class SRPMBuild(object):
         if ret != 0:
             raise Error(
                 "Unable to prepare the package: rpmbuild -bp returned %d" % ret)
-        logging.info("Files prepared in: " +
+        log.info("Files prepared in: " +
                      os.path.join(self.results_dir, "BUILD"))
     # end of prepare()
 
@@ -243,7 +251,7 @@ class SRPMBuild(object):
                     if not fnmatch.fnmatch(x, '*.src.rpm')]
             if not rpms:
                 raise OSGBuildError("No RPMs found. Making RPMs failed?")
-            logging.info("The following RPM(s) have been created:\n" +
+            log.info("The following RPM(s) have been created:\n" +
                          "\n".join(rpms))
 
 
@@ -255,7 +263,7 @@ class SRPMBuild(object):
         rpms = self.mock_obj.rebuild(self.results_dir, srpm)
         if self.buildopts['mock_clean']:
             self.mock_obj.clean()
-        logging.info("The following RPM(s) have been created:\n" +
+        log.info("The following RPM(s) have been created:\n" +
                      "\n".join(rpms))
 
 

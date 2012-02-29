@@ -7,7 +7,7 @@ Wishlist:
 * Be consistent about catching/not catching CalledProcessError
 
 """
-# pylint: disable=C0103,R0904
+# pylint: disable=C0103,R0904,W0614
 
 import atexit
 import re
@@ -19,13 +19,9 @@ import unittest
 from unittest import makeSuite
 import sys
 
-from osgbuild.constants import (
-    SVN_ROOT,
-    WD_PREBUILD,
-    WD_RESULTS,
-    WD_UNPACKED,
-    WD_UNPACKED_TARBALL)
+from osgbuild.constants import *
 from osgbuild import main
+from osgbuild import srpm
 from osgbuild import utils
 from osgbuild.utils import (
     checked_backtick,
@@ -79,7 +75,8 @@ def get_listing(directory):
     return checked_backtick(
             ["ls", directory]).split("\n")
 
-
+def regex_in_list(pattern, listing):
+    return [x for x in listing if re.match(pattern, x)]
 
 class XTestCase(unittest.TestCase):
     """XTestCase (extended test case) adds some useful assertions to
@@ -149,7 +146,8 @@ class TestRpmbuild(XTestCase):
         try:
             self.assertReSearch(
                 r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
-                r'[^\n]+' + re.escape("yum-remove-osg-1.0-0.2.osg.el5.noarch.rpm"),
+                r'[^\n]+'
+                r'yum-remove-osg-1[.]0-0[.]2[.]osg[.]el\d[.]noarch[.]rpm',
                 out,
                 "rpm created message not found")
         except:
@@ -180,7 +178,7 @@ class TestPrebuild(XTestCase):
             "multilib-python.patch" in final_contents,
             "osg patch not in final contents")
         self.assertTrue(
-            "mash-0.5.22-2.osg.el5.src.rpm" in final_contents,
+            regex_in_list(r"mash-0[.]5[.]22-2[.]osg[.]el\d[.]src[.]rpm", final_contents),
             "srpm not successfully built")
 
     def test_prebuild_osgonly(self):
@@ -190,7 +188,9 @@ class TestPrebuild(XTestCase):
         final_contents = get_listing(opj(pkg_osgonly_dir, WD_PREBUILD))
 
         self.assertTrue(
-            "yum-remove-osg-1.0-0.2.osg.el5.src.rpm" in final_contents,
+            regex_in_list(
+                r"yum-remove-osg-1[.]0-0[.]2[.]osg.el\d[.]src[.]rpm",
+                final_contents),
             "srpm not successfully built")
 
     def test_prebuild_passthrough(self):
@@ -200,19 +200,18 @@ class TestPrebuild(XTestCase):
         final_contents = get_listing(opj(pkg_passthrough_dir, WD_PREBUILD))
 
         self.assertTrue(
-            "globus-core-8.5-2.osg.el5.src.rpm" in final_contents,
+            regex_in_list(
+                r"globus-core-8[.]5-2[.]osg[.]el\d[.]src[.]rpm",
+                final_contents),
             "srpm not successfully built")
 
     def test_prebuild_full_extract(self):
         pkg_dir = common_setUp(opj(TRUNK, "mash"),
                                "{2011-12-08}")
         out = backtick_osg_build(["prebuild", "--full-extract", pkg_dir])
-        ut_contents = checked_backtick(
-            ["ls", opj(pkg_dir, WD_UNPACKED_TARBALL)]
-            ).split("\n")
-        tarball_contents = checked_backtick(
-            ["ls", opj(pkg_dir, WD_UNPACKED_TARBALL, "mash-0.5.22")]
-            ).split("\n")
+        ut_contents = get_listing(opj(pkg_dir, WD_UNPACKED_TARBALL))
+        tarball_contents = get_listing(opj(pkg_dir, WD_UNPACKED_TARBALL,
+                                           "mash-0.5.22"))
 
         self.assertNoReSearch(
             re.escape("cpio: premature end of archive"),
@@ -265,7 +264,7 @@ fetch_sources.fetch('.')
     def test_fetch(self):
         os.chdir('mash')
         checked_call("../fetch-sources")
-        contents = checked_backtick(["ls"]).split("\n")
+        contents = get_listing('.')
 
         self.assertTrue(
             "mash.spec" in contents,
@@ -303,14 +302,44 @@ class TestKoji(XTestCase):
         self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
                                     "{2012-01-25}")
 
-    def test_koji_basic(self):
-        checked_osg_build(["koji", "--scratch", self.pkg_dir])
+    def test_koji_args1(self):
+        output = backtick_osg_build(["koji", "--dry-run", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji build el5-osg.*", out_list),
+            "not building for el5")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji build el6-osg.*", out_list),
+            "not building for el6")
+
+    def test_koji_args2(self):
+        output = backtick_osg_build(["koji", "--el5", "--dry-run", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji build el5-osg.*", out_list),
+            "not building for el5")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji build el6-osg.*", out_list),
+            "falsely building for el6")
+
+    def test_koji_args3(self):
+        output = backtick_osg_build(["koji", "--ktt", "el6-gt52", "--dry-run", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji build el5-osg.*", out_list),
+            "falsely building for el5")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji build el6-gt52.*", out_list),
+            "not building for el6 for the right target")
+
+    def test_koji_build(self):
+        checked_osg_build(["koji", "--el5", "--scratch", self.pkg_dir, "--wait"])
 
 
-class TestCmdline(XTestCase):
-    """Tests for command-line argument handling"""
+class TestMisc(XTestCase):
+    """Other tests"""
 
-    def test_scratch_svn(self):
+    def test_cmdline_scratch_svn(self):
         buildopts = main.init(
             ["osg-build", "-C", "/dev/null", "koji", "--scratch", "."])[0]
         self.assertFalse(buildopts['svn'],
@@ -320,9 +349,36 @@ class TestCmdline(XTestCase):
             ["osg-build", "-C", "/dev/null", "koji", "."])[0]
         self.assertTrue(buildopts['svn'],
                         "svn not true for non-scratch build")
+
+    def test_rpmbuild_defines(self):
+        buildopts_el = dict()
+        build_el = dict()
+        defines_el = dict()
+        for rhel in ['5', '6']:
+            buildopts_el[rhel] = DEFAULT_BUILDOPTS_COMMON.copy()
+            buildopts_el[rhel]['redhat_release'] = rhel
+            buildopts_el[rhel].update(DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE[rhel])
+            build_el[rhel] = srpm.SRPMBuild(".", buildopts_el[rhel], None, None)
+            defines_el[rhel] = build_el[rhel].get_rpmbuild_defines(True)
+            self.assertTrue("--define=rhel %s" % rhel in defines_el[rhel],
+                            "%%rhel not set correctly for el%s build" % rhel)
+
+        self.assertTrue('--define=el5 1' in defines_el['5'],
+                        "%el5 not set for el5 build")
+        self.assertTrue('--define=el6 0' in defines_el['5'],
+                        "%el6 not unset for el5 build")
+                        
+        self.assertTrue('--define=el6 1' in defines_el['6'],
+                        "%el6 not set for el6 build")
+        self.assertTrue('--define=el5 0' in defines_el['6'],
+                        "%el5 not unset for el6 build")
+        
+        self.assertTrue('--define=_source_filedigest_algorithm 1' in
+                        defines_el['5'],
+                        "filedigest algorithm not set for el5 build")
                         
 
-short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestCmdline)
+short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc)
 TestSuiteShort = unittest.TestSuite()
 TestSuiteShort.addTests([makeSuite(t) for t in short_test_cases])
 # Make sure TestKoji comes first since it requires user interaction.

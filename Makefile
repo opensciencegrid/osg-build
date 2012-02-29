@@ -1,4 +1,4 @@
-VERSION = 1.1.0
+VERSION = 1.1.5
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osgbuild
@@ -6,7 +6,7 @@ SVNDATADIR = data
 SVNDOCDIR = doc
 MAIN_SCRIPT = $(NAME)
 MAIN_SCRIPT_SYMLINK = vdt-build
-EXTRA_SCRIPTS = koji-tag-diff osg-build-test osg-import-srpm osg-koji rpm-ripper
+EXTRA_SCRIPTS = koji-tag-checker koji-tag-diff osg-build-test osg-import-srpm osg-koji rpm-ripper
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 BINDIR = /usr/bin
 DOCDIR = /usr/share/doc/$(NAME)
@@ -66,4 +66,7 @@ test:
 	pylint -E osg-build osg-build-test $(PYDIR)/*.py
 	python osg-build-test -v TestSuiteAll
 
+lint:
+	-pylint osg-build osg-build-test $(PYDIR)/*.py
+# ignore return code in above
 

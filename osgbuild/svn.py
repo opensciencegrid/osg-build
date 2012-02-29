@@ -1,5 +1,4 @@
 """Helper functions for an SVN build."""
-# pylint: disable=W0614
 import re
 import os
 
@@ -26,12 +25,24 @@ def is_outdated(package_dir):
     SVN working dir.
 
     """
-    info = get_package_info(package_dir)
-    head_info = get_package_info(package_dir, 'HEAD')
-    rev = int(info['revision'])
-    last_changed = int(head_info['last_changed_rev'])
-
-    return rev < last_changed
+    out, err = utils.sbacktick("svn status -u -q " + package_dir)
+    if err:
+        raise SVNError("Exit code %d getting SVN status. Output:\n%s" %
+                       (err, out))
+    outdated_files = []
+    for line in out.split("\n"):
+        try:
+            outdated_flag = line[8]
+        except IndexError:
+            continue
+        if outdated_flag == "*":
+            outdated_files.append(line)
+    if outdated_files:
+        print "The following outdated files exist:"
+        print "\n".join(outdated_files)
+        return True
+    else:
+        return False
 
 
 def verify_working_dir(pkg):
@@ -40,17 +51,16 @@ def verify_working_dir(pkg):
 
     """
     if is_uncommitted(pkg):
-        if not utils.ask_yn(
-                "Package directory " + pkg + " has"
-                " uncommitted changes that will not be"
-                " included in the SVN build."
-                " Continue (yes/no)?"):
+        if not utils.ask_yn("""\
+Package working directory %s has uncommitted changes that will not be included
+in the SVN build.
+Continue (yes/no)?""" % pkg):
             return False
     if is_outdated(pkg):
-        if not utils.ask_yn(
-                "Package directory " + pkg + " is"
-                " out of date."
-                " Continue (yes/no)?"):
+        if not utils.ask_yn("""\
+Package working directory %s is out of date and its contents may not reflect
+what will be built.
+Continue (yes/no)?""" % pkg):
             return False
     return True
 
@@ -60,6 +70,9 @@ def get_package_info(package_dir, rev=None):
     command = ["svn", "info", package_dir]
     if rev:
         command += ["-r", rev]
+    else:
+        command += ["-r", "HEAD"]
+
     out, err = utils.sbacktick(command,
                                clocale=True, err2out=True)
     if err:

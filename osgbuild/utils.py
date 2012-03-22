@@ -188,7 +188,7 @@ def find_files(filename, paths=None):
         paths = sys.path
     for p in paths:
         j = os.path.join(p, filename)
-        if os.path.exists(j):
+        if os.path.isfile(j):
             matches += [j]
     return matches
             
@@ -279,3 +279,50 @@ def which(program):
             if is_exe(exe_file):
                 return exe_file
     return None
+
+
+
+def printf(fstring, *args, **kwargs):
+    """A shorthand for printing with a format string.
+    The kwargs 'file' and 'end' are as in the Python3 print function.
+    """
+    file = kwargs.pop('file', sys.stdout)
+    end = kwargs.pop('end', "\n")
+    ffstring = fstring + end
+    if len(args) == 0 and len(kwargs) > 0:
+        file.write(ffstring % kwargs)
+    elif len(args) == 1 and type(args[0]) == dict:
+        file.write(ffstring % args[0])
+    else:
+        file.write(ffstring % args)
+
+def errprintf(fstring, *args, **kwargs):
+    """printf to stderr"""
+    kwargs.pop('file', None)
+    printf(fstring, file=sys.stderr, *args, **kwargs)
+
+class safelist(list):
+    """A version of the list type that has get and pop methods that accept
+    default arguments instead of raising errors. (Compare dict.get and dict.pop)
+    """
+    def get(self, idx, default=None):
+        """L.get(idx, default=None) -> item
+        Get item at idx. If idx is out of range, return default."""
+        try:
+            return self.__getitem__(idx)
+        except IndexError:
+            return default
+
+    def pop(self, *args):
+        """L.pop([idx[,default]]) -> item, remove specified index
+        (default last). If idx is out of range, then if return default if
+        specified, raise IndexError if not.
+        """
+        try:
+            return list.pop(self, args[0])
+        except IndexError:
+            if len(args) < 2:
+                raise
+            else:
+                return args[1]
+

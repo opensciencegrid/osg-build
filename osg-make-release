@@ -1,0 +1,36 @@
+#!/usr/bin/python
+
+valid = False
+while not valid:
+    version = raw_input("Enter OSG version number (e.g. 3.0.8):")
+    # TODO warn user if that version already exists... check for the el5-osg-release-$version tag
+    # TODO validate input
+
+# Look for an osg-version-$version-X.osg.elY package in elY-osg-testing
+# If not, check in development; if found, tag
+# If not, bail.
+
+# Verify that el{5,6}-osg-prerelease is empty
+
+# do backtick('koji-tag-diff elY-osg-testing elY-osg-release')
+# save the results, ask user to edit them.
+# pipe them through osg-promote --dry-run
+# ask user if there are any rejects. bail if there are.
+# pipe them through osg-promote for real.
+# TODO edit osg-promote to make sure pkg exists in tag and run add-pkg if it doesn't.
+#      make it add to elY-osg by default if dest tag inherits from it.
+
+# koji regen-repo el{5,6}-osg-prerelease
+
+# tell user to test the changes. provide instructions. wait for tests to pass.
+
+
+# koji edit-tag --unlock el{5,6}-osg-release
+# backtick a list of packages to move ($move_to_release)
+# koji move-pkg all packages in prerelease to release.
+# koji clone-tag from elY-osg-release to elY-osg-release-$version
+# koji edit-tag --lock el{5,6}-osg-release{,-$version}
+# koji regen-repo el{5,6}-osg-release{,-$version}
+
+# print out release notes to a file
+

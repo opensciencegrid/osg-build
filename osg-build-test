@@ -1,11 +1,5 @@
 #!/usr/bin/python
 """unit tests for the osg-build tasks
-
-Wishlist:
-
-* Automatically print command output if tests fail
-* Be consistent about catching/not catching CalledProcessError
-
 """
 # pylint: disable=C0103,R0904,W0614
 
@@ -27,7 +21,9 @@ from osgbuild.utils import (
     checked_backtick,
     checked_call,
     CalledProcessError,
-    find_file)
+    find_file,
+    printf,
+    errprintf)
 
 TRUNK = "native/redhat/trunk"
 
@@ -36,7 +32,7 @@ osg_build_path = find_file('osg-build', [initial_wd,
                                          '/usr/bin'])
 
 if not osg_build_path:
-    print >> sys.stderr, "osg-build script not found!"
+    errprintf("osg-build script not found!")
     sys.exit(255)
 
 osg_build_command = [osg_build_path, "--config-file=/dev/null"]
@@ -67,8 +63,7 @@ def svn_export(path, rev, destpath):
             ["svn", "export", opj(SVN_ROOT, path), "-r", rev, destpath],
             err2out=True)
     except CalledProcessError, err:
-        print >> sys.stderr, "Error in svn export:"
-        print >> sys.stderr, err.output
+        errprintf("Error in svn export:\n%s", err.output)
         raise
 
 def get_listing(directory):
@@ -90,9 +85,7 @@ class XTestCase(unittest.TestCase):
             return self.assertTrue(re.search(regex, text), message)
         except AssertionError:
             if verbose:
-                print >> sys.stderr, (
-                    "Regex search '%s' failed on text '%s'" %
-                    (regex, text))
+                errprintf("Regex search '%s' failed on text '%s'", regex, text)
             raise
 
     def assertNoReSearch(self, regex, text, message, verbose=False):
@@ -101,9 +94,9 @@ class XTestCase(unittest.TestCase):
             return self.assertFalse(re.search(regex, text), message)
         except AssertionError:
             if verbose:
-                print >> sys.stderr, (
-                    "Negative regex search '%s' failed on text '%s'" %
-                    (regex, text))
+                errprintf(
+                    "Negative regex search '%s' failed on text '%s'",
+                    regex, text)
             raise
 
 
@@ -130,7 +123,7 @@ class TestLint(XTestCase):
                 out,
                 "expected problems not found")
         except:
-            print >> sys.stderr, "Problems found. Output:\n", out
+            errprintf("Problems found. Output:\n%s", out)
             raise
 
 
@@ -151,7 +144,7 @@ class TestRpmbuild(XTestCase):
                 out,
                 "rpm created message not found")
         except:
-            print >> sys.stderr, "Problems found. Output:\n", out
+            errprintf("Problems found. Output:\n%s", out)
             raise
 
 
@@ -332,6 +325,13 @@ class TestKoji(XTestCase):
             regex_in_list(r"(osg-)?koji build el6-gt52.*", out_list),
             "not building for el6 for the right target")
 
+    def test_koji_args4(self):
+        output = backtick_osg_build(["koji", "--el5", "--koji-target", "gt52b", "--koji-tag", "TARGET", "--dry-run", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertFalse(
+            regex_in_list(r"Unable to determine redhat release", out_list),
+            "Bad error with --koji-tag=TARGET")
+
     def test_koji_build(self):
         checked_osg_build(["koji", "--el5", "--scratch", self.pkg_dir, "--wait"])
 
@@ -386,9 +386,9 @@ TestSuiteAll = unittest.TestSuite((makeSuite(TestKoji), TestSuiteShort, makeSuit
 
 if __name__ == '__main__':
     try:
-        print >> sys.stderr, "testing " + osg_build_path
+        errprintf("testing %s", osg_build_path)
         unittest.main()
     except CalledProcessError, e:
-        print >> sys.stderr, "output: " + e.output
+        errprintf("output: %s", e.output)
         raise
 

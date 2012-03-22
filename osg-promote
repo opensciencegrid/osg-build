@@ -1,0 +1,405 @@
+#!/usr/bin/python
+"""A package promotion script for OSG"""
+
+import glob
+import itertools
+import re
+import os
+import shutil
+import subprocess
+import sys
+import time
+import urllib
+
+from osgbuild import kojiinter
+from osgbuild import utils
+from osgbuild.utils import printf, errprintf
+from optparse import OptionParser
+
+
+kwrap = None
+ksession = None
+
+valid_dvers = ["el5", "el6"]
+valid_routes = {
+    "testing": ["osg-development", "osg-testing"],
+    "contrib": ["osg-development", "osg-contrib"],
+    "release": ["osg-testing", "osg-prerelease"],
+    "prerelease": ["osg-testing", "osg-prerelease"]}
+
+
+def get_screen_columns():
+    """Returns the number of columns in the screen"""
+    screen_columns = os.environ.get('COLUMNS')
+    if not screen_columns:
+        try:
+            screen_columns = int(utils.backtick("stty size").split()[1])
+        except:
+            screen_columns = 80
+    return screen_columns
+
+
+def parse_cmdline_args(argv):
+    parser = OptionParser("""
+    %prog TODO
+""")
+    parser.add_option("-r", "--route", default=None)
+    parser.add_option("-n", "--dry-run", action="store_true", default=False)
+    parser.add_option("--el5", action="store_true", default=False)
+    parser.add_option("--el6", action="store_true", default=False)
+    parser.add_option("--ignore-rejects", dest="skip_rejects", action="store_false", default=True)
+    parser.add_option("--output-format", "--of", default='old', help="Valid output formats are: old, short, long, relnote")
+    parser.add_option("--short", action="store_true", default=False)
+    parser.add_option("--release-note-mode", action="store_true", default=False)
+    parser.add_option("-y", "--assume-yes", action="store_true", default=False)
+    
+    options, args = parser.parse_args(argv[1:])
+
+    return (options, args)
+
+
+def get_latest_build(package, tag):
+    latest = utils.backtick(["koji", "-q", "list-tagged", "--latest", tag, package])
+    if not latest:
+        return None
+    else:
+        return latest.split()[0]
+
+
+def split_nvr(build):
+    match = re.match(r"(?P<name>.+)-(?P<version>[^-]+)-(?P<release>[^-]+)$", build)
+    if match:
+        return [match.group('name'), match.group('version'), match.group('release')]
+    else:
+        return []
+
+
+def cli_get_tagged_builds(tag):
+    output = utils.backtick(["koji", "-q", "list-tagged", tag]).split("\n")
+    tagged_builds = [x.split()[0] for x in output]
+    return tagged_builds
+
+
+def kwrap_get_tagged_builds(tag):
+    global ksession
+    data = ksession.listTagged(tag)
+    return [x['nvr'] for x in data]
+    
+
+def get_tagged_builds(tag):
+    return kwrap_get_tagged_builds(tag)
+        
+
+def cli_get_tagged_builds_latest(tag):
+    output = utils.backtick(["koji", "-q", "list-tagged", "--latest", tag]).split("\n")
+    tagged_builds = [x.split()[0] for x in output]
+    return tagged_builds
+
+
+def kwrap_get_tagged_builds_latest(tag):
+    global ksession
+    data = ksession.listTagged(tag, latest=True)
+    return [x['nvr'] for x in data]
+
+
+def get_tagged_builds_latest(tag):
+    return kwrap_get_tagged_builds_latest(tag)
+
+def cli_get_tagged_packages(tag):
+    output = utils.backtick(["koji", "-q", "list-pkgs", "--tag", tag]).split("\n")
+    tagged_packages = [x.split()[0] for x in output]
+    return tagged_packages
+
+def kwrap_get_tagged_packages(tag):
+    global ksession
+    data = ksession.listPackages(tagID=ksession.getTag(tag)['id'], inherited=True)
+    return [x['package_name'] for x in data]
+    
+def get_tagged_packages(tag):
+    return kwrap_get_tagged_packages(tag)
+
+def get_tag(pattern, dver=None):
+    def get_first(*args):
+        return utils.backtick(["koji", "search", "tag"] + list(args)).split("\n")[0]
+    if dver is None:
+        tag = (get_first("--exact", pattern) or
+               get_first("--regex", re.quote(pattern) + ".*"))
+    else:
+        tag = (get_first("--exact", "%s-%s" %
+                         (dver, pattern)) or
+               get_first("--exact", "%s-osg-%s" %
+                         (dver, pattern)) or
+               get_first("--regex", "%s-(osg-)?%s.*" %
+                         (dver, re.quote(pattern))))
+    if not tag:
+        raise Exception("Can't find tag %s in koji" % pattern)
+    return tag
+
+
+def remove_dver(build):
+    pattern = re.compile(r".(el\d)$")
+    removed = pattern.sub("", build)
+    dver = pattern.search(build)
+    if dver:
+        dver = dver.group(1)
+    return (removed, dver)
+
+
+class Promoter(object):
+    def __init__(self, packages, dvers, route, skip_rejects=True):
+        self.packages = packages
+        self.dvers = dvers
+        self.promoted_packages = {}
+        self.tag_pkg_args = {}
+        self.from_tag_base, self.to_tag_base = valid_routes[route]
+        self.rejects_distinct_latest = dict([(x, []) for x in dvers])
+        self.rejects_missing_build = dict([(x, []) for x in dvers])
+        self.skip_rejects = skip_rejects
+        self.tagged = {}
+        self.tagged_latest = {}
+        self.tagged_packages = {}
+        for dver in self.dvers:
+            from_tag = get_tag(self.from_tag_base, dver)
+            to_tag = get_tag(self.to_tag_base, dver)
+
+            self.tagged[from_tag] = get_tagged_builds(from_tag)
+            self.tagged_latest[from_tag] = get_tagged_builds_latest(from_tag)
+            self.tagged_packages[from_tag] = get_tagged_packages(from_tag)
+            self.tagged_packages[to_tag] = get_tagged_packages(to_tag)
+
+
+    def get_build_in_tag(self, tag, pattern):
+        if pattern in self.tagged_packages[tag]:
+            return get_latest_build(pattern, tag)
+        elif pattern in self.tagged[tag]:
+            return pattern
+        else:
+            return None
+            
+            
+    def add_promotion(self, pkg_or_build):
+        """See which packages can be promoted. Populate tag_pkg_args and promoted_packages"""
+        builds = self.get_builds(pkg_or_build, skip_rejects=self.skip_rejects)
+        
+        for dver in builds:
+            to_tag = get_tag(self.to_tag_base, dver)
+        
+            build = builds[dver]
+            self.tag_pkg_args.setdefault(to_tag, [])
+            self.tag_pkg_args[to_tag].append(build)
+
+        
+
+    def get_builds(self, pkg_or_build, skip_rejects=False):
+        """Get the builds keyed by dver for pkg_or_build."""
+        builds = {}
+        # find the build for each dver
+        for dver in self.dvers:
+            from_tag = get_tag(self.from_tag_base, dver)
+            
+            pkg_or_build_no_dver, _ = remove_dver(pkg_or_build)
+            build = self.get_build_in_tag(from_tag, pkg_or_build_no_dver + "." + dver) or self.get_build_in_tag(from_tag, pkg_or_build_no_dver)
+            if not build:
+                self.rejects_missing_build[dver].append(pkg_or_build_no_dver)
+                if skip_rejects:
+                    return []
+                else:
+                    continue
+            builds[dver] = build
+
+        # find builds where the nvrs (without dver) are distinct between the
+        # dvers we are running the script for, and reject them.
+        name = split_nvr(builds.values()[0])[0]
+        vrs = ['-'.join(split_nvr(builds[x])[1:]) for x in builds]
+        vrs_no_dver = [remove_dver(x)[0] for x in vrs]
+        if len(set(vrs_no_dver)) > 1:
+            for dver in builds:
+                self.rejects_distinct_latest[dver].append(builds[dver])
+            if skip_rejects:
+                return []
+        return builds
+        
+    def tag_packages(self, dry_run=False):
+        printf("--- Tagging packages")
+        for tag, builds in self.tag_pkg_args.iteritems():
+            for build in builds:
+                printf("tagBuild('%s', '%s')", tag, build)
+                build_no_dver, dver = remove_dver(build)
+                dver = dver or ''
+                err = False
+                if not dry_run:
+                    pass # TODO. Set err on failure
+                if not err:
+                    self.promoted_packages.setdefault(build_no_dver, dict())
+                    self.promoted_packages[build_no_dver][dver] = build
+                else:
+                    printf("* Error promoting build %s", build)
+
+    def write_twiki(self, output_format, fh=None):
+        if not fh:
+            fh=sys.stdout
+        def write_field(text):
+            fh.write(text)
+            if output_format == 'long':
+                fh.write("\\\n")
+        first = True
+        if output_format == 'relnote':
+            for dver in self.dvers:
+                for build_no_dver in sorted(self.promoted_packages):
+                    build = self.promoted_packages[build_no_dver][dver]
+                    fh.write("   * [[%s][%s]]\n" % (get_build_uri(build), build))
+        elif output_format == 'long' or output_format == 'short':
+            for build_no_dver in sorted(self.promoted_packages):
+                if first:
+                    write_field("| %s |" % time.strftime("%Y-%m-%d"))
+                    first = False
+                else:
+                    write_field("| |")
+                write_field(" %(build_no_dver)s |" % locals())
+                for dver in sorted(self.promoted_packages[build_no_dver]):
+                    build = self.promoted_packages[build_no_dver][dver]
+                    write_field(" [[%s][%s]]" % (get_build_uri(build), dver))
+                write_field(" | DESCRIPTION |\n")
+        elif output_format == 'old':
+            for build_no_dver in sorted(self.promoted_packages):
+                if first:
+                    write_field("| %s |" % time.strftime("%Y-%m-%d"))
+                    first = False
+                else:
+                    write_field("||")
+                fh.write(" %(build_no_dver)s ( " % locals())
+                for dver in sorted(self.promoted_packages[build_no_dver]):
+                    build = self.promoted_packages[build_no_dver][dver]
+                    fh.write("[[%s]][%s]] " % (get_build_uri(build), dver))
+                fh.write(")")
+                write_field(" | DESCRIPTION |\n")
+        else:
+            print "Unknown output format!"
+
+        
+
+def get_search_uri(match, stype, terms):
+    quoted_args = [urllib.quote_plus(x) for x in [match, stype, terms]]
+    return ("https://koji-hub.batlab.org/koji/search?match=%s&type=%s&terms=%s" %
+            tuple(quoted_args))
+
+
+def get_exact_build_uri(build):
+    return get_search_uri('exact', 'build', build)
+
+
+def get_build_uri(build):
+    global ksession
+    buildinfo = ksession.getBuild(build)
+    return ("https://koji-hub.batlab.org/koji/buildinfo?buildID=%d" % int(buildinfo['id']))
+    
+    
+    
+
+
+def print_table(contents_by_dver):
+    screen_columns = get_screen_columns()
+    fw = int(screen_columns / len(contents_by_dver))
+    columns = []
+    for entry in sorted(contents_by_dver):
+        columns.append([entry, '---'] + sorted(contents_by_dver[entry]))
+    for row in itertools.izip_longest(*columns, fillvalue=''):
+        for c in row:
+            printf("%-*s", fw, c, end='')
+        printf("")
+
+
+def main(argv=None):
+    global kwrap
+    global ksession
+
+    if argv is None:
+        argv = sys.argv
+    
+    options, pkgs_or_builds = parse_cmdline_args(argv)
+
+
+    # What dvers (e.g. el5) to promote for
+    if not options.el5 and not options.el6:
+        dvers = valid_dvers
+    else:
+        dvers = []
+        if options.el5:
+            dvers.append('el5')
+        if options.el6:
+            dvers.append('el6')
+
+    
+    # Promotion route
+    if not options.route:
+        raise Exception("Need route.")
+    matching_routes = [x for x in valid_routes.keys() if x.startswith(options.route)]
+    if len(matching_routes) > 1:
+        raise Exception("Ambiguous route.")
+    elif not matching_routes:
+        raise Exception("Invalid route.")
+    else:
+        route = matching_routes[0]
+
+
+    # Connect to koji-hub
+    kwrap = kojiinter.KojiLibInter()
+    kwrap.read_config_file()
+    kwrap.init_koji_session(login=(not options.dry_run))
+    ksession = kwrap.kojisession
+
+
+    printf("Promoting from %s to %s for distro versions (dvers): %s", valid_routes[route][0], valid_routes[route][1], ", ".join(dvers))
+    printf("Examining the following packages/builds:\n%s", "\n".join(["'" + x + "'" for x in pkgs_or_builds]))
+
+    promoter = Promoter(pkgs_or_builds, dvers, route, options.skip_rejects)
+    for x in pkgs_or_builds:
+        promoter.add_promotion(x)
+
+    
+    # Print rejects table
+    if any(promoter.rejects_distinct_latest.values()):
+        rejects = True
+        printf("*** rejects (latest versions for package different between dvers")
+        print_table(promoter.rejects_distinct_latest)
+    if any(promoter.rejects_missing_build.values()):
+        rejects = True
+        printf("*** rejects (builds missing for some dvers):")
+        print_table(promoter.rejects_missing_build)
+
+    print "Promotion plan:"
+    print_table(promoter.tag_pkg_args)
+    
+    # Do the actual tagging
+    proceed = False
+    if sys.stdin.isatty():
+        proceed = utils.ask_yn("Proceed with promoting the builds? Rejects will not be promoted.")
+    else:
+        proceed = options.assume_yes
+    if proceed:
+        promoter.tag_packages(options.dry_run)
+        printf("Twiki code for this set of promotions:")
+        promoter.write_twiki(options.output_format)
+    else:
+        printf("Not proceeding.")
+        return 1
+
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+#    args = []
+#    args.append("--route=testing")
+#    #args.append("--ignore-rejects")
+#    #args.append("--el5")
+#    args.append("koji")
+#    args.append("gums")
+#    args.append("osg-release")
+#    args.append("bestman2-2.2.0-13.osg.el5")
+#    sys.exit(main([sys.argv[0]] + args))
+
+#awk '{ print "   * [[https://koji-hub.batlab.org/koji/search?match=glob&type=build&terms=" $1 "][" $1 "]]"}'  move-to-release > release-note-packages
+
+#test: 
+# ./koji-tag-diff el5-osg-testing el5-osg-release | tail -n +2 | xargs ./osg-promote --route=release
+

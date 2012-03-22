@@ -22,7 +22,7 @@ import ConfigParser
 
 from osgbuild.constants import *
 from osgbuild.error import UsageError
-from osgbuild import koji
+from osgbuild import kojiinter
 from osgbuild import mock
 from osgbuild import srpm
 from osgbuild import svn
@@ -73,6 +73,8 @@ def main(argv):
         log.warning("Non-scratch Koji builds should be from SVN!")
 
     # main loop 
+    # HACK
+    task_ids = []
     for pkg in package_dirs:
         if task == 'allbuild':
             # allbuild is special--we ignore most options and use
@@ -84,7 +86,8 @@ def main(argv):
                 for key in ALLBUILD_ALLOWED_OPTNAMES:
                     rel_buildopts[key] = buildopts[key]
 
-                svn.koji(pkg, koji.Koji(rel_buildopts), rel_buildopts)
+                svn.koji(pkg, kojiinter.KojiInter(rel_buildopts),
+                         rel_buildopts)
 
         else:
             targetparams = buildopts['targetparams']
@@ -97,12 +100,12 @@ def main(argv):
                 if (task == 'koji' or
                         (task == 'mock' and
                          rel_buildopts['mock_config_from_koji'])):
-                    koji_obj = koji.Koji(rel_buildopts)
+                    koji_obj = kojiinter.KojiInter(rel_buildopts)
                 if task == 'mock':
                     mock_obj = mock.Mock(rel_buildopts, koji_obj)
                 
                 if buildopts['svn'] and task == 'koji':
-                    svn.koji(pkg, koji_obj, rel_buildopts)
+                    task_ids.append(svn.koji(pkg, koji_obj, rel_buildopts))
 
                 else:
                     builder = srpm.SRPMBuild(pkg,
@@ -110,8 +113,21 @@ def main(argv):
                                              mock_obj=mock_obj,
                                              koji_obj=koji_obj)
                     builder.maybe_autoclean()
-                    getattr(builder, task)()
+                    method = getattr(builder, task)
+                    if task == 'koji':
+                        task_ids.append(method())
+                    else:
+                        method()
     # end of main loop
+    # HACK
+    # TODO: Print task urls
+    task_ids = filter(None, task_ids)
+    if kojiinter.KojiInter.backend and task_ids:
+        if buildopts['no_wait']:
+            print "Koji task ids are:", task_ids
+        else:
+            kojiinter.KojiInter.backend.watch_tasks(task_ids)
+
 
     return 0
 # end of main()
@@ -389,6 +405,10 @@ def parser_targetparams_callback(option, opt_str, value, parser, *args,
             rel = '6'
         elif opt_str == '--redhat-release':
             rel = value
+    elif opt_name == 'koji_tag' and opt_str == 'TARGET': # HACK
+        for rel in targetparams:
+            targetparams[rel]['koji_tag'] = 'TARGET'
+        return
     else:
         rel = get_el_release_from_string(value)
 
@@ -571,6 +591,8 @@ def verify_release_in_targetparams(targetparams):
         targetparams.get('distro_tag'),
         targetparams.get('koji_target'),
         targetparams.get('koji_tag'))
+    if koji_tag == 'TARGET': # HACK
+        koji_tag = None
     def same_or_none(a, b):
         return (a == b) or a is None or b is None
     def same_or_none4(a, b, c, d):

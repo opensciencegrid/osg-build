@@ -1,0 +1,76 @@
+#!/usr/bin/python
+
+import ConfigParser
+import os
+import sys
+
+#print sys.path
+sys.path.insert(0, '/p/vdt/workspace/koji-1.6.0')
+import koji
+
+
+
+class KojiWrapper:
+    def init_koji(self, user, kojiconfig=None, url=None):
+        # Code stolen from fedpkg, which was in turn stolen from koji
+        defaults = {
+                    'server' : 'http://localhost/kojihub',
+                    'weburl' : 'http://localhost/koji',
+                    'pkgurl' : 'http://localhost/packages',
+                    'topdir' : '/mnt/koji',
+                    'cert': '~/.koji/client.crt',
+                    'ca': '~/.koji/clientca.crt',
+                    'serverca': '~/.koji/serverca.crt',
+                    'authtype': None 
+                    }    
+        # Process the configs in order, global, user, then any option passed
+        configs = ['/etc/koji.conf', os.path.expanduser('~/.koji/config')]
+        if kojiconfig:
+            configs.append(os.path.join(kojiconfig))
+        for configFile in configs:
+            if os.access(configFile, os.F_OK):
+                f = open(configFile)
+                config = ConfigParser.ConfigParser()
+                config.readfp(f)
+                f.close()
+                if config.has_section('koji'):
+                    for name, value in config.items('koji'):
+                        if defaults.has_key(name):
+                            defaults[name] = value
+        # Expand out the directory options
+        for name in ('topdir', 'cert', 'ca', 'serverca'):
+            defaults[name] = os.path.expanduser(defaults[name])
+        session_opts = {'user': user}
+        # We assign the kojisession to our self as it can be used later to
+        # watch the tasks.
+        print('Initiating a koji session to %s' % defaults['server'])
+        try: 
+            self.kojisession = koji.ClientSession(defaults['server'], session_opts)
+        except:
+            raise Exception('Could not initiate koji session')
+        # save the weburl for later use too
+        self.kojiweburl = defaults['weburl']
+        # log in using ssl
+        try: 
+            self.kojisession.ssl_login(defaults['cert'], defaults['ca'],
+                                       defaults['serverca'])
+        except:
+            raise Exception('Opening a SSL connection failed')
+        if not self.kojisession.logged_in:
+            raise Exception('Could not auth with koji as %s' % user)
+        return
+
+
+kwrap = KojiWrapper()
+kwrap.init_koji(koji, 'Matyas Selmeci 564109')
+
+opts = dict()
+opts['scratch'] = True
+target1 = 'el5-osg'
+target2 = 'el6-osg'
+url = 'svn+https://vdt.cs.wisc.edu/svn/native/redhat/trunk/osg-build#14180'
+
+print kwrap.kojisession.search('osg-build-1.1.5-1.osg.el5', 'build', 'exact')
+#kwrap.kojisession.build(url, target1, opts, priority=None)
+#kwrap.kojisession.build(url, target2, opts, priority=None)
+

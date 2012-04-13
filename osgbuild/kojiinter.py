@@ -297,7 +297,11 @@ if HAVE_KOJILIB:
     kojicli.options = _KojiCliOptions(5)
 
 class KojiLibInter(object):
-
+    # Aliasing for convenience
+    BR_STATES = kojilib.BR_STATES
+    BUILD_STATES = kojilib.BUILD_STATES
+    REPO_STATES = kojilib.REPO_STATES
+    TASK_STATES = kojilib.TASK_STATES
 
     def __init__(self, user=None, dry_run=False):
         self.ca = None
@@ -350,7 +354,10 @@ class KojiLibInter(object):
         if owner is None:
             owner = self.user
         tag_obj = self.kojisession.getTag(tag) # TODO EC
-        package_list = self.kojisession.listPackages(tagID=tag_obj['id'], pkgID=package)
+        try:
+            package_list = self.kojisession.listPackages(tagID=tag_obj['id'], pkgID=package)
+        except kojilib.GenericError, e: # koji raises this if the package doesn't exist
+            package_list = None
         if not package_list:
             return self.kojisession.packageListAdd(tag, package, owner) # TODO Handle errors.
 
@@ -413,6 +420,11 @@ class KojiLibInter(object):
         """Return the build and destination tags for target."""
         info = self.kojisession.getBuildTargets(target) # TODO EC TESTME
         return (info[0]['build_tag_name'], info[0]['dest_tag_name'])
+
+    
+    def regen_repo(self, tag):
+        """Regenerate a repo"""
+        return self.kojisession.newRepo(tag)
 
 
     def watch_tasks(self, tasks):

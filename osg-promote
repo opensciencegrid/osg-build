@@ -13,7 +13,7 @@ import urllib
 
 from osgbuild import kojiinter
 from osgbuild import utils
-from osgbuild.utils import printf, errprintf
+from osgbuild.utils import printf
 from optparse import OptionParser
 
 
@@ -29,7 +29,7 @@ valid_routes = {
 
 
 def get_screen_columns():
-    """Returns the number of columns in the screen"""
+    """Return the number of columns in the screen"""
     screen_columns = os.environ.get('COLUMNS')
     if not screen_columns:
         try:
@@ -39,18 +39,33 @@ def get_screen_columns():
     return screen_columns
 
 
+def print_table(contents_by_dver):
+    """Print a dict of lists in a table, with each list being a column"""
+    screen_columns = get_screen_columns()
+    field_width = int(screen_columns / len(contents_by_dver))
+    columns = []
+    for entry in sorted(contents_by_dver):
+        columns.append([entry, '---'] + sorted(contents_by_dver[entry]))
+    for columns_in_row in itertools.izip_longest(*columns, fillvalue=''):
+        for col in columns_in_row:
+            printf("%-*s", field_width, col, end='')
+        printf("")
+
+
 def parse_cmdline_args(argv):
     parser = OptionParser("""
     %prog TODO
-""")
+""") # ^ TODO
     parser.add_option("-r", "--route", default=None)
     parser.add_option("-n", "--dry-run", action="store_true", default=False)
     parser.add_option("--el5", action="store_true", default=False)
     parser.add_option("--el6", action="store_true", default=False)
     parser.add_option("--ignore-rejects", dest="skip_rejects", action="store_false", default=True)
-    parser.add_option("--output-format", "--of", default='old', help="Valid output formats are: old, short, long, relnote")
-    parser.add_option("--short", action="store_true", default=False)
-    parser.add_option("--release-note-mode", action="store_true", default=False)
+    parser.add_option("--output-format", "--of", default='old',
+                      help="Valid output formats are: old, short, long, relnote, none")
+    parser.add_option("--no-date", "--nodate", default=False, action="store_true",
+                       help="Do not add the date to the output")
+    parser.add_option("--regen", default=False, action="store_true", help="Regenerate repo(s) afterward")
     parser.add_option("-y", "--assume-yes", action="store_true", default=False)
     
     options, args = parser.parse_args(argv[1:])
@@ -59,6 +74,7 @@ def parse_cmdline_args(argv):
 
 
 def get_latest_build(package, tag):
+    """Return the NVR of the latest build of a package in a tag, or None"""
     latest = utils.backtick(["koji", "-q", "list-tagged", "--latest", tag, package])
     if not latest:
         return None
@@ -67,6 +83,7 @@ def get_latest_build(package, tag):
 
 
 def split_nvr(build):
+    """Split an NVR into a [Name, Version, Release] list"""
     match = re.match(r"(?P<name>.+)-(?P<version>[^-]+)-(?P<release>[^-]+)$", build)
     if match:
         return [match.group('name'), match.group('version'), match.group('release')]
@@ -74,51 +91,34 @@ def split_nvr(build):
         return []
 
 
-def cli_get_tagged_builds(tag):
-    output = utils.backtick(["koji", "-q", "list-tagged", tag]).split("\n")
-    tagged_builds = [x.split()[0] for x in output]
-    return tagged_builds
-
-
-def kwrap_get_tagged_builds(tag):
+def get_tagged_builds(tag):
+    """Return a list of NVRs of all builds in a tag"""
     global ksession
     data = ksession.listTagged(tag)
     return [x['nvr'] for x in data]
     
 
-def get_tagged_builds(tag):
-    return kwrap_get_tagged_builds(tag)
-        
-
-def cli_get_tagged_builds_latest(tag):
-    output = utils.backtick(["koji", "-q", "list-tagged", "--latest", tag]).split("\n")
-    tagged_builds = [x.split()[0] for x in output]
-    return tagged_builds
-
-
-def kwrap_get_tagged_builds_latest(tag):
+def get_tagged_builds_latest(tag):
+    """Return a list of NVRs of the latest builds of each package in a tag"""
     global ksession
     data = ksession.listTagged(tag, latest=True)
     return [x['nvr'] for x in data]
 
 
-def get_tagged_builds_latest(tag):
-    return kwrap_get_tagged_builds_latest(tag)
-
-def cli_get_tagged_packages(tag):
-    output = utils.backtick(["koji", "-q", "list-pkgs", "--tag", tag]).split("\n")
-    tagged_packages = [x.split()[0] for x in output]
-    return tagged_packages
-
-def kwrap_get_tagged_packages(tag):
+def get_tagged_packages(tag):
+    """Return all package names in a tag"""
     global ksession
     data = ksession.listPackages(tagID=ksession.getTag(tag)['id'], inherited=True)
     return [x['package_name'] for x in data]
     
-def get_tagged_packages(tag):
-    return kwrap_get_tagged_packages(tag)
 
 def get_tag(pattern, dver=None):
+    """Return the name of a koji tag matching 'pattern' for 'dver'.
+    For example, get_tag('development', 'el5') returns 'el5-osg-development'
+    If 'dver' is None, then the dver is assumed to be part of 'pattern'.
+    Raise an Exception if no matching tag is found.
+
+    """
     def get_first(*args):
         return utils.backtick(["koji", "search", "tag"] + list(args)).split("\n")[0]
     if dver is None:
@@ -136,7 +136,12 @@ def get_tag(pattern, dver=None):
     return tag
 
 
-def remove_dver(build):
+def split_dver(build):
+    """Split out the dver from the NVR of 'build'.
+    For example, split_dver("foobar-1-1.osg.el5") returns
+    ("foobar-1-1.osg", "el5")
+    
+    """
     pattern = re.compile(r".(el\d)$")
     removed = pattern.sub("", build)
     dver = pattern.search(build)
@@ -146,8 +151,7 @@ def remove_dver(build):
 
 
 class Promoter(object):
-    def __init__(self, packages, dvers, route, skip_rejects=True):
-        self.packages = packages
+    def __init__(self, dvers, route, skip_rejects=True):
         self.dvers = dvers
         self.promoted_packages = {}
         self.tag_pkg_args = {}
@@ -155,30 +159,39 @@ class Promoter(object):
         self.rejects_distinct_latest = dict([(x, []) for x in dvers])
         self.rejects_missing_build = dict([(x, []) for x in dvers])
         self.skip_rejects = skip_rejects
-        self.tagged = {}
-        self.tagged_latest = {}
+        self.tagged_builds = {}
+        #self.tagged_latest = {}
         self.tagged_packages = {}
         for dver in self.dvers:
             from_tag = get_tag(self.from_tag_base, dver)
             to_tag = get_tag(self.to_tag_base, dver)
 
-            self.tagged[from_tag] = get_tagged_builds(from_tag)
-            self.tagged_latest[from_tag] = get_tagged_builds_latest(from_tag)
-            self.tagged_packages[from_tag] = get_tagged_packages(from_tag)
-            self.tagged_packages[to_tag] = get_tagged_packages(to_tag)
+            for tag in [from_tag, to_tag]:
+                self.tagged_builds[tag] = get_tagged_builds(tag)
+                #self.tagged_latest[tag] = get_tagged_builds_latest(from_tag)
+                self.tagged_packages[tag] = [split_nvr(x)[0] for x in self.tagged_builds[tag]]
 
 
-    def get_build_in_tag(self, tag, pattern):
-        if pattern in self.tagged_packages[tag]:
-            return get_latest_build(pattern, tag)
-        elif pattern in self.tagged[tag]:
-            return pattern
+    def get_build_in_tag(self, tag, pkg_or_build):
+        """Return the build matching 'pkg_or_build' in 'tag'.
+        If pkg_or_build is not in the tag, returns None. Otherwise:
+        If pkg_or_build is a package, returns the latest build for that
+        package. If pkg_or_build is a build, it is returned unchanged.
+
+        """
+        if pkg_or_build in self.tagged_packages[tag]:
+            return get_latest_build(pkg_or_build, tag)
+        elif pkg_or_build in self.tagged_builds[tag]:
+            return pkg_or_build
         else:
             return None
             
             
     def add_promotion(self, pkg_or_build):
-        """See which packages can be promoted. Populate tag_pkg_args and promoted_packages"""
+        """See if 'pkg_or_build' can be promoted, add the build to
+        self.tag_pkg_args for each tag it should be added to.
+        
+        """
         builds = self.get_builds(pkg_or_build, skip_rejects=self.skip_rejects)
         
         for dver in builds:
@@ -196,8 +209,9 @@ class Promoter(object):
         # find the build for each dver
         for dver in self.dvers:
             from_tag = get_tag(self.from_tag_base, dver)
-            
-            pkg_or_build_no_dver, _ = remove_dver(pkg_or_build)
+            to_tag = get_tag(self.to_tag_base, dver)
+
+            pkg_or_build_no_dver, _ = split_dver(pkg_or_build)
             build = self.get_build_in_tag(from_tag, pkg_or_build_no_dver + "." + dver) or self.get_build_in_tag(from_tag, pkg_or_build_no_dver)
             if not build:
                 self.rejects_missing_build[dver].append(pkg_or_build_no_dver)
@@ -207,11 +221,13 @@ class Promoter(object):
                     continue
             builds[dver] = build
 
+        if len(builds) == 0:
+            return []
         # find builds where the nvrs (without dver) are distinct between the
         # dvers we are running the script for, and reject them.
         name = split_nvr(builds.values()[0])[0]
         vrs = ['-'.join(split_nvr(builds[x])[1:]) for x in builds]
-        vrs_no_dver = [remove_dver(x)[0] for x in vrs]
+        vrs_no_dver = [split_dver(x)[0] for x in vrs]
         if len(set(vrs_no_dver)) > 1:
             for dver in builds:
                 self.rejects_distinct_latest[dver].append(builds[dver])
@@ -219,23 +235,46 @@ class Promoter(object):
                 return []
         return builds
         
-    def tag_packages(self, dry_run=False):
-        printf("--- Tagging packages")
+    def tag_builds(self, dry_run=False, regen=False):
+        global kwrap
+        global ksession
+
+        printf("--- Tagging builds")
+        tags = set()
+        tasks = dict()
         for tag, builds in self.tag_pkg_args.iteritems():
+            tags.add(tag)
             for build in builds:
+                try:
+                    if build in self.tagged_builds[tag]:
+                        printf("Skipping %s, already in %s", build, tag)
+                        continue
+                except: pass
                 printf("tagBuild('%s', '%s')", tag, build)
-                build_no_dver, dver = remove_dver(build)
+                build_no_dver, dver = split_dver(build)
                 dver = dver or ''
                 err = False
                 if not dry_run:
-                    pass # TODO. Set err on failure
+                    task_id = kwrap.tag_build(tag, build)
+                    tasks[task_id] = (build_no_dver, dver, build)
+
+        if not dry_run:
+            kwrap.watch_tasks(list(tasks.keys()))
+            for task_id in tasks:
+                build_no_dver, dver, build = tasks[task_id]
+                err = kojiinter.KojiLibInter.TASK_STATES[ksession.getTaskInfo(task_id)['state']] != 'CLOSED'
                 if not err:
                     self.promoted_packages.setdefault(build_no_dver, dict())
                     self.promoted_packages[build_no_dver][dver] = build
                 else:
                     printf("* Error promoting build %s", build)
+        if regen:
+            printf("--- Regenerating repos")
+            for tag in tags:
+                kwrap.watch_tasks([kwrap.regen_repo(tag)])
 
-    def write_twiki(self, output_format, fh=None):
+
+    def write_twiki(self, output_format, no_date=False, fh=None):
         if not fh:
             fh=sys.stdout
         def write_field(text):
@@ -250,7 +289,7 @@ class Promoter(object):
                     fh.write("   * [[%s][%s]]\n" % (get_build_uri(build), build))
         elif output_format == 'long' or output_format == 'short':
             for build_no_dver in sorted(self.promoted_packages):
-                if first:
+                if first and not no_date:
                     write_field("| %s |" % time.strftime("%Y-%m-%d"))
                     first = False
                 else:
@@ -259,35 +298,36 @@ class Promoter(object):
                 for dver in sorted(self.promoted_packages[build_no_dver]):
                     build = self.promoted_packages[build_no_dver][dver]
                     write_field(" [[%s][%s]]" % (get_build_uri(build), dver))
-                write_field(" | DESCRIPTION |\n")
+                write_field(" | |\n")
         elif output_format == 'old':
             for build_no_dver in sorted(self.promoted_packages):
-                if first:
+                if first and not no_date:
                     write_field("| %s |" % time.strftime("%Y-%m-%d"))
                     first = False
                 else:
                     write_field("||")
-                fh.write(" %(build_no_dver)s ( " % locals())
+                fh.write(" %(build_no_dver)s " % locals())
+                builds = []
                 for dver in sorted(self.promoted_packages[build_no_dver]):
                     build = self.promoted_packages[build_no_dver][dver]
-                    fh.write("[[%s]][%s]] " % (get_build_uri(build), dver))
-                fh.write(")")
-                write_field(" | DESCRIPTION |\n")
+                    builds += ["[[%s][%s]]" % (get_build_uri(build), dver)]
+                fh.write("(" + "+".join(builds) + ")")
+                write_field(" |\n")
         else:
             print "Unknown output format!"
 
         
 
-def get_search_uri(match, stype, terms):
-    quoted_args = [urllib.quote_plus(x) for x in [match, stype, terms]]
-    return ("https://koji-hub.batlab.org/koji/search?match=%s&type=%s&terms=%s" %
-            tuple(quoted_args))
-
-
-def get_exact_build_uri(build):
-    return get_search_uri('exact', 'build', build)
-
-
+#def get_search_uri(match, stype, terms):
+#    quoted_args = [urllib.quote_plus(x) for x in [match, stype, terms]]
+#    return ("https://koji-hub.batlab.org/koji/search?match=%s&type=%s&terms=%s" %
+#            tuple(quoted_args))
+#
+#
+#def get_exact_build_uri(build):
+#    return get_search_uri('exact', 'build', build)
+#
+#
 def get_build_uri(build):
     global ksession
     buildinfo = ksession.getBuild(build)
@@ -295,18 +335,6 @@ def get_build_uri(build):
     
     
     
-
-
-def print_table(contents_by_dver):
-    screen_columns = get_screen_columns()
-    fw = int(screen_columns / len(contents_by_dver))
-    columns = []
-    for entry in sorted(contents_by_dver):
-        columns.append([entry, '---'] + sorted(contents_by_dver[entry]))
-    for row in itertools.izip_longest(*columns, fillvalue=''):
-        for c in row:
-            printf("%-*s", fw, c, end='')
-        printf("")
 
 
 def main(argv=None):
@@ -349,15 +377,16 @@ def main(argv=None):
     ksession = kwrap.kojisession
 
 
-    printf("Promoting from %s to %s for distro versions (dvers): %s", valid_routes[route][0], valid_routes[route][1], ", ".join(dvers))
+    printf("Promoting from %s to %s for dvers: %s", valid_routes[route][0], valid_routes[route][1], ", ".join(dvers))
     printf("Examining the following packages/builds:\n%s", "\n".join(["'" + x + "'" for x in pkgs_or_builds]))
 
-    promoter = Promoter(pkgs_or_builds, dvers, route, options.skip_rejects)
+    promoter = Promoter(dvers, route, options.skip_rejects)
     for x in pkgs_or_builds:
         promoter.add_promotion(x)
 
     
     # Print rejects table
+    rejects = False
     if any(promoter.rejects_distinct_latest.values()):
         rejects = True
         printf("*** rejects (latest versions for package different between dvers")
@@ -368,18 +397,22 @@ def main(argv=None):
         print_table(promoter.rejects_missing_build)
 
     print "Promotion plan:"
-    print_table(promoter.tag_pkg_args)
-    
-    # Do the actual tagging
-    proceed = False
-    if sys.stdin.isatty():
-        proceed = utils.ask_yn("Proceed with promoting the builds? Rejects will not be promoted.")
+    if any(promoter.tag_pkg_args.values()):
+        print_table(promoter.tag_pkg_args)
     else:
-        proceed = options.assume_yes
-    if proceed:
-        promoter.tag_packages(options.dry_run)
-        printf("Twiki code for this set of promotions:")
-        promoter.write_twiki(options.output_format)
+        printf("Nothing will be promoted!")
+    
+    question = "Proceed with promoting the builds?"
+    if rejects:
+        question += " Rejects will not be promoted!"
+        return 1
+
+    # Do the actual tagging
+    if (options.assume_yes or (sys.stdin.isatty() and utils.ask_yn(question))):
+        promoter.tag_builds(options.dry_run, options.regen)
+        if options.output_format != 'none':
+            printf("\nTwiki code for this set of promotions:\n")
+            promoter.write_twiki(options.output_format, options.no_date)
     else:
         printf("Not proceeding.")
         return 1
@@ -388,18 +421,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
-#    args = []
-#    args.append("--route=testing")
-#    #args.append("--ignore-rejects")
-#    #args.append("--el5")
-#    args.append("koji")
-#    args.append("gums")
-#    args.append("osg-release")
-#    args.append("bestman2-2.2.0-13.osg.el5")
-#    sys.exit(main([sys.argv[0]] + args))
-
-#awk '{ print "   * [[https://koji-hub.batlab.org/koji/search?match=glob&type=build&terms=" $1 "][" $1 "]]"}'  move-to-release > release-note-packages
-
-#test: 
-# ./koji-tag-diff el5-osg-testing el5-osg-release | tail -n +2 | xargs ./osg-promote --route=release
 

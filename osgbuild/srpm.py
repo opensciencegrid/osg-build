@@ -276,7 +276,8 @@ class SRPMBuild(object):
             self.koji_obj.add_pkg(self.package_name)
         utils.safe_makedirs(self.results_dir)
         srpm = self.prebuild()
-        self.koji_obj.build_srpm(srpm)
+        task_id = self.koji_obj.build_srpm(srpm)
+        return task_id
 
 
     def lint(self):

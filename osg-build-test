@@ -4,9 +4,11 @@
 # pylint: disable=C0103,R0904,W0614
 
 import atexit
+import grp
 import re
 import os
 from os.path import join as opj
+import pwd
 import shutil
 import tempfile
 import unittest
@@ -79,48 +81,48 @@ class XTestCase(unittest.TestCase):
 
     """
 
-    def assertReSearch(self, regex, text, message, verbose=False):
-        """Assert that a regex search on text succeeds"""
-        try:
-            return self.assertTrue(re.search(regex, text), message)
-        except AssertionError:
-            if verbose:
-                errprintf("Regex search '%s' failed on text '%s'", regex, text)
-            raise
+    # Code from unittest in Python 2.7 (c) Python Software Foundation
+    def assertRegexpMatches(self, text, regexp, msg=None):
+        """Fail if 'text' does not match 'regexp'"""
+        if isinstance(regexp, basestring):
+            regexp = re.compile(regexp)
+        if not regexp.search(text):
+            msg = msg or "Regexp didn't match"
+            msg = '%s: %r not found in %r' % (msg, regexp.pattern, text)
+            raise super.failureException(msg)
 
-    def assertNoReSearch(self, regex, text, message, verbose=False):
-        """Assert that a regex search on text fails"""
-        try:
-            return self.assertFalse(re.search(regex, text), message)
-        except AssertionError:
-            if verbose:
-                errprintf(
-                    "Negative regex search '%s' failed on text '%s'",
-                    regex, text)
-            raise
+    # Code from unittest in Python 2.7 (c) Python Software Foundation
+    def assertNotRegexpMatches(self, text, regexp, msg=None):
+        """Fail if 'text' matches 'regex'"""
+        if isinstance(regexp, basestring):
+            regexp = re.compile(regexp)
+        match = regexp.search(text)
+        if match:
+            msg = msg or "Regexp matched"
+            msg = '%s: %r matches %r in %r' % (msg, text[match.start():match.end()], regexp.pattern, text)
+            raise super.failureException(msg)
 
 
 class TestLint(XTestCase):
     """Tests for 'lint' task"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
-                                    "{2011-12-06}")
+        self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"), "{2011-12-06}")
 
     def test_lint(self):
         out = backtick_osg_build(["lint", self.pkg_dir])
         try:
-            self.assertReSearch(
+            self.assertRegexpMatches(
+                out,
                 re.escape("yum-remove-osg.src:25: E: hardcoded-library-path"),
-                out,
                 "expected error not found")
-            self.assertReSearch(
+            self.assertRegexpMatches(
+                out,
                 re.escape("1 packages and 0 specfiles checked"),
-                out,
                 "unexpected number of packages checked")
-            self.assertReSearch(
-                re.escape("rpmlint found problems with yum-remove-osg"),
+            self.assertRegexpMatches(
                 out,
+                re.escape("rpmlint found problems with yum-remove-osg"),
                 "expected problems not found")
         except:
             errprintf("Problems found. Output:\n%s", out)
@@ -137,11 +139,11 @@ class TestRpmbuild(XTestCase):
     def test_rpmbuild(self):
         out = backtick_osg_build(["rpmbuild", self.pkg_dir])
         try:
-            self.assertReSearch(
+            self.assertRegexpMatches(
+                out,
                 r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
                 r'[^\n]+'
                 r'yum-remove-osg-1[.]0-0[.]2[.]osg[.]el\d[.]noarch[.]rpm',
-                out,
                 "rpm created message not found")
         except:
             errprintf("Problems found. Output:\n%s", out)
@@ -206,9 +208,9 @@ class TestPrebuild(XTestCase):
         tarball_contents = get_listing(opj(pkg_dir, WD_UNPACKED_TARBALL,
                                            "mash-0.5.22"))
 
-        self.assertNoReSearch(
-            re.escape("cpio: premature end of archive"),
+        self.assertNotRegexpMatches(
             out,
+            re.escape("cpio: premature end of archive"),
             "file unreadable by cpio")
         self.assertTrue(
             "mash.spec" in ut_contents,
@@ -233,9 +235,9 @@ class TestPrepare(XTestCase):
         head_out = checked_backtick(
             ["head", "-n", "10", opj(self.pkg_dir, WD_RESULTS, "BUILD",
             "globus_gatekeeper-8.1", "init", "globus-gatekeeper-lsb.in")])
-        self.assertReSearch(
-            r"Default-Stop:\s+0 1 2 3 4 5 6",
+        self.assertRegexpMatches(
             head_out,
+            r"Default-Stop:\s+0 1 2 3 4 5 6",
             "Patches not applied")
 
 
@@ -267,9 +269,9 @@ fetch_sources.fetch('.')
             "source tarball not found")
         head_out = checked_backtick(
             ["head", "-n", "15", "mash.spec"])
-        self.assertReSearch(
-            r"Patch0:\s+multilib-python.patch",
+        self.assertRegexpMatches(
             head_out,
+            r"Patch0:\s+multilib-python.patch",
             "Spec file not overridden")
 
 
@@ -279,13 +281,30 @@ class TestMock(XTestCase):
     def setUp(self):
         self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
                                     "{2012-01-25}")
+
+    def check_for_mock_group(self):
+        username = pwd.getpwuid(os.getuid()).pw_name
+        try:
+            mock_group = grp.getgrnam('mock')
+        except KeyError:
+            errprintf("mock group not found")
+            return False
+        try:
+            if username in mock_group.gr_mem:
+                return True
+        except AttributeError:
+            pass
+        errprintf("%s not in mock group", username)
+        return False
+
         
     def test_mock_auto_cfg(self):
-        checked_osg_build(["mock", self.pkg_dir])
+        if self.check_for_mock_group():
+            checked_osg_build(["mock", self.pkg_dir])
 
     def test_mock_koji_cfg(self):
-        checked_osg_build(["mock", self.pkg_dir,
-                           "--mock-config-from-koji=el5-osg-build"])
+        if self.check_for_mock_group():
+            checked_osg_build(["mock", self.pkg_dir, "--mock-config-from-koji=el5-osg-build"])
         
 
 class TestKoji(XTestCase):
@@ -295,8 +314,10 @@ class TestKoji(XTestCase):
         self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
                                     "{2012-01-25}")
 
-    def test_koji_args1(self):
-        output = backtick_osg_build(["koji", "--dry-run", "--scratch", self.pkg_dir])
+    kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
+    kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
+    def test_koji_shell_args1(self):
+        output = backtick_osg_build(self.kdr_shell + ["--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(
             regex_in_list(r"(osg-)?koji build el5-osg.*", out_list),
@@ -305,8 +326,8 @@ class TestKoji(XTestCase):
             regex_in_list(r"(osg-)?koji build el6-osg.*", out_list),
             "not building for el6")
 
-    def test_koji_args2(self):
-        output = backtick_osg_build(["koji", "--el5", "--dry-run", "--scratch", self.pkg_dir])
+    def test_koji_shell_args2(self):
+        output = backtick_osg_build(self.kdr_shell + ["--el5", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(
             regex_in_list(r"(osg-)?koji build el5-osg.*", out_list),
@@ -315,8 +336,8 @@ class TestKoji(XTestCase):
             regex_in_list(r"(osg-)?koji build el6-osg.*", out_list),
             "falsely building for el6")
 
-    def test_koji_args3(self):
-        output = backtick_osg_build(["koji", "--ktt", "el6-gt52", "--dry-run", "--scratch", self.pkg_dir])
+    def test_koji_shell_args3(self):
+        output = backtick_osg_build(self.kdr_shell + ["--ktt", "el6-gt52", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertFalse(
             regex_in_list(r"(osg-)?koji build el5-osg.*", out_list),
@@ -325,12 +346,23 @@ class TestKoji(XTestCase):
             regex_in_list(r"(osg-)?koji build el6-gt52.*", out_list),
             "not building for el6 for the right target")
 
-    def test_koji_args4(self):
-        output = backtick_osg_build(["koji", "--el5", "--koji-target", "gt52b", "--koji-tag", "TARGET", "--dry-run", "--scratch", self.pkg_dir])
+    def test_koji_shell_args4(self):
+        output = backtick_osg_build(self.kdr_shell + ["--el5", "--koji-target", "el5-gt52b", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertFalse(
             regex_in_list(r"Unable to determine redhat release", out_list),
             "Bad error with --koji-tag=TARGET")
+
+    def test_koji_lib_args1(self):
+        output = backtick_osg_build(self.kdr_lib + ["--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(
+            regex_in_list(r".*kojisession.build\([^,]+?, 'el[56]-osg', " + re.escape("{'scratch': True}") + ", None\)", out_list))
+
+class TestKojiLong(XTestCase):
+    def setUp(self):
+        self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
+                                    "{2012-01-25}")
 
     def test_koji_build(self):
         checked_osg_build(["koji", "--el5", "--scratch", self.pkg_dir, "--wait"])
@@ -378,11 +410,11 @@ class TestMisc(XTestCase):
                         "filedigest algorithm not set for el5 build")
                         
 
-short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc)
+short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc, TestKoji)
 TestSuiteShort = unittest.TestSuite()
 TestSuiteShort.addTests([makeSuite(t) for t in short_test_cases])
 # Make sure TestKoji comes first since it requires user interaction.
-TestSuiteAll = unittest.TestSuite((makeSuite(TestKoji), TestSuiteShort, makeSuite(TestMock)))
+TestSuiteAll = unittest.TestSuite((makeSuite(TestKojiLong), TestSuiteShort, makeSuite(TestMock)))
 
 if __name__ == '__main__':
     try:

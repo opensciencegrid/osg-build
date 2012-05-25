@@ -98,7 +98,7 @@ def koji(package_dir, koji_obj, buildopts):
 
     if not buildopts.get('scratch'):
         koji_obj.add_pkg(package_name)
-    koji_obj.build_svn(package_info['canon_url'],
-                       package_info['revision'])
+    return koji_obj.build_svn(package_info['canon_url'],
+                              package_info['revision'])
 
 

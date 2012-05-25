@@ -1,4 +1,5 @@
 """utilities for osg-build"""
+import itertools
 import logging
 import os
 import re
@@ -132,8 +133,8 @@ def checked_backtick(*args, **kwargs):
 
 def slurp(filename):
     """Return the contents of a file as a single string."""
+    fh = open(filename, 'r')
     try:
-        fh = open(filename, 'r')
         contents = fh.read()
     finally:
         fh.close()
@@ -142,8 +143,8 @@ def slurp(filename):
 
 def unslurp(filename, contents):
     """Write a string to a file."""
+    fh = open(filename, 'w')
     try:
-        fh = open(filename, 'w')
         fh.write(contents)
     finally:
         fh.close()
@@ -188,7 +189,7 @@ def find_files(filename, paths=None):
         paths = sys.path
     for p in paths:
         j = os.path.join(p, filename)
-        if os.path.exists(j):
+        if os.path.isfile(j):
             matches += [j]
     return matches
             
@@ -279,3 +280,101 @@ def which(program):
             if is_exe(exe_file):
                 return exe_file
     return None
+
+
+
+def printf(fstring, *args, **kwargs):
+    """A shorthand for printing with a format string.
+    The kwargs 'file' and 'end' are as in the Python3 print function.
+    """
+    file = kwargs.pop('file', sys.stdout)
+    end = kwargs.pop('end', "\n")
+    ffstring = fstring + end
+    if len(args) == 0 and len(kwargs) > 0:
+        file.write(ffstring % kwargs)
+    elif len(args) == 1 and type(args[0]) == dict:
+        file.write(ffstring % args[0])
+    else:
+        file.write(ffstring % args)
+
+def errprintf(fstring, *args, **kwargs):
+    """printf to stderr"""
+    kwargs.pop('file', None)
+    printf(fstring, file=sys.stderr, *args, **kwargs)
+
+class safelist(list):
+    """A version of the list type that has get and pop methods that accept
+    default arguments instead of raising errors. (Compare dict.get and dict.pop)
+    """
+    def get(self, idx, default=None):
+        """L.get(idx, default=None) -> item
+        Get item at idx. If idx is out of range, return default."""
+        try:
+            return self.__getitem__(idx)
+        except IndexError:
+            return default
+
+    def pop(self, *args):
+        """L.pop([idx[,default]]) -> item, remove specified index
+        (default last). If idx is out of range, then if return default if
+        specified, raise IndexError if not.
+        """
+        try:
+            return list.pop(self, args[0])
+        except IndexError:
+            if len(args) < 2:
+                raise
+            else:
+                return args[1]
+
+
+def get_screen_columns():
+    """Return the number of columns in the screen"""
+    screen_columns = os.environ.get('COLUMNS')
+    if not screen_columns:
+        try:
+            screen_columns = int(backtick("stty size").split()[1])
+        except:
+            screen_columns = 80
+    return screen_columns
+
+try:
+    from itertools import izip_longest
+except ImportError:
+    class ZipExhausted(Exception):
+        pass
+
+    def izip_longest(*args, **kwds):
+        """izip_longest from the python 2.6 documentation
+        (since it's not in 2.4)
+        """
+        # izip_longest('ABCD', 'xy', fillvalue='-') --> Ax By C- D-
+        fillvalue = kwds.get('fillvalue')
+        counter = [len(args) - 1]
+        def sentinel():
+            if not counter[0]:
+                raise ZipExhausted
+            counter[0] -= 1
+            yield fillvalue
+            fillers = itertools.repeat(fillvalue)
+            iterators = [itertools.chain(it, sentinel(), fillers) for it in args]
+            try:
+                while iterators:
+                    yield tuple(map(next, iterators))
+            except ZipExhausted:
+                pass
+        
+
+def print_table(columns_by_header):
+    """Print a dict of lists in a table, with each list being a column"""
+    screen_columns = get_screen_columns()
+    field_width = int(screen_columns / len(columns_by_header))
+    columns = []
+    for entry in sorted(columns_by_header):
+        columns.append([entry, '---'] + sorted(columns_by_header[entry]))
+    for columns_in_row in izip_longest(fillvalue='', *columns):
+        for col in columns_in_row:
+            printf("%-*s", field_width, col, end='')
+        printf("")
+
+

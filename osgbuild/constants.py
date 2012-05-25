@@ -27,6 +27,7 @@ DATA_FILE_SEARCH_PATH = [sys.path[0],
                          DATA_DIR]
 
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
+CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.6.0"
 
 
 DEFAULT_BUILDOPTS_COMMON = {
@@ -34,12 +35,13 @@ DEFAULT_BUILDOPTS_COMMON = {
     'cache_prefix': 'AUTO',
     'dry_run': False,
     'full_extract': False,
+    'koji_backend': None,
     'kojilogin': None,
     'koji_wrapper': True,
     'mock_clean': True,
     'mock_config': 'AUTO',
     'mock_config_from_koji': None,
-    'no_wait': True,
+    'no_wait': False,
     'redhat_releases': None,
     'regen_repos': False,
     'scratch': False,
@@ -57,7 +59,7 @@ ALLBUILD_BUILDOPTS.update({
 })
 
 ALLBUILD_ALLOWED_OPTNAMES = [
-    'kojilogin', 'koji_wrapper', 'no_wait', 'scratch']
+    'koji_backend', 'kojilogin', 'koji_wrapper', 'no_wait', 'scratch']
 
 DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE = {
     '5': {

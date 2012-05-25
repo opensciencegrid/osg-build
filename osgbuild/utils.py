@@ -1,4 +1,5 @@
 """utilities for osg-build"""
+import itertools
 import logging
 import os
 import re
@@ -132,8 +133,8 @@ def checked_backtick(*args, **kwargs):
 
 def slurp(filename):
     """Return the contents of a file as a single string."""
+    fh = open(filename, 'r')
     try:
-        fh = open(filename, 'r')
         contents = fh.read()
     finally:
         fh.close()
@@ -142,8 +143,8 @@ def slurp(filename):
 
 def unslurp(filename, contents):
     """Write a string to a file."""
+    fh = open(filename, 'w')
     try:
-        fh = open(filename, 'w')
         fh.write(contents)
     finally:
         fh.close()
@@ -325,4 +326,55 @@ class safelist(list):
                 raise
             else:
                 return args[1]
+
+
+def get_screen_columns():
+    """Return the number of columns in the screen"""
+    screen_columns = os.environ.get('COLUMNS')
+    if not screen_columns:
+        try:
+            screen_columns = int(backtick("stty size").split()[1])
+        except:
+            screen_columns = 80
+    return screen_columns
+
+try:
+    from itertools import izip_longest
+except ImportError:
+    class ZipExhausted(Exception):
+        pass
+
+    def izip_longest(*args, **kwds):
+        """izip_longest from the python 2.6 documentation
+        (since it's not in 2.4)
+        """
+        # izip_longest('ABCD', 'xy', fillvalue='-') --> Ax By C- D-
+        fillvalue = kwds.get('fillvalue')
+        counter = [len(args) - 1]
+        def sentinel():
+            if not counter[0]:
+                raise ZipExhausted
+            counter[0] -= 1
+            yield fillvalue
+            fillers = itertools.repeat(fillvalue)
+            iterators = [itertools.chain(it, sentinel(), fillers) for it in args]
+            try:
+                while iterators:
+                    yield tuple(map(next, iterators))
+            except ZipExhausted:
+                pass
+        
+
+def print_table(columns_by_header):
+    """Print a dict of lists in a table, with each list being a column"""
+    screen_columns = get_screen_columns()
+    field_width = int(screen_columns / len(columns_by_header))
+    columns = []
+    for entry in sorted(columns_by_header):
+        columns.append([entry, '---'] + sorted(columns_by_header[entry]))
+    for columns_in_row in izip_longest(fillvalue='', *columns):
+        for col in columns_in_row:
+            printf("%-*s", field_width, col, end='')
+        printf("")
+
 

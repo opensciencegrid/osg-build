@@ -112,11 +112,13 @@ Unable to determine your Koji login. Either pass --kojilogin or verify that
 gives you a subject with a CN""" % KOJI_CLIENT_CERT)
     
         if KojiInter.backend is None:
-            if HAVE_KOJILIB:
+            if HAVE_KOJILIB and opts.get('koji_backend') != 'shell':
                 log.debug("KojiInter Using KojiLib backend")
-                KojiInter.backend = KojiLibInter(self.cn)
+                KojiInter.backend = KojiLibInter(self.cn, opts['dry_run'])
                 KojiInter.backend.read_config_file()
                 KojiInter.backend.init_koji_session()
+            elif not HAVE_KOJILIB and opts['koji_backend'] == 'kojilib':
+                raise KojiError("KojiLib backend requested, but can't import it!")
             else:
                 log.debug("KojiInter Using shell backend")
                 KojiInter.backend = KojiShellInter(self.cn, opts['dry_run'],
@@ -340,7 +342,7 @@ class KojiLibInter(object):
         print "Initializing koji session to", self.server
         self.kojisession = kojilib.ClientSession(self.server,
                                                  {'user': self.user})
-        if login:
+        if login and not self.dry_run:
             print "Logging in to koji as", self.user
             try:
                 self.kojisession.ssl_login(self.cert, self.ca, self.serverca)
@@ -353,13 +355,19 @@ class KojiLibInter(object):
     def add_pkg(self, tag, package, owner=None):
         if owner is None:
             owner = self.user
-        tag_obj = self.kojisession.getTag(tag) # TODO EC
+        tag_obj = self.kojisession.getTag(tag)
+        if not tag_obj:
+            raise KojiError("Invalid tag %s", tag)
         try:
             package_list = self.kojisession.listPackages(tagID=tag_obj['id'], pkgID=package)
         except kojilib.GenericError, e: # koji raises this if the package doesn't exist
             package_list = None
         if not package_list:
-            return self.kojisession.packageListAdd(tag, package, owner) # TODO Handle errors.
+            if not self.dry_run:
+                return self.kojisession.packageListAdd(tag, package, owner) # TODO Handle errors.
+            else:
+                log.info("kojisession.packageListAdd(%r, %r, %r)", tag, package, owner)
+                
 
 
     def build(self, url, target, scratch=False, **kwargs):
@@ -370,7 +378,10 @@ class KojiLibInter(object):
 
         """
         opts = { 'scratch': scratch }
-        return self.kojisession.build(url, target, opts, kwargs.get('priority'))
+        if not self.dry_run:
+            return self.kojisession.build(url, target, opts, kwargs.get('priority'))
+        else:
+            log.info("kojisession.build(%r, %r, %r, %r)", url, target, opts, kwargs.get('priority'))
 
 
     def build_srpm(self, srpm, target, scratch=False, **kwargs):
@@ -408,7 +419,8 @@ class KojiLibInter(object):
     def upload(self, source):
         "Upload a file to koji. Return the relative remote path."
         serverdir = self._unique_path()
-        self.kojisession.uploadWrapper(source, serverdir, callback=None)
+        if not self.dry_run:
+            self.kojisession.uploadWrapper(source, serverdir, callback=None)
         return os.path.join(serverdir, os.path.basename(source))
 
 
@@ -418,13 +430,18 @@ class KojiLibInter(object):
 
     def get_build_and_dest_tags(self, target):
         """Return the build and destination tags for target."""
-        info = self.kojisession.getBuildTargets(target) # TODO EC TESTME
+        info = self.kojisession.getBuildTargets(target) # TESTME
+        if not info:
+            raise KojiError("Couldn't get info for target %s" % target)
         return (info[0]['build_tag_name'], info[0]['dest_tag_name'])
 
     
     def regen_repo(self, tag):
         """Regenerate a repo"""
-        return self.kojisession.newRepo(tag)
+        if not self.dry_run:
+            return self.kojisession.newRepo(tag)
+        else:
+            log.info("self.kojisession.newRepo(%r)" % tag)
 
 
     def watch_tasks(self, tasks):

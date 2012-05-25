@@ -35,6 +35,7 @@ DEFAULT_BUILDOPTS_COMMON = {
     'cache_prefix': 'AUTO',
     'dry_run': False,
     'full_extract': False,
+    'koji_backend': None,
     'kojilogin': None,
     'koji_wrapper': True,
     'mock_clean': True,
@@ -58,7 +59,7 @@ ALLBUILD_BUILDOPTS.update({
 })
 
 ALLBUILD_ALLOWED_OPTNAMES = [
-    'kojilogin', 'koji_wrapper', 'no_wait', 'scratch']
+    'koji_backend', 'kojilogin', 'koji_wrapper', 'no_wait', 'scratch']
 
 DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE = {
     '5': {

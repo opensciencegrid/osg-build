@@ -290,6 +290,11 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "--dry-run", action="store_true",
         help="Do not invoke koji, only show what would be done.")
     koji_group.add_option(
+        "--koji-backend", dest="koji_backend",
+        help="The back end to use for invoking koji. Valid values are: "
+        "'shell', 'kojilib'. If not specified, will try to use kojilib and use "
+        "shell as a fallback.")
+    koji_group.add_option(
         "-k", "--kojilogin", "--koji-login", dest="kojilogin",
         help="The login you use for koji (most likely your CN, e.g."
         "'Matyas Selmeci 564109')")
@@ -405,7 +410,7 @@ def parser_targetparams_callback(option, opt_str, value, parser, *args,
             rel = '6'
         elif opt_str == '--redhat-release':
             rel = value
-    elif opt_name == 'koji_tag' and opt_str == 'TARGET': # HACK
+    elif opt_name == 'koji_tag' and value == 'TARGET': # HACK
         for rel in targetparams:
             targetparams[rel]['koji_tag'] = 'TARGET'
         return
@@ -581,6 +586,18 @@ def print_version_and_exit():
     sys.exit(0)
 
 
+def all(iterable):
+    """Return True if all elements of the iterable are true (or if it's empty).
+    This is a builtin in Python 2.5+, but doesn't exist in 2.4.
+
+    """
+    for element in iterable:
+        if not element:
+            return False
+    return True
+    
+
+
 def verify_release_in_targetparams(targetparams):
     """Verify that the values for distro_tag, koji_target and koji_tag are
     consistent. If consistent, return the release; else, return None.
@@ -593,19 +610,17 @@ def verify_release_in_targetparams(targetparams):
         targetparams.get('koji_tag'))
     if koji_tag == 'TARGET': # HACK
         koji_tag = None
-    def same_or_none(a, b):
+    def same_or_none2(a, b):
         return (a == b) or a is None or b is None
-    def same_or_none4(a, b, c, d):
-        return (same_or_none(a, b) and same_or_none(a, c) and
-                same_or_none(a, d) and same_or_none(b, c) and
-                same_or_none(b, d) and same_or_none(c, d))
+    def same_or_none(*args):
+        return all((same_or_none2(args[x], args[y]) for x in range(len(args)) for y in range(x, len(args))))
 
     # Verify consistency
     dist_rel = get_el_release_from_string(distro_tag)
     target_rel = get_el_release_from_string(koji_target)
     tag_rel = get_el_release_from_string(koji_tag)
 
-    if not same_or_none4(redhat_release, dist_rel, tag_rel, target_rel):
+    if not same_or_none(redhat_release, dist_rel, tag_rel, target_rel):
         return None
 
     rel = redhat_release or dist_rel or target_rel or tag_rel

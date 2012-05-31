@@ -25,7 +25,6 @@ try:
     # UW CSL hack
     if os.path.isdir(CSL_KOJI_DIR):
         # explicitly import koji (as kojilib) from CSL_KOJI_DIR
-        import imp
         kojilib_filehandle, kojilib_filename, kojilib_desc = (
             imp.find_module('koji', [CSL_KOJI_DIR]))
         kojilib = imp.load_module('koji',
@@ -46,10 +45,14 @@ try:
                               kojicli_filehandle,
                               kojicli_filename,
                               kojicli_desc)
-    HAVE_KOJILIB = True
+    if kojilib.BR_STATES and kojilib.BUILD_STATES and kojilib.REPO_STATES and kojilib.TASK_STATES:
+        HAVE_KOJILIB = True
+    else:
+        HAVE_KOJILIB = False
 except ImportError:
     HAVE_KOJILIB = False
-    
+except AttributeError:
+    HAVE_KOJILIB = False
     
 
 def get_koji_cmd(use_osg_koji):
@@ -300,12 +303,16 @@ if HAVE_KOJILIB:
 
 class KojiLibInter(object):
     # Aliasing for convenience
-    BR_STATES = kojilib.BR_STATES
-    BUILD_STATES = kojilib.BUILD_STATES
-    REPO_STATES = kojilib.REPO_STATES
-    TASK_STATES = kojilib.TASK_STATES
+    if HAVE_KOJILIB:
+        BR_STATES = kojilib.BR_STATES
+        BUILD_STATES = kojilib.BUILD_STATES
+        REPO_STATES = kojilib.REPO_STATES
+        TASK_STATES = kojilib.TASK_STATES
 
     def __init__(self, user=None, dry_run=False):
+        if not HAVE_KOJILIB:
+            raise KojiError("Cannot use KojiLibInter without kojilib!")
+
         self.ca = None
         self.cert = KOJI_CLIENT_CERT
         self.kojisession = None

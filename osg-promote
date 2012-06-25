@@ -1,5 +1,6 @@
 #!/usr/bin/python
 """A package promotion script for OSG"""
+# TODO: Implement --wiki
 
 import glob
 import re
@@ -35,16 +36,16 @@ def parse_cmdline_args(argv):
     parser = OptionParser("""
     %prog -r|--route ROUTE [options] <packages or builds>
 """)
-    parser.add_option("-r", "--route", default=None, type='choice', choices=VALID_ROUTES.keys(),
-    	              help="The promotion route to use. Valid routes are: " + ", ".join(VALID_ROUTES.keys()))
+    parser.add_option("-r", "--route", default="testing", type='choice', choices=VALID_ROUTES.keys(),
+                      help="The promotion route to use. Valid routes are: " + ", ".join(VALID_ROUTES.keys()))
     parser.add_option("-n", "--dry-run", action="store_true", default=False,
-    	              help="Do not promote, just show what would be done")
-    parser.add_option("--el5", action="append_const", dest='dvers', const='el5',
-    	              help="Promote el5 packages.")
-    parser.add_option("--el6", action="append_const", dest='dvers', const='el6',
-    	              help="Promote el6 packages.")
+                      help="Do not promote, just show what would be done")
+    parser.add_option("--el5-only", action="store_false", dest='el6', default=True,
+                      help="Promote only el5 packages.")
+    parser.add_option("--el6-only", action="store_false", dest='el5', default=True,
+                      help="Promote only el6 packages.")
     parser.add_option("--ignore-rejects", dest="ignore_rejects", action="store_true", default=False,
-    	              help="Ignore rejections due to version mismatch between dvers or missing package for one dver")
+                      help="Ignore rejections due to version mismatch between dvers or missing package for one dver")
     parser.add_option("--output-format", "--of", default='old', type='choice', choices=['old', 'new', 'relnote', 'none'],
                       help="Valid output formats are: old, new, relnote, none")
     parser.add_option("--no-date", "--nodate", default=False, action="store_true",
@@ -52,26 +53,32 @@ def parse_cmdline_args(argv):
     parser.add_option("--regen", default=False, action="store_true",
                       help="Regenerate repo(s) afterward")
     parser.add_option("-w", "--wiki", "--twiki", default=False, action="store_true",
-                      help="Do not promote, only generate wiki code for the arguments.")
+                      help="Do not promote, only generate wiki code for the arguments. (Unimplemented)")
+    # ^ TODO Implement this
     parser.add_option("-y", "--assume-yes", action="store_true", default=False,
                       help="Do not prompt before promotion")
     
     options, args = parser.parse_args(argv[1:])
 
-    if not options.dvers:
-        options.dvers = VALID_DVERS
+    if not options.el5 and not options.el6:
+        parser.error("Can't specify both --el5-only and --el6-only")
+
+    # optparse doesn't do 'append_const' in python 2.4 so simulate it
+    options.dvers = []
+    if options.el5: options.dvers.append('el5')
+    if options.el6: options.dvers.append('el6')
 
     if options.route:
         # User is allowed to specify the shortest unambiguous prefix of a route
         matching_routes = [x for x in VALID_ROUTES.keys() if x.startswith(options.route)]
         if len(matching_routes) > 1:
-            raise Exception("Ambiguous route.")
+            parser.error("Ambiguous route. Matching routes are: " + ", ".join(matching_routes))
         elif not matching_routes:
-            raise Exception("Invalid route.")
+            parser.error("Invalid route. Valid routes are: " + ", ".join(VALID_ROUTES.keys()))
         else:
             options.route = matching_routes[0]
     else:
-        raise Exception("Need --route.")
+        parser.error("Missing required parameter '--route'")
 
     if options.wiki:
         options.dry_run = True

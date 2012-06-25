@@ -123,9 +123,10 @@ def main(argv):
     # TODO: Print task urls
     task_ids = filter(None, task_ids)
     if kojiinter.KojiInter.backend and task_ids:
-        if buildopts['no_wait']:
-            print "Koji task ids are:", task_ids
-        else:
+        print "Koji task ids are:", task_ids
+        for tid in task_ids:
+            print re.sub(r'^http:', 'https:', KOJI_HUB) + "/koji/taskinfo?taskID=" + str(tid)
+        if not buildopts['no_wait']:
             kojiinter.KojiInter.backend.watch_tasks(task_ids)
 
 

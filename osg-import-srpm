@@ -86,7 +86,13 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
 #    safe_makedirs(name)
 #    safe_makedirs(opj(name, "upstream"))
 
-    source_filename = opj(upstream_dir, name+"-srpm.source")
+    if re.search(r'emisoft\.web\.cern\.ch', url):
+        provider_name = 'emi'
+    elif re.search(r'fedoraproject\.org', url):
+        provider_name = 'epel'
+    else:
+        provider_name = 'developer'
+    source_filename = opj(upstream_dir, provider_name+".srpm.source")
     readme_filename = opj(name, "README")
 
     source_contents = opj(name, version, srpm) + "\n"
@@ -210,6 +216,9 @@ downloading and putting the SRPM into the upstream cache.
 
         if unchecked_call("svn info &>/dev/null", shell=True):
             raise Error("Must be called from an svn checkout!")
+
+        if not re.match(r'(http|https|ftp):', upstream_url):
+            raise UsageError("upstream-url is not a valid url")
         
         srpm = download_srpm(upstream_url, options.output)
         make_svn_tree(srpm, upstream_url, options.extract_spec, options.diff_spec)

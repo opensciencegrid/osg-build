@@ -3,15 +3,14 @@ import re
 import os
 
 from osgbuild.constants import SVN_ROOT
-from osgbuild.error import Error, SVNError
+from osgbuild.error import Error, SVNError, UsageError
 from osgbuild import utils
 
 def is_uncommitted(package_dir):
     """Return True if there are uncommitted changes in the SVN working dir."""
     out, err = utils.sbacktick("svn status -q " + package_dir)
     if err:
-        raise SVNError("Exit code %d getting SVN status. Output:\n%s" %
-                       (err, out))
+        raise SVNError("Exit code %d getting SVN status. Output:\n%s" % (err, out))
     if out:
         print "The following uncommitted changes exist:"
         print out
@@ -27,8 +26,7 @@ def is_outdated(package_dir):
     """
     out, err = utils.sbacktick("svn status -u -q " + package_dir)
     if err:
-        raise SVNError("Exit code %d getting SVN status. Output:\n%s" %
-                       (err, out))
+        raise SVNError("Exit code %d getting SVN status. Output:\n%s" % (err, out))
     outdated_files = []
     for line in out.split("\n"):
         try:
@@ -65,6 +63,26 @@ Continue (yes/no)?""" % pkg):
     return True
 
 
+def verify_package_info(package_info):
+    """Check if package_info points to a valid package dir (i.e. contains
+    at least an osg/ dir or an upstream/ dir).
+
+    """
+    url = package_info['canon_url']
+    rev = package_info['revision']
+    command = ["svn", "ls", url, "-r", rev]
+    out, err = utils.sbacktick(command, clocale=True, err2out=True)
+    if err:
+        raise SVNError("Exit code %d getting SVN listing of %s (rev %s). Output:\n%s" % (err, url, rev, out))
+    for line in out.split("\n"):
+        if line.startswith('osg/') or line.startswith('upstream/'):
+            return True
+    return False
+
+        
+
+
+
 def get_package_info(package_dir, rev=None):
     """Return the svn info for a package dir."""
     command = ["svn", "info", package_dir]
@@ -73,18 +91,15 @@ def get_package_info(package_dir, rev=None):
     else:
         command += ["-r", "HEAD"]
 
-    out, err = utils.sbacktick(command,
-                               clocale=True, err2out=True)
+    out, err = utils.sbacktick(command, clocale=True, err2out=True)
     if err:
-        raise SVNError("Exit code %d getting SVN info. Output:\n%s" %
-                       (err, out))
+        raise SVNError("Exit code %d getting SVN info. Output:\n%s" % (err, out))
     info = dict()
     for line in out.split("\n"):
         label, value = line.strip().split(": ", 1)
         label = label.strip().lower().replace(' ', '_')
         info[label] = value
-    info['canon_url'] = re.sub("^" + re.escape(info['repository_root']),
-                               SVN_ROOT, info['url'])
+    info['canon_url'] = re.sub("^" + re.escape(info['repository_root']), SVN_ROOT, info['url'])
     return info
 
 
@@ -93,8 +108,10 @@ def koji(package_dir, koji_obj, buildopts):
     package_info = get_package_info(package_dir)
     package_name = os.path.basename(package_info['canon_url'])
     if not re.match("\w+", package_name): # sanity check
-        raise Error("Package directory '%s' gives invalid package name '%s'" %
-                    (package_dir, package_name))
+        raise Error("Package directory '%s' gives invalid package name '%s'" % (package_dir, package_name))
+    if not verify_package_info(package_info):
+        raise UsageError("%s isn't a package directory "
+                         "(must have either osg/ or upstream/ dirs or both)" % (package_dir))
 
     if not buildopts.get('scratch'):
         koji_obj.add_pkg(package_name)

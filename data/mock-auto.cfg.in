@@ -5,6 +5,14 @@ config_opts['root'] = '${NAME}'
 config_opts['target_arch'] = '${ARCH}'
 config_opts['chroot_setup_cmd'] = 'install buildsys-build yum-priorities'
 
+config_opts['macros'] = {
+    '%_topdir': "/builddir/build",
+    '%_rpmfilename': "%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
+    '%dist': ".${DIST}",
+    '%centos_ver': "${RHEL}",
+    '%rhel': '${RHEL}',
+    '%el${RHEL}': '1'}
+
 config_opts['yum.conf'] = """
 [main]
 cachedir=/var/cache/yum
@@ -21,27 +29,39 @@ assumeyes=1
 name=os
 mirrorlist=http://mirrorlist.centos.org/?release=${RHEL}&arch=${BASEARCH}&repo=os
 #baseurl=http://mirror.centos.org/centos/${RHEL}/os/${BASEARCH}/
+#baseurl=http://mirror.batlab.org/cobbler/repo_mirror/centos-${RHEL}-${BASEARCH}/
 
 [updates]
 name=updates
-#mirrorlist=http://mirrorlist.centos.org/?release=${RHEL}&arch=${BASEARCH}&repo=updates
+mirrorlist=http://mirrorlist.centos.org/?release=${RHEL}&arch=${BASEARCH}&repo=updates
 #baseurl=http://mirror.centos.org/centos/${RHEL}/updates/${BASEARCH}/
-baseurl=http://mirror.unl.edu/centos/${RHEL}/os/${BASEARCH}/
+#baseurl=http://mirror.unl.edu/centos/${RHEL}/os/${BASEARCH}/
 
-[groups]
-name=groups
-baseurl=http://dev.centos.org/centos/buildsys/${RHEL}/
+#[groups]
+#name=groups
+#baseurl=http://dev.centos.org/centos/buildsys/${RHEL}/
+#
 
 [osg-development]
 name=osg-development
 #baseurl=http://vdt.cs.wisc.edu/repos/3.0/el${RHEL}/development/${BASEARCH}/
-mirrorlist=http://repo.grid.iu.edu/mirror/osg-development/${BASEARCH}
+mirrorlist=http://repo.grid.iu.edu/mirror/3.0/el${RHEL}/osg-development/${BASEARCH}
 priority=98
 
 [epel]
 name=Extra Packages for Enterprise Linux ${RHEL} - ${BASEARCH}
 #baseurl=http://download.fedoraproject.org/pub/epel/${RHEL}/$BASEARCH
 mirrorlist=http://mirrors.fedoraproject.org/mirrorlist?repo=epel-${RHEL}&arch=${BASEARCH}
+#baseurl=http://mirror.batlab.org/cobbler/repo_mirror/epel-${RHEL}-${BASEARCH}/
+
+#[jpackage-batlab-mirror]
+#name=JPackage (Batlab mirror)
+#baseurl=http://mirror.batlab.org/cobbler/repo_mirror/jpackage-${RHEL}/
+#failovermethod=priority
+#gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
+#enabled=1
+#priority=10
 
 [jpackage-generic-${RHEL}.0]
 name=JPackage (free), generic
@@ -53,16 +73,17 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
 enabled=1
 priority=10
 
-[jpackage-generic-${RHEL}.0-updates]
-name=JPackage (free), generic updates
-#baseurl=http://mirrors.dotsrc.org/jpackage/${RHEL}.0-updates/generic/free
-mirrorlist=http://www.jpackage.org/mirrorlist.php?dist=generic&type=free&release=${RHEL}.0-updates
-failovermethod=priority
-gpgcheck=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
-enabled=1
-priority=10
-
+# does not exist on rhel6
+#[jpackage-generic-${RHEL}.0-updates]
+#name=JPackage (free), generic updates
+##baseurl=http://mirrors.dotsrc.org/jpackage/${RHEL}.0-updates/generic/free
+#mirrorlist=http://www.jpackage.org/mirrorlist.php?dist=generic&type=free&release=${RHEL}.0-updates
+#failovermethod=priority
+#gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
+#enabled=1
+#priority=10
+#
 [jpackage-generic-${RHEL}.0-devel]
 name=JPackage (free), generic
 baseurl=http://mirrors.dotsrc.org/jpackage/${RHEL}.0/generic/devel
@@ -72,14 +93,16 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
 enabled=0
 priority=10
 
-[jpackage-distro]
-name=JPackage (free) for distro $$releasever
-mirrorlist=http://www.jpackage.org/mirrorlist.php?dist=redhat-el-${RHEL}&type=free&release=${RHEL}.0
-failovermethod=priority
-gpgcheck=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
-enabled=1
-priority=10
+# does not exist on rhel6
+#[jpackage-distro]
+#name=JPackage (free) for distro $$releasever
+#mirrorlist=http://www.jpackage.org/mirrorlist.php?dist=redhat-el-${RHEL}&type=free&release=${RHEL}.0
+#failovermethod=priority
+#gpgcheck=0
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-jpackage
+#enabled=1
+#priority=10
+#
 
 [osg-minefield]
 name=OSG Development Repository on koji-hub
@@ -88,13 +111,5 @@ failovermethod=priority
 gpgcheck=0
 enabled=1
 priority=98
-
-config_opts['macros'] = {
-    '%_topdir': "/builddir/build",
-    '%_rpmfilename': "%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
-    '%dist': ".${DIST}",
-    '%centos_ver': "${RHEL}",
-    '%rhel': '${RHEL}',
-    '%el${RHEL}': '1'}
 
 """

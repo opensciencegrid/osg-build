@@ -4,10 +4,8 @@
 
 import ConfigParser
 import logging
-import random
 import re
 import os
-import time
 
 from osgbuild.constants import *
 from osgbuild import utils
@@ -319,7 +317,7 @@ class KojiLibInter(object):
         self.server = os.path.join(KOJI_HUB, "kojihub")
         self.serverca = None
         self.user = user or get_cn()
-        self.weburl = os.path.join(KOJI_HUB, "koji")
+        self.weburl = os.path.join(HTTPS_KOJI_HUB, "koji")
         self.dry_run = dry_run
 
 
@@ -410,8 +408,9 @@ class KojiLibInter(object):
             raise KojiError("Couldn't get repo for tag %s", tag)
         opts = {'tag_name': tag_obj['name'],
                 'repoid': repo['id'],
-                'distribution': dist}
-        output = kojilib.getMockConfig(name, arch, **opts)
+                'distribution': dist,
+                'topurl': KOJI_HUB + "/mnt/koji"}
+        output = kojilib.genMockConfig(name, arch, **opts)
         utils.unslurp(outpath, output)
 
 

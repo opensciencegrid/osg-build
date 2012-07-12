@@ -17,7 +17,7 @@ from osgbuild import utils
 
 
 
-def make_mock_config_from_template(arch, cfg_path, dist, rhel=5):
+def make_mock_config_from_template(arch, cfg_path, dist, rhel):
     """Autogenerate a mock config for arch 'arch'."""
     if re.match(r'i[3-6]86', arch):
         basearch = 'i386'
@@ -27,17 +27,13 @@ def make_mock_config_from_template(arch, cfg_path, dist, rhel=5):
     cfg_abspath = os.path.abspath(cfg_path)
     cfg_name = re.sub(r'\.cfg$', '', os.path.basename(cfg_abspath))
 
-    template = string.Template(
-        utils.slurp(utils.find_file('mock-auto.cfg.in',
-                                    DATA_FILE_SEARCH_PATH)))
+    template = string.Template(utils.slurp(utils.find_file('mock-auto.cfg.in', DATA_FILE_SEARCH_PATH)))
 
-    utils.unslurp(cfg_abspath,
-            template.safe_substitute(
-                NAME=cfg_name,
-                ARCH=arch,
-                BASEARCH=basearch,
-                DIST=dist,
-                RHEL=rhel))
+    utils.unslurp(cfg_abspath, template.safe_substitute(NAME=cfg_name,
+                                                        ARCH=arch,
+                                                        BASEARCH=basearch,
+                                                        DIST=dist,
+                                                        RHEL=rhel))
     
     return cfg_abspath
 
@@ -67,8 +63,7 @@ class Mock(object):
             self.cfg_name = os.path.basename(cfg_abspath_no_ext)
 
             if not os.path.isfile(cfg_abspath):
-                raise MockError("Couldn't find mock config file at " +
-                                cfg_abspath)
+                raise MockError("Couldn't find mock config file at " + cfg_abspath)
 
             # The cfg file passed to mock is always relative to /etc/mock
             self.mock_cmd += ['-r', "../../" + cfg_abspath_no_ext]
@@ -115,9 +110,9 @@ You might need to log out and log in for the changes to take effect""")
                 atexit.register(shutil.rmtree, cfg_dir)
                 cfg_path = make_mock_config_from_template(
                     arch,
-                    os.path.join(cfg_dir,"mock-auto-%s.%d.cfg" %
-                                 (arch, os.getuid())),
-                    distro_tag)
+                    os.path.join(cfg_dir,"mock-auto-%s.%d.cfg" % (arch, os.getuid())),
+                    distro_tag,
+                    self.buildopts['redhat_release'])
             else:
                 # mock is very particular with its config file
                 # names. The path we pass it is interpreted to be
@@ -142,10 +137,8 @@ You might need to log out and log in for the changes to take effect""")
                     # /etc/mock. Prefer cwd.
                     given_cfg_dir, given_cfg_file = os.path.split(given_cfg_path)
                     cfg_dir1 = os.path.abspath(given_cfg_dir)
-                    cfg_dir2 = os.path.abspath(os.path.join('/etc/mock',
-                                                            given_cfg_dir))
-                    cfg_path = utils.find_file(given_cfg_file,
-                                               [cfg_dir1, cfg_dir2])
+                    cfg_dir2 = os.path.abspath(os.path.join('/etc/mock', given_cfg_dir))
+                    cfg_path = utils.find_file(given_cfg_file, [cfg_dir1, cfg_dir2])
 
         elif mock_config_from_koji:
             cfg_dir = tempfile.mkdtemp(prefix="osg-build-mock-")
@@ -153,8 +146,7 @@ You might need to log out and log in for the changes to take effect""")
             cfg_path = make_mock_config_from_koji(
                 self.koji_obj,
                 arch,
-                os.path.join(cfg_dir,"mock-koji-%s-%s.%d.cfg" %
-                             (mock_config_from_koji, arch, os.getuid())),
+                os.path.join(cfg_dir,"mock-koji-%s-%s.%d.cfg" % (mock_config_from_koji, arch, os.getuid())),
                 mock_config_from_koji,
                 distro_tag)
         else:
@@ -173,15 +165,15 @@ You might need to log out and log in for the changes to take effect""")
                                        srpm]
         if self.target_arch:
             rebuild_cmd += ['--arch', self.target_arch]
-
+        # ccache on el6 tries to install the el5 package for ccache and dies
+        if str(self.buildopts['redhat_release']) == '6':
+            rebuild_cmd += ['--disable-plugin=ccache']
         ret = utils.unchecked_call(rebuild_cmd)
         if ret:
-            raise MockError('Mock build failed (command was: ' +
-                                ' '.join(rebuild_cmd) + ')')
+            raise MockError('Mock build failed (command was: ' + ' '.join(rebuild_cmd) + ')')
         
         # TODO: Parse the mock logs/output instead of using glob.
-        rpms = [x for x in glob(os.path.join(resultdir, "*.rpm"))
-                if not fnmatch(x, "*.src.rpm")]
+        rpms = [x for x in glob(os.path.join(resultdir, "*.rpm")) if not fnmatch(x, "*.src.rpm")]
 
         return rpms
 

@@ -142,14 +142,14 @@ def get_tag(pattern, dver=None):
         return utils.backtick(["koji", "search", "tag"] + list(args)).split("\n")[0]
     if dver is None:
         tag = (get_first("--exact", pattern) or
-               get_first("--regex", re.quote(pattern) + ".*"))
+               get_first("--regex", re.escape(pattern) + ".*"))
     else:
         tag = (get_first("--exact", "%s-%s" %
                          (dver, pattern)) or
                get_first("--exact", "%s-osg-%s" %
                          (dver, pattern)) or
                get_first("--regex", "%s-(osg-)?%s.*" %
-                         (dver, re.quote(pattern))))
+                         (dver, re.escape(pattern))))
     if not tag:
         raise Exception("Can't find tag %s in koji" % pattern)
     return tag

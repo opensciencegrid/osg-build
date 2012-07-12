@@ -337,17 +337,17 @@ class TestKoji(XTestCase):
             "falsely building for el6")
 
     def test_koji_shell_args3(self):
-        output = backtick_osg_build(self.kdr_shell + ["--ktt", "el6-gt52", "--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_shell + ["--ktt", "el6-osg", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertFalse(
             regex_in_list(r"(osg-)?koji build el5-osg.*", out_list),
             "falsely building for el5")
         self.assertTrue(
-            regex_in_list(r"(osg-)?koji build el6-gt52.*", out_list),
+            regex_in_list(r"(osg-)?koji build el6-osg.*", out_list),
             "not building for el6 for the right target")
 
     def test_koji_shell_args4(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el5", "--koji-target", "el5-gt52b", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_shell + ["--el5", "--koji-target", "el5-osg", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertFalse(
             regex_in_list(r"Unable to determine redhat release", out_list),

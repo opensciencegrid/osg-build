@@ -66,7 +66,7 @@ def srpm_nvr(srpm):
                     base_srpm)
 
 
-def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
+def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False, provider=None):
     """Create an svn tree for the srpm and populate it as follows:
     $name/osg/*.spec        - the spec file as extracted from the srpm
                               (if extract_spec is True)
@@ -83,15 +83,17 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
         checked_call(["svn", "mkdir", name])
     if not exists(upstream_dir):
         checked_call(["svn", "mkdir", upstream_dir])
-#    safe_makedirs(name)
-#    safe_makedirs(opj(name, "upstream"))
 
-    if re.search(r'emisoft\.web\.cern\.ch', url):
-        provider_name = 'emi'
-    elif re.search(r'fedoraproject\.org', url):
-        provider_name = 'epel'
+    if provider is None:
+        if re.search(r'emisoft\.web\.cern\.ch', url):
+            provider_name = 'emi'
+        elif re.search(r'fedoraproject\.org', url):
+            provider_name = 'epel'
+        else:
+            provider_name = 'developer'
     else:
-        provider_name = 'developer'
+        provider_name = provider
+
     source_filename = opj(upstream_dir, provider_name+".srpm.source")
     readme_filename = opj(name, "README")
 
@@ -133,7 +135,7 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
             chdir(osg_dir)
             for s in glob.glob("*.spec"):
                 move(s, s + ".old")
-            checked_call("rpm2cpio %s | cpio -ivd '*.spec'" % abs_srpm, shell=True)
+            checked_call("rpm2cpio '%s' | cpio -ivd '*.spec'" % abs_srpm, shell=True)
             if exists(s + ".old"):
                 for s in glob.glob("*.spec"):
                     move(s, s + ".new")
@@ -147,7 +149,7 @@ def make_svn_tree(srpm, url, extract_spec=False, diff_spec=False):
             checked_call(["svn", "mkdir", osg_dir])
         old_dir = getcwd() # pushd
         chdir(osg_dir)
-        checked_call("rpm2cpio %s | cpio -ivd '*.spec'" % abs_srpm, shell=True)
+        checked_call("rpm2cpio '%s' | cpio -ivd '*.spec'" % abs_srpm, shell=True)
         checked_call("svn add *.spec", shell=True)
         chdir(old_dir) # popd
 
@@ -177,12 +179,12 @@ downloading and putting the SRPM into the upstream cache.
 """)
         parser.add_option(
             "-d", "--diff-spec", action="store_true",
-            help="Extract the spec file from the SRPM and put it into an " +
-            "osg/ subdirectory under a new name. If a spec file already " +
+            help="Extract the spec file from the SRPM and put it into an "
+            "osg/ subdirectory under a new name. If a spec file already "
             "exists, diff the two.")
         parser.add_option(
             "-e", "--extract-spec", action="store_true",
-            help="Extract the spec file from the SRPM and put it into an " +
+            help="Extract the spec file from the SRPM and put it into an "
             "osg/ subdirectory.")
         parser.add_option(
             "--loglevel",
@@ -192,8 +194,13 @@ downloading and putting the SRPM into the upstream cache.
             "-o", "--output",
             help="The filename the upstream-url should be saved as.")
         parser.add_option(
+            "-p", "--provider",
+            help="Who provided the SRPM being imported. For example, 'epel'. "
+            "This is used to name the .source file in the 'upstream' directory. "
+            "The default is 'epel' if the SPRM is from EPEL, 'emi' if the SRPM is from EMI, and 'developer' otherwise.")
+        parser.add_option(
             "-u", "--upstream", default=DEFAULT_UPSTREAM_ROOT,
-            help="The base directory to put the upstream sources under. " +
+            help="The base directory to put the upstream sources under. "
             "Default: %default")
 
         options, pos_args = parser.parse_args(argv[1:])
@@ -221,7 +228,7 @@ downloading and putting the SRPM into the upstream cache.
             raise UsageError("upstream-url is not a valid url")
         
         srpm = download_srpm(upstream_url, options.output)
-        make_svn_tree(srpm, upstream_url, options.extract_spec, options.diff_spec)
+        make_svn_tree(srpm, upstream_url, options.extract_spec, options.diff_spec, options.provider)
         move_to_cache(srpm, options.upstream)
 
     except UsageError, e:

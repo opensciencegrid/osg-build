@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """A package promotion script for OSG"""
 # TODO: Implement --wiki
+# TODO: Do not attempt to promote if the build is already in the destination
 
 import glob
 import re
@@ -88,11 +89,17 @@ def parse_cmdline_args(argv):
 
 def get_latest_build(package, tag):
     """Return the NVR of the latest build of a package in a tag, or None"""
-    latest = utils.backtick(["koji", "-q", "list-tagged", "--latest", tag, package])
-    if not latest:
+    global ksession
+    data = ksession.listTagged(tag, latest=True, package=package)
+    if not data:
         return None
     else:
-        return latest.split()[0]
+        try:
+            return data[0]['nvr']
+        except AttributeError:
+            return None
+        except IndexError:
+            return None
 
 
 def get_build_uri(build):
@@ -138,20 +145,20 @@ def get_tag(pattern, dver=None):
     Raise an Exception if no matching tag is found.
 
     """
-    def get_first(*args):
-        return utils.backtick(["koji", "search", "tag"] + list(args)).split("\n")[0]
+    global kwrap
+    def get_first_tag(match, terms):
+        try:
+            return kwrap.search_names(terms, 'tag', match)[0]
+        except IndexError:
+            return None
     if dver is None:
-        tag = (get_first("--exact", pattern) or
-               get_first("--regex", re.escape(pattern) + ".*"))
+        tag = (get_first_tag('exact', pattern) or get_first_tag('regex', re.escape(pattern) + ".*"))
     else:
-        tag = (get_first("--exact", "%s-%s" %
-                         (dver, pattern)) or
-               get_first("--exact", "%s-osg-%s" %
-                         (dver, pattern)) or
-               get_first("--regex", "%s-(osg-)?%s.*" %
-                         (dver, re.escape(pattern))))
+        tag = (get_first_tag('exact', "%s-%s" % (dver, pattern)) or
+               get_first_tag('exact', "%s-osg-%s" % (dver, pattern)) or
+               get_first_tag('regex', "%s-(osg-)?%s.*" % (dver, re.escape(pattern))))
     if not tag:
-        raise Exception("Can't find tag %s in koji" % pattern)
+        raise Exception("Can't find tag %s or variations of it in koji" % pattern)
     return tag
 
 
@@ -452,7 +459,13 @@ def main(argv=None):
         return 1
     
     question = "Proceed with promoting the builds?"
-    if (options.assume_yes or not sys.stdin.isatty() or utils.ask_yn(question)):
+    try:
+        proceed = (options.assume_yes or not sys.stdin.isatty() or utils.ask_yn(question))
+    except KeyboardInterrupt:
+        printf("Canceled.")
+        return 3
+
+    if proceed:
         promoted_builds = promoter.do_promotions()
         if options.output_format != 'none':
             printf("\nTwiki code for this set of promotions:\n")

@@ -1,5 +1,5 @@
 """koji interface classes for osg-build"""
-# pylint: disable=W0614
+# pylint: disable=W0614,C0103
 
 
 import ConfigParser
@@ -32,7 +32,7 @@ try:
         # HAAACK
         kojicli_filename = os.path.join(CSL_KOJI_DIR, "cli", "koji")
     else:
-        import koji as kojilib
+        import koji as kojilib # pylint: disable=F0401
         kojicli_filename = utils.which("koji")
     # load koji cli (as kojicli) from either somewhere in $PATH or CSL_KOJI_DIR/cli/koji
     # I can't use imp.find_module here to get the values I need because
@@ -273,6 +273,21 @@ class KojiShellInter(object):
                             str(err))
 
 
+    def search_names(self, terms, stype, match):
+        search_subcmd = ["search", stype]
+        if match == 'regex':
+            search_subcmd.append("--regex")
+        elif match == 'exact':
+            search_subcmd.append("--exact")
+        search_subcmd.append(terms)
+
+        out, err = utils.sbacktick(self.koji_cmd + search_subcmd)       
+        if err:
+            raise KojiError("koji search failed with exit code " + str(err))
+        return out.split("\n")
+            
+
+
     def tag_build(self, tag, build, force=False):
         tag_pkg_subcmd = ["tag-pkg",
                           tag,
@@ -294,7 +309,7 @@ if HAVE_KOJILIB:
     # kojicli.watch_tasks() expects a global variable named options with
     # an attribute poll_interval to determine how often to poll the server
     # for a status update.
-    class _KojiCliOptions(object):
+    class _KojiCliOptions(object): # pylint: disable=C0111,R0903
         def __init__(self, poll_interval):
             self.poll_interval = poll_interval
     kojicli.options = _KojiCliOptions(5)
@@ -365,7 +380,7 @@ class KojiLibInter(object):
             raise KojiError("Invalid tag %s", tag)
         try:
             package_list = self.kojisession.listPackages(tagID=tag_obj['id'], pkgID=package)
-        except kojilib.GenericError, e: # koji raises this if the package doesn't exist
+        except kojilib.GenericError: # koji raises this if the package doesn't exist
             package_list = None
         if not package_list:
             if not self.dry_run:
@@ -416,6 +431,11 @@ class KojiLibInter(object):
 
     def search(self, terms, stype, match):
         return self.kojisession.search(terms, stype, match)
+
+
+    def search_names(self, terms, stype, match):
+        data = self.search(terms, stype, match)
+        return [x['name'] for x in data]
 
 
     def tag_build(self, tag, build, force=False):

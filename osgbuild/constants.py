@@ -6,6 +6,7 @@ WD_RESULTS = '_build_results'
 WD_PREBUILD = '_final_srpm_contents'
 WD_UNPACKED = '_upstream_srpm_contents'
 WD_UNPACKED_TARBALL = '_upstream_tarball_contents'
+WD_QUILT = '_quilt'
 AFS_CACHE_PATH = '/p/vdt/public/html/upstream'
 AFS_CACHE_PREFIX = 'file://' + AFS_CACHE_PATH
 WEB_CACHE_PREFIX = 'http://vdt.cs.wisc.edu/upstream'

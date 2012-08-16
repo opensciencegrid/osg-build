@@ -55,8 +55,8 @@ class SRPMBuild(object):
         self.results_dir = os.path.join(self.working_subdir, WD_RESULTS)
         self.prebuild_dir = os.path.join(self.working_subdir, WD_PREBUILD)
         self.unpacked_dir = os.path.join(self.working_subdir, WD_UNPACKED)
-        self.unpacked_tarball_dir = os.path.join(self.working_subdir,
-                                                 WD_UNPACKED_TARBALL)
+        self.unpacked_tarball_dir = os.path.join(self.working_subdir, WD_UNPACKED_TARBALL)
+        self.quilt_dir = os.path.join(self.working_subdir, WD_QUILT)
     # end of __init__()
 
 
@@ -147,14 +147,15 @@ class SRPMBuild(object):
                                "Unable to find resulting SRPM.")
 
 
-    def prebuild_external_sources(self):
+    def prebuild_external_sources(self, destdir=None):
         """Collect sources and spec file in prebuild_dir. Return the path to
         the spec file.
 
         """
+        if destdir is None: destdir = self.prebuild_dir
         return fetch_sources.fetch(
             package_dir=self.package_dir,
-            destdir=self.prebuild_dir,
+            destdir=destdir,
             cache_prefix=self.buildopts['cache_prefix'],
             unpacked_dir=self.unpacked_dir,
             want_full_extract=self.buildopts.get('full_extract'),
@@ -186,15 +187,20 @@ class SRPMBuild(object):
         if not utils.which("quilt"):
             raise ProgramNotFoundError("quilt")
 
-        utils.safe_makedirs(self.prebuild_dir)
-        spec_filename = self.prebuild_external_sources()
+        if self.buildopts['autoclean']:
+            if os.path.exists(self.quilt_dir):
+                log.debug("autoclean removing " + self.quilt_dir)
+                shutil.rmtree(self.quilt_dir)
 
-        os.chdir(self.prebuild_dir)
+        utils.safe_makedirs(self.quilt_dir)
+        spec_filename = self.prebuild_external_sources(destdir=self.quilt_dir)
+
+        os.chdir(self.quilt_dir)
         ret = utils.unchecked_call(["quilt", "-v", "setup", spec_filename])
         if ret != 0:
             raise Error("Error running 'quilt setup' on the spec file.")
 
-        log.info("quilt files ready in %s", self.prebuild_dir)
+        log.info("quilt files ready in %s", self.quilt_dir)
 
 
     def prepare(self):

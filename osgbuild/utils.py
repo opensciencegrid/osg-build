@@ -339,7 +339,7 @@ def get_screen_columns():
     return screen_columns
 
 try:
-    from itertools import izip_longest
+    from itertools import izip_longest # pylint: disable=E0611
 except ImportError:
     class ZipExhausted(Exception):
         pass
@@ -356,13 +356,14 @@ except ImportError:
                 raise ZipExhausted
             counter[0] -= 1
             yield fillvalue
-            fillers = itertools.repeat(fillvalue)
-            iterators = [itertools.chain(it, sentinel(), fillers) for it in args]
-            try:
-                while iterators:
-                    yield tuple(map(next, iterators))
-            except ZipExhausted:
-                pass
+        fillers = itertools.repeat(fillvalue)
+        iterators = [itertools.chain(it, sentinel(), fillers) for it in args]
+        try:
+            while iterators:
+                yield tuple(map(lambda x:x.next(), iterators))
+                # ^ the 'next' builtin is not in 2.4
+        except ZipExhausted:
+            pass
         
 
 def print_table(columns_by_header):

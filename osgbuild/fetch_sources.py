@@ -91,7 +91,7 @@ def extract_srpms(srpms_downloaded, destdir):
 
 def copy_with_filter(files_list, destdir):
     """Copy files in files_list to destdir, skipping backup files and
-    the underscore directories.
+    directories.
 
     """
     for fname in files_list:
@@ -100,7 +100,8 @@ def copy_with_filter(files_list, destdir):
                      WD_PREBUILD,
                      WD_UNPACKED,
                      WD_UNPACKED_TARBALL] or
-                base.endswith('~')):
+                base.endswith('~') or
+                os.path.isdir(fname)):
             log.debug("Skipping file " + fname)
         else:
             log.debug("Copying file " + fname)
@@ -150,7 +151,8 @@ def fetch(package_dir,
 
     # Copy non *.source files in upstream
     other_sources = [x for x in glob.glob(os.path.join(upstream_dir, '*'))
-                     if not fnmatch.fnmatch(x, '*.source')]
+                     if (not fnmatch.fnmatch(x, '*.source')
+                         and os.path.isfile(x))]
     copy_with_filter(other_sources, destdir)
 
     # Extract any archives we downloaded plus any archives in the SRPM

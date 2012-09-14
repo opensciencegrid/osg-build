@@ -32,6 +32,11 @@ VALID_ROUTES = {
     "release": ["osg-testing", "osg-prerelease"],
     "prerelease": ["osg-testing", "osg-prerelease"]}
 
+def any(iterable):
+    for element in iterable:
+        if element:
+            return True
+    return False
 
 def parse_cmdline_args(argv):
     parser = OptionParser("""

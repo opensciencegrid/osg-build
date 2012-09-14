@@ -75,6 +75,7 @@ def main(argv):
     # main loop 
     # HACK
     task_ids = []
+    task_ids_by_results_dir = dict()
     for pkg in package_dirs:
         if task == 'allbuild':
             # allbuild is special--we ignore most options and use
@@ -106,7 +107,6 @@ def main(argv):
                 
                 if buildopts['svn'] and task == 'koji':
                     task_ids.append(svn.koji(pkg, koji_obj, rel_buildopts))
-
                 else:
                     builder = srpm.SRPMBuild(pkg,
                                              rel_buildopts,
@@ -115,12 +115,14 @@ def main(argv):
                     builder.maybe_autoclean()
                     method = getattr(builder, task)
                     if task == 'koji':
-                        task_ids.append(method())
+                        task_ids_by_results_dir.setdefault(builder.results_dir, [])
+                        task_id = method()
+                        task_ids.append(task_id)
+                        task_ids_by_results_dir[builder.results_dir].append(task_id)
                     else:
                         method()
     # end of main loop
     # HACK
-    # TODO: Print task urls
     task_ids = filter(None, task_ids)
     if kojiinter.KojiInter.backend and task_ids:
         print "Koji task ids are:", task_ids
@@ -128,7 +130,20 @@ def main(argv):
             print HTTPS_KOJI_HUB + "/koji/taskinfo?taskID=" + str(tid)
         if not buildopts['no_wait']:
             kojiinter.KojiInter.backend.watch_tasks(task_ids)
-
+            # TODO This is not implemented for the KojiShellInter backend
+            # Not implemented for SVN builds since results_dir is undefined for those
+            if buildopts['getfiles']:
+                if buildopts['svn']:
+                    log.warning("--getfiles is only for SRPM builds")
+                elif not isinstance(kojiinter.KojiInter.backend, kojiinter.KojiLibInter):
+                    log.warning("--getfiles is only implemented on the KojiLib backend")
+                else:
+                    for destdir, tids in task_ids_by_results_dir.iteritems():
+                        kojiinter.KojiInter.backend.download_results(tids, destdir)
+                        log.info("Results and logs downloaded to %s", destdir)
+        else:
+            if buildopts['getfiles']:
+                log.warning("Cannot use both --getfiles and --nowait")
 
     return 0
 # end of main()
@@ -356,6 +371,9 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "--no-svn", "--nosvn", action="store_false", dest="svn",
         help="Do not build package directly from SVN "
         "(default for scratch builds)")
+    koji_group.add_option(
+        "--getfiles", "--get-files", action="store_true", dest="getfiles",
+        help="Download finished products and logfiles")
 
     optnames = [x.dest for x in parser.option_list if x.dest is not None]
     for grp in [prebuild_group, rpmbuild_mock_group, mock_group, koji_group]:

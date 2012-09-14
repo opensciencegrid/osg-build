@@ -6,6 +6,7 @@ import ConfigParser
 import logging
 import re
 import os
+import urllib2
 
 from osgbuild.constants import *
 from osgbuild import utils
@@ -94,6 +95,25 @@ def get_cn():
         return cn_match.group(1)
     else:
         return None
+
+
+def download_koji_file(task_id, filename, destdir):
+    """Download a the file 'filename' for task number 'task_id' and place it
+    in destdir/task_id/filename
+
+    """
+    url = "http://koji-hub.batlab.org/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
+    log.debug('Retrieving ' + url)
+    handle = urllib2.urlopen(url)
+    utils.safe_makedirs(destdir)
+    full_filename = os.path.join(destdir, filename)
+    desthandle = open(full_filename, 'w')
+    try:
+        desthandle.write(handle.read())
+    finally:
+        desthandle.close()
+
+
 
 
 class KojiInter(object):
@@ -472,6 +492,51 @@ class KojiLibInter(object):
 
     def watch_tasks(self, tasks):
         return kojicli.watch_tasks(self.kojisession, tasks)
+
+
+    def download_results(self, task_ids, destdir):
+        """Download the resulting files of a set of tasks into destdir.
+        Each task gets its own separate subdir in destdir.
+
+        """
+        session = self.kojisession
+
+        # Loop through all task ids, and also get their children if they have not
+        # been specified; get all output files for each task and download them.
+        # TODO EC
+        all_task_ids = [int(x) for x in task_ids]
+        for task_id in all_task_ids:
+            children = session.getTaskChildren(task_id)
+            for child in children:
+                child_id = int(child['id'])
+                if child_id not in all_task_ids:
+                    all_task_ids.append(child_id)
+
+            # buildArch tasks have files in them that we want. Get tag and arch
+            # from task info and download files into a subdir under destdir.
+            # Subdir name determined by build tag and arch. If the build tag is
+            # el5-osg-build and the arch is noarch, files will be in 'el5-osg-noarch'.
+            task_info = session.getTaskInfo(task_id, request=True)
+            if task_info.get('method', "") == 'buildArch':
+                if task_info.has_key('request'):
+                    tag_id, arch = task_info['request'][1:3]
+                    tag_info = session.getTag(tag_id)
+                    try:
+                        tag_name = tag_info.get('name', 'unknown')
+                        filenames = session.listTaskOutput(task_id)
+                        for filename in filenames:
+                            if not filename.endswith('src.rpm'):
+                                download_koji_file(task_id, filename, os.path.join(destdir, re.sub(r'-build', '', tag_name) + "-" + arch))
+                    except (TypeError, AttributeError):
+                        # TODO More useful error message
+                        log.warning("Unable to download files for task %d", task_id)
+                        pass
+
+
+
+            
+        
+        
 
 
 # end of class KojiLibInter

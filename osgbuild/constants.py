@@ -37,6 +37,7 @@ DEFAULT_BUILDOPTS_COMMON = {
     'cache_prefix': 'AUTO',
     'dry_run': False,
     'full_extract': False,
+    'getfiles': False,
     'koji_backend': None,
     'kojilogin': None,
     'koji_wrapper': True,

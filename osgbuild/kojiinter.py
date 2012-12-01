@@ -1,5 +1,5 @@
 """koji interface classes for osg-build"""
-# pylint: disable=W0614,C0103
+# pylint: disable=W0614,C0103,W0142
 
 
 import ConfigParser
@@ -10,7 +10,7 @@ import urllib2
 
 from osgbuild.constants import *
 from osgbuild import utils
-from osgbuild.error import KojiError
+from osgbuild.error import KojiError, type_of_error
 
 log = logging.getLogger('osgbuild')
 log.propagate = False
@@ -142,8 +142,7 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
                 raise KojiError("KojiLib backend requested, but can't import it!")
             else:
                 log.debug("KojiInter Using shell backend")
-                KojiInter.backend = KojiShellInter(self.cn, opts['dry_run'],
-                                                   opts['koji_wrapper'])
+                KojiInter.backend = KojiShellInter(self.cn, opts['dry_run'], opts['koji_wrapper'])
 
         self.target = opts['koji_target']
         self.build_tag, self.dest_tag = KojiInter.backend.get_build_and_dest_tags(self.target)
@@ -164,13 +163,20 @@ gives you a subject with a CN""" % KOJI_CLIENT_CERT)
 
     def build_srpm(self, srpm):
         """Submit an SRPM build"""
-        return KojiInter.backend.build_srpm(srpm, self.target, self.scratch, regen_repos=self.regen_repos, no_wait=self.no_wait)
+        return KojiInter.backend.build_srpm(srpm,
+                                            self.target,
+                                            self.scratch,
+                                            regen_repos=self.regen_repos,
+                                            no_wait=self.no_wait)
 
     
     def build_svn(self, url, rev):
         """Submit an SVN build"""
-        return KojiInter.backend.build("svn+" + url + "#" + rev, self.target, self.scratch, regen_repos=self.regen_repos, no_wait=self.no_wait)
-    
+        return KojiInter.backend.build("svn+" + url + "#" + rev,
+                                       self.target,
+                                       self.scratch,
+                                       regen_repos=self.regen_repos,
+                                       no_wait=self.no_wait)
 
     def mock_config(self, arch, tag, dist, outpath, name):
         """Request a mock config from koji-hub"""
@@ -193,8 +199,7 @@ class KojiShellInter(object):
             owner = self.user
 
         found = False
-        list_pkgs = utils.backtick(self.koji_cmd +
-                                   ["list-pkgs", "--package", package])
+        list_pkgs = utils.backtick(self.koji_cmd + ["list-pkgs", "--package", package])
         for line in list_pkgs.split("\n"):
             fields = re.split(r"\s*", line, 2)
             try:
@@ -204,8 +209,7 @@ class KojiShellInter(object):
                 pass
 
         if not found:
-            cmd = (self.koji_cmd +
-                   ["add-pkg", tag, package, "--owner", owner])
+            cmd = (self.koji_cmd + ["add-pkg", tag, package, "--owner", owner])
             log.info("Calling koji to add the package to tag %s", tag)
             if not self.dry_run:
                 utils.checked_call(cmd)
@@ -214,12 +218,9 @@ class KojiShellInter(object):
     
     def get_build_and_dest_tags(self, target):
         """Return the build and destination tags for the current target."""
-        line = utils.checked_backtick(
-            self.koji_cmd +
-            ["-q", "list-targets", "--name", target])
+        line = utils.checked_backtick(self.koji_cmd + ["-q", "list-targets", "--name", target])
         if not line:
-            raise KojiError("Unable to find koji target with the name " +
-                            target)
+            raise KojiError("Unable to find koji target with the name " + target)
         else:
             try:
                 fields = re.split(r"\s*", line, 2)
@@ -267,8 +268,7 @@ class KojiShellInter(object):
                 print " ".join(self.koji_cmd + regen_repo_subcmd)
                 err2 = 0
             if err2:
-                raise KojiError("koji regen-repo failed with exit code "
-                                + str(err2))
+                raise KojiError("koji regen-repo failed with exit code " + str(err2))
 
         
     def build_srpm(self, srpm, target, scratch=False, **kwargs):
@@ -289,8 +289,7 @@ class KojiShellInter(object):
         
         err = utils.unchecked_call(self.koji_cmd + mock_config_subcmd)
         if err:
-            raise KojiError("koji mock-config failed with exit code " +
-                            str(err))
+            raise KojiError("koji mock-config failed with exit code " + str(err))
 
 
     def search_names(self, terms, stype, match):
@@ -309,15 +308,12 @@ class KojiShellInter(object):
 
 
     def tag_build(self, tag, build, force=False):
-        tag_pkg_subcmd = ["tag-pkg",
-                          tag,
-                          build]
+        tag_pkg_subcmd = ["tag-pkg", tag, build]
         if force:
             tag_pkg_subcmd.append("--force")
         err = utils.unchecked_call(self.koji_cmd + tag_pkg_subcmd)
         if err:
-            raise KojiError("koji tag-pkg failed with exit code " +
-                            str(err))
+            raise KojiError("koji tag-pkg failed with exit code " + str(err))
 
     def watch_tasks(self, *args):
         pass
@@ -333,6 +329,42 @@ if HAVE_KOJILIB:
         def __init__(self, poll_interval):
             self.poll_interval = poll_interval
     kojicli.options = _KojiCliOptions(5)
+
+
+def koji_error_wrap(description):
+    """Descriptor to wrap the body of a function in a try/except clause which
+    catches kojilib.GenericError and raises a KojiError with a more
+    user-friendly error message including a description of what we were doing.
+    Also catches kojilib.ServerOffline and raises a more specific error.
+
+    Example usage:
+        @koji_error_wrap('adding package')
+        def add_pkg(self, ...):
+            ...
+    
+    """
+    # Due to the way descriptors work in python, it is necessary to have three levels of functions here.
+    # This:
+    #   @koji_error_wrap(description)
+    #   def foo()...
+    # gets translated into:
+    #   def foo()...
+    #   foo = koji_error_wrap(description)(foo)
+    # The second line then becomes:
+    #   foo = koji_error_wrap_helper(foo)
+    # (where the definition of koji_error_wrap_helper depends on 'description'),
+    # which must then return a function that has the same calling conventions as 'foo'.
+    def koji_error_wrap_helper(function_to_wrap):
+        def wrapped_function(*args, **kwargs):
+            try:
+                return function_to_wrap(*args, **kwargs)
+            except kojilib.ServerOffline, err:
+                raise KojiError("Server outage detected while %s: %s" % (description, str(err)))
+            except kojilib.GenericError, err:
+                raise KojiError("Error of type %s while %s: %s" % (type_of_error(err), description, str(err)))
+        return wrapped_function
+    return koji_error_wrap_helper
+
 
 class KojiLibInter(object):
     # Aliasing for convenience
@@ -371,8 +403,7 @@ class KojiLibInter(object):
             cfg.read(config_file)
             items = dict(cfg.items('koji'))
         except ConfigParser.Error, err:
-            raise KojiError("Can't read config file from %s: %s" %
-                            (config_file, str(err)))
+            raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl']:
             if items.get(var):
                 setattr(self, var, os.path.expanduser(items[var]))
@@ -380,8 +411,7 @@ class KojiLibInter(object):
 
     def init_koji_session(self, login=True):
         print "Initializing koji session to", self.server
-        self.kojisession = kojilib.ClientSession(self.server,
-                                                 {'user': self.user})
+        self.kojisession = kojilib.ClientSession(self.server, {'user': self.user})
         if login and not self.dry_run:
             print "Logging in to koji as", self.user
             try:
@@ -392,6 +422,7 @@ class KojiLibInter(object):
                 raise KojiError("Couldn't log in to koji for unknown reason")
 
 
+    @koji_error_wrap('adding package')
     def add_pkg(self, tag, package, owner=None):
         if owner is None:
             owner = self.user
@@ -404,12 +435,13 @@ class KojiLibInter(object):
             package_list = None
         if not package_list:
             if not self.dry_run:
-                return self.kojisession.packageListAdd(tag, package, owner) # TODO Handle errors.
+                return self.kojisession.packageListAdd(tag, package, owner)
             else:
                 log.info("kojisession.packageListAdd(%r, %r, %r)", tag, package, owner)
                 
 
 
+    @koji_error_wrap('building')
     def build(self, url, target, scratch=False, **kwargs):
         """build package at url for target.
 
@@ -431,6 +463,7 @@ class KojiLibInter(object):
                           **kwargs)
 
 
+    @koji_error_wrap('generating mock config')
     def mock_config(self, arch, tag, dist, outpath, name):
         tag_obj = self.kojisession.getTag(tag)
         if not tag_obj:
@@ -449,6 +482,7 @@ class KojiLibInter(object):
         utils.unslurp(outpath, output)
 
 
+    @koji_error_wrap('searching')
     def search(self, terms, stype, match):
         return self.kojisession.search(terms, stype, match)
 
@@ -458,10 +492,12 @@ class KojiLibInter(object):
         return [x['name'] for x in data]
 
 
+    @koji_error_wrap('tagging')
     def tag_build(self, tag, build, force=False):
         return self.kojisession.tagBuild(tag, build, force)
 
 
+    @koji_error_wrap('uploading')
     def upload(self, source):
         "Upload a file to koji. Return the relative remote path."
         serverdir = self._unique_path()
@@ -490,10 +526,12 @@ class KojiLibInter(object):
             log.info("self.kojisession.newRepo(%r)" % tag)
 
 
+    @koji_error_wrap('watching tasks')
     def watch_tasks(self, tasks):
         return kojicli.watch_tasks(self.kojisession, tasks)
 
 
+    @koji_error_wrap('downloading results')
     def download_results(self, task_ids, destdir):
         """Download the resulting files of a set of tasks into destdir.
         Each task gets its own separate subdir in destdir.
@@ -503,7 +541,6 @@ class KojiLibInter(object):
 
         # Loop through all task ids, and also get their children if they have not
         # been specified; get all output files for each task and download them.
-        # TODO EC
         all_task_ids = [int(x) for x in task_ids]
         for task_id in all_task_ids:
             children = session.getTaskChildren(task_id)
@@ -526,11 +563,11 @@ class KojiLibInter(object):
                         filenames = session.listTaskOutput(task_id)
                         for filename in filenames:
                             if not filename.endswith('src.rpm'):
-                                download_koji_file(task_id, filename, os.path.join(destdir, re.sub(r'-build', '', tag_name) + "-" + arch))
+                                destsubdir = re.sub(r'-build', '', tag_name) + "-" + arch
+                                download_koji_file(task_id, filename, os.path.join(destdir, destsubdir))
                     except (TypeError, AttributeError):
                         # TODO More useful error message
                         log.warning("Unable to download files for task %d", task_id)
-                        pass
 
 
 

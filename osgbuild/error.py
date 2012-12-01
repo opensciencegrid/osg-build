@@ -1,6 +1,7 @@
 """Exception classes for osg-build"""
 # pylint: disable=C0103,C0111
 import os
+import re
 import traceback
 
 class Error(Exception):
@@ -72,4 +73,9 @@ class MockError(Error):
     def __init__(self, msg, tb=None):
         Error.__init__(self, "Mock error: " + msg, tb)
 
+def type_of_error(err_object):
+    if isinstance(err_object, Exception):
+        return re.sub(r"<type '([^']+)'>", r"\1", str(type(err_object)))
+    else:
+        return "Unknown"
 

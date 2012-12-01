@@ -13,7 +13,7 @@ import shutil
 import urllib2
 
 from osgbuild.constants import *
-from osgbuild.error import GlobNotFoundError
+from osgbuild.error import Error, GlobNotFoundError
 from osgbuild import utils
 
 log = logging.getLogger('osgbuild')
@@ -48,10 +48,16 @@ def process_dot_source(cache_prefix, sfilename, destdir):
                 uri = line
 
             log.info('Retrieving ' + uri)
-            handle = urllib2.urlopen(uri)
+            try:
+                handle = urllib2.urlopen(uri)
+            except urllib2.URLError, err:
+                raise Error("Unable to download %s\n%s" % (uri, str(err)))
             filename = os.path.join(destdir, basename)
-            desthandle = open(filename, 'w')
-            desthandle.write(handle.read())
+            try:
+                desthandle = open(filename, 'w')
+                desthandle.write(handle.read())
+            except EnvironmentError, err:
+                raise Error("Unable to save downloaded file to %s\n%s" % (filename, str(err)))
             downloaded.append(filename)
     finally:
         sfile.close()

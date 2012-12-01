@@ -7,7 +7,8 @@ import logging
 import traceback
 
 from osgbuild import main
-from osgbuild.error import Error, UsageError
+from osgbuild import constants
+from osgbuild.error import Error, UsageError, type_of_error
 
 log = main.log
 
@@ -62,8 +63,11 @@ except Error, err:
     sys.exit(4)
 except Exception, err:
     print >> sys.stderr, "-" * 79
-    print >> sys.stderr, "An exception occurred:"
+    print >> sys.stderr, "An unhandled exception of type %s occurred:" % type_of_error(err)
     print >> sys.stderr, str(err)
+    print >> sys.stderr, "Please send a bug report with as much information"
+    print >> sys.stderr, "about the circumstances as you can provide to:"
+    print >> sys.stderr, constants.BUGREPORT_EMAIL
     print >> sys.stderr, "-" * 79
     print >> sys.stderr, "Full traceback follows:"
     traceback.print_exc()

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import glob
 import os
 import shutil
 import sys
@@ -21,16 +22,33 @@ from osgbuild.utils import (
     unslurp)
 
 
-CA_CERTS = [
-    # subject, openssl 0.9.8 hash, openssl 1.x hash
-    ["subject= /DC=net/DC=ES/O=ESnet/OU=Certificate Authorities/CN=ESnet Root CA 1",
-     "d1b603c3", "0119347c"],
-    ["subject= /DC=org/DC=DOEGrids/OU=Certificate Authorities/CN=DOEGrids CA 1",
-     "1c3f2ca8", "12d0da68"]]
+# subject, openssl 0.9.8 hash, openssl 1.x hash
+DOEGRIDS_CA_CERTS = [
+    {'subject': "/DC=net/DC=ES/O=ESnet/OU=Certificate Authorities/CN=ESnet Root CA 1",
+    '098hash': "d1b603c3",
+    '1xhash': "0119347c"},
+    {'subject': "/DC=org/DC=DOEGrids/OU=Certificate Authorities/CN=DOEGrids CA 1",
+    '098hash': "1c3f2ca8",
+    '1xhash': "12d0da68"}]
+DIGICERT_CA_CERTS = [
+    {'subject': "/C=US/O=DigiCert Inc/OU=www.digicert.com/CN=DigiCert Assured ID Root CA",
+    '098hash': "69105f4f",
+    '1xhash': "b1159c4c"},
+    {'subject': "/DC=com/DC=DigiCert-Grid/O=DigiCert Grid/CN=DigiCert Grid CA-1",
+    '098hash': "c7a717ce",
+    '1xhash': "82c2b224"},
+    {'subject': "/DC=com/DC=DigiCert-Grid/O=DigiCert Grid/CN=DigiCert Grid Root CA",
+    '098hash': "2694e4f2",
+    '1xhash': "74a04bb6"},
+    {'subject': "/C=US/O=DigiCert Grid/OU=www.digicert.com/CN=DigiCert Grid Trust CA",
+    '098hash': "38f7145f",
+    '1xhash': "67707166"}]
+CA_CERTS = DOEGRIDS_CA_CERTS + DIGICERT_CA_CERTS
 
 CSL_KOJI_PATH = "/p/vdt/workspace/koji-1.6.0"
 
 DOEGRIDS_TARBALL_URL = "https://pki1.doegrids.org/Other/doegrids.tar"
+DIGICERT_GRID_BASEURL = "http://www.digicert-grid.com"
 GRID_CERTS_DIR = "/etc/grid-security/certificates"
 
 OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
@@ -44,6 +62,11 @@ PROGRAM_NAME = os.path.basename(sys.argv[0])
 RUN_SETUP_MSG = """\
 Run '%s setup' to set up a koji environment containing the
 necessary files in %s.""" % (PROGRAM_NAME, OSG_KOJI_USER_CONFIG_DIR)
+
+EXTRA_HELP = """
+%s adds the following commands:
+	setup                     Initialize the configuration in %s
+""" % (PROGRAM_NAME, OSG_KOJI_USER_CONFIG_DIR)
 
 
 class Error(Exception):
@@ -60,126 +83,132 @@ def get_openssl_version():
     return major, minor, release
 
 
+def checked_download(dest, url, descr=None):
+    """Download a file from 'url' to 'dest'. 'descr' is an optional text
+    description of a file, for a more informative error message.
+    
+    """
+    if os.path.isdir(dest):
+        realdest = os.path.join(dest, os.path.basename(url))
+    else:
+        realdest = dest
+    try:
+        urlhandle = urllib2.urlopen(url)
+        realdesthandle = open(realdest, 'w')
+        realdesthandle.write(urlhandle.read())
+        realdesthandle.close()
+    except Exception, e:
+        if descr:
+            raise Error("Error downloading %s (from %s to %s): %s" % (descr, url, realdest, str(e)))
+        else:
+            raise Error("Error downloading from %s to %s: %s" % (url, realdest, str(e)))
+    return realdest
+
 def create_ca_bundle(working_dir="."):
     """Create the ca-bundle.crt file in working_dir"""
     if os.path.isdir(GRID_CERTS_DIR):
         # Use local grid certificates
         certs_dir = GRID_CERTS_DIR
     else:
-        # Download grid certificates
-        try:
-            tarball_name = os.path.join(working_dir,
-                                        os.path.basename(DOEGRIDS_TARBALL_URL))
-            handle = urllib2.urlopen(DOEGRIDS_TARBALL_URL)
-            desthandle = open(tarball_name, 'w')
-            desthandle.write(handle.read())
-            desthandle.close()
-        except Exception, e:
-            raise Error("Error downloading certs tarball: " + str(e))
+        certs_dir = os.path.join(working_dir, 'certs')
+        # Download DOE grid certificates
+        tarball_name = checked_download(working_dir, DOEGRIDS_TARBALL_URL, "DOEGrids certs tarball")
         checked_call(["tar", "xf", tarball_name, "-C", working_dir])
-        certs_dir = os.path.join(working_dir, 'doegrids')
-        if not os.path.isdir(certs_dir):
-            raise Error("Certs tarball does not have expected contents")
+        if (not os.path.isdir(os.path.join(working_dir, 'doegrids')) or
+                not glob.glob(os.path.join(working_dir, 'doegrids', '*.0'))):
+            raise Error("DOEGrids certs tarball does not have expected contents")
+        os.rename(os.path.join(working_dir, 'doegrids'), certs_dir)
+        
+        # Download DigiCert grid certificates
+        for cert in DIGICERT_CA_CERTS:
+            checked_download(certs_dir, os.path.join(DIGICERT_GRID_BASEURL, cert['098hash']+".0"))
 
     bundle_contents = ""
     openssl_major = int(get_openssl_version()[0])
     for cert in CA_CERTS:
-        expected_subject = cert[0]
+        expected_subject = "subject= " + cert['subject']
         if openssl_major == 0:
-            expected_hash = cert[1]
+            expected_hash = cert['098hash']
         else:
-            expected_hash = cert[2]
-        ca_fname = cert[1] + ".0"
-        ca_path = os.path.join(certs_dir, ca_fname)
-        real_subject = backtick(["openssl", "x509", "-in", ca_path, "-noout",
-                                 "-subject"])
-        real_hash = backtick(["openssl", "x509", "-in", ca_path, "-noout",
-                              "-hash"])
+            expected_hash = cert['1xhash']
+        cert_fname = cert['098hash'] + ".0"
+        cert_path = os.path.join(certs_dir, cert_fname)
+        real_subject = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-subject"])
+        real_hash = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-hash"])
         if real_subject != expected_subject:
             raise Error(("Subject for %s doesn't match expected:\n"
-                         "Expected: '%s', got: '%s'") %
-                        (ca_fname, expected_subject, real_subject))
+                         "Expected: %r, got: %r") %
+                        (cert_fname, expected_subject, real_subject))
         if real_hash != expected_hash:
             raise Error(("Hash for %s doesn't match expected:\n"
-                         "Expected: '%s', got: '%s'") %
-                        (ca_fname, expected_hash, real_hash))
+                         "Expected: %r, got: %r") %
+                        (cert_fname, expected_hash, real_hash))
         else:
-            bundle_contents += slurp(ca_path) + "\n"
+            bundle_contents += slurp(cert_path) + "\n"
     bundle_filename = os.path.join(working_dir, "ca-bundle.crt")
     unslurp(bundle_filename, bundle_contents)
-    print "wrote ca bundle '%s'" % bundle_filename
+    print "Wrote CA cert bundle %r" % bundle_filename
 
     return bundle_filename
 
 
 def setup_koji_config_file():
     """Create the koji config file (if needed)."""
-    new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
-                                        KOJI_CONFIG_FILE)
+    new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
     if (not os.path.exists(new_koji_config_path) or
-            ask_yn("Koji configuration file '" +
-                   new_koji_config_path +
-                   "' already exists. Recreate it?")):
-        shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH),
-                    new_koji_config_path)
+            ask_yn("Koji configuration file '" + new_koji_config_path + "' already exists. Recreate it?")):
+        shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH), new_koji_config_path)
 
 
 def setup_koji_server_cert():
     """Create the koji server cert file (if needed)."""
-    new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
-                                        SERVER_CERT_FILE)
+    new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, SERVER_CERT_FILE)
     if (not os.path.exists(new_server_cert_path) or
-            ask_yn("Server cert file '" +
-                   new_server_cert_path +
-                   "' already exists. Recreate it?")):
+            ask_yn("Server cert file '" + new_server_cert_path + "' already exists. Recreate it?")):
         working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
         safe_make_backup(new_server_cert_path)
         shutil.copy(create_ca_bundle(working_dir), new_server_cert_path)
         shutil.rmtree(working_dir, ignore_errors=True)
     else:
-        print "not writing server cert file '%s'" % new_server_cert_path
+        print "Not writing server cert file %r" % new_server_cert_path
 
 
 def setup_koji_client_cert():
     """Create or copy the client cert file (if needed)."""
-    new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
-                                        CLIENT_CERT_FILE)
-    if (not os.path.exists(new_client_cert_path) or
-            ask_yn("Client cert file '" +
-                   new_client_cert_path +
-                   "' already exists. Recreate it?")):
-        success = False
+    new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
+    if (os.path.exists(new_client_cert_path) and
+            not ask_yn("Client cert file '" + new_client_cert_path + "' already exists. Recreate it?")):
 
-        if (os.path.exists(KOJI_USER_CONFIG_DIR) and
-                (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
-                not os.path.samefile(KOJI_USER_CONFIG_DIR,
-                                     OSG_KOJI_USER_CONFIG_DIR)) and
-                os.path.isfile(OLD_CLIENT_CERT_FILE)):
-            user_choice = ask_yn("Copy client cert from '" +
-                                 OLD_CLIENT_CERT_FILE +
-                                 "' ?")
-            if user_choice:
-                old_umask = os.umask(0077)
-                safe_make_backup(new_client_cert_path)
-                shutil.copy(OLD_CLIENT_CERT_FILE, new_client_cert_path)
-                os.umask(old_umask)
-                success = True
+        print "Not writing client cert file %r" % new_client_cert_path
+        return
+        
+    success = False
 
-        if not success and os.path.isdir(GLOBUS_DIR):
-            usercert = os.path.join(GLOBUS_DIR, "usercert.pem")
-            userkey = os.path.join(GLOBUS_DIR, "userkey.pem")
-            if os.path.isfile(usercert) and os.path.isfile(userkey):
-                old_umask = os.umask(0077)
-                safe_make_backup(new_client_cert_path)
-                os.system("cat '%s' '%s' > '%s'" %
-                    (usercert, userkey, new_client_cert_path))
-                os.umask(old_umask)
-                print ("'%s' written from '%s' and '%s'" %
-                    (new_client_cert_path, usercert, userkey))
-                success = True
+    if (os.path.exists(KOJI_USER_CONFIG_DIR) and
+            (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
+            not os.path.samefile(KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR)) and
+            os.path.isfile(OLD_CLIENT_CERT_FILE)):
+            
+        if ask_yn("Copy client cert from '" + OLD_CLIENT_CERT_FILE + "' ?"):
+            old_umask = os.umask(0077)
+            safe_make_backup(new_client_cert_path)
+            shutil.copy(OLD_CLIENT_CERT_FILE, new_client_cert_path)
+            os.umask(old_umask)
+            success = True
 
-        if not success:
-            print ("""
+    if not success and os.path.isdir(GLOBUS_DIR):
+        usercert = os.path.join(GLOBUS_DIR, "usercert.pem")
+        userkey = os.path.join(GLOBUS_DIR, "userkey.pem")
+        if os.path.isfile(usercert) and os.path.isfile(userkey):
+            old_umask = os.umask(0077)
+            safe_make_backup(new_client_cert_path)
+            os.system("cat %r %r > %r" % (usercert, userkey, new_client_cert_path))
+            os.umask(old_umask)
+            print ("%r written from %r and %r" % (new_client_cert_path, usercert, userkey))
+            success = True
+
+    if not success:
+        print ("""
 Could not find user key and cert in %s.
 You must manually copy your certs:
 
@@ -188,8 +217,6 @@ You must manually copy your certs:
 
 where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
 """ % (GLOBUS_DIR, new_client_cert_path, new_client_cert_path))
-    else:
-        print "not writing client cert file '%s'" % new_client_cert_path
     
 
 def run_setup():
@@ -199,29 +226,20 @@ def run_setup():
     setup_koji_client_cert()
 
     if (not os.path.exists(KOJI_USER_CONFIG_DIR) and
-            ask_yn("Create symlink %s -> %s ?" %
-                   (KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR))):
+            ask_yn("Create symlink %s -> %s ?" % (KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR))):
+        
         os.symlink(OSG_KOJI_USER_CONFIG_DIR, KOJI_USER_CONFIG_DIR)
         
 
 
-def osg_koji_extra_help():
-    return ("\n%s adds the following commands:\n"
-            "\t%-25s %s\n" %
-                (PROGRAM_NAME,
-                 "setup",
-                 "Initialize the configuration in " +
-                     OSG_KOJI_USER_CONFIG_DIR))
-
-
 def verify_koji_dir(config_dir):
-    for path, description in [
+    for path, descr in [
             (KOJI_CONFIG_FILE, "Koji configuration file"),
             (CLIENT_CERT_FILE, "User certificate file (client cert)"),
             (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
+            
         if not os.path.exists(os.path.join(config_dir, path)):
-            raise Error("%s (%s) not found in config directory (%s).\n%s" %
-                        (description, path, config_dir, RUN_SETUP_MSG))
+            raise Error("%s (%s) not found in config directory (%s).\n%s" % (descr, path, config_dir, RUN_SETUP_MSG))
 
 
 def main(argv=None):
@@ -230,10 +248,8 @@ def main(argv=None):
 
     # Kind of a hack
     if os.path.exists(CSL_KOJI_PATH):
-        os.environ['PATH'] = (os.path.join(CSL_KOJI_PATH, "cli") +
-                              os.pathsep + os.environ['PATH'])
-        os.environ['PYTHONPATH'] = (CSL_KOJI_PATH +
-                                    os.pathsep + os.environ['PYTHONPATH'])
+        os.environ['PATH'] = (os.path.join(CSL_KOJI_PATH, "cli") + os.pathsep + os.environ['PATH'])
+        os.environ['PYTHONPATH'] = (CSL_KOJI_PATH + os.pathsep + os.environ['PYTHONPATH'])
 
     try:
         if len(argv) > 1:
@@ -241,23 +257,20 @@ def main(argv=None):
                 run_setup()
             elif argv[1] == "help":
                 os.system("koji " + ' '.join(argv[1:]))
-                print osg_koji_extra_help()
+                print EXTRA_HELP
             else:
                 if os.path.exists(OSG_KOJI_USER_CONFIG_DIR):
                     config_dir = OSG_KOJI_USER_CONFIG_DIR
                 elif os.path.exists(KOJI_USER_CONFIG_DIR):
                     config_dir = KOJI_USER_CONFIG_DIR
                 else:
-                    raise Error("No koji config directory found.\n" +
-                                RUN_SETUP_MSG)
+                    raise Error("No koji config directory found.\n" + RUN_SETUP_MSG)
                 verify_koji_dir(config_dir)
-                args = ["--config=" + os.path.join(config_dir,
-                                                   KOJI_CONFIG_FILE),
-                        "--authtype=ssl"] + argv[1:]
+                args = ["--config=" + os.path.join(config_dir, KOJI_CONFIG_FILE), "--authtype=ssl"] + argv[1:]
                 os.execlp("koji", "koji", *args)
         else:
             os.system("koji")
-            print osg_koji_extra_help()
+            print EXTRA_HELP
     except SystemExit, e:
         return e.code
     except KeyboardInterrupt:

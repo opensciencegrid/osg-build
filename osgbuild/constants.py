@@ -33,7 +33,7 @@ CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.6.0"
 
 
 DEFAULT_BUILDOPTS_COMMON = {
-    'autoclean': False,
+    'autoclean': True,
     'cache_prefix': 'AUTO',
     'dry_run': False,
     'full_extract': False,
@@ -80,4 +80,6 @@ DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE = {
 }
 
 REDHAT_RELEASES = DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE.keys()
+
+BUGREPORT_EMAIL = "osg-software@opensciencegrid.org"
 

@@ -75,7 +75,7 @@ class MockError(Error):
 
 def type_of_error(err_object):
     if isinstance(err_object, Exception):
-        return re.sub(r"<type '([^']+)'>", r"\1", str(type(err_object)))
+        return str(err_object.__class__.__name__)
     else:
         return "Unknown"
 

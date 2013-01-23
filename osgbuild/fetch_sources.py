@@ -174,6 +174,8 @@ def fetch(package_dir,
     spec_filenames = glob.glob(spec_glob)
     if not spec_filenames:
         raise GlobNotFoundError(spec_glob)
+    if len(spec_filenames) > 1:
+        log.warning("Multiple spec files found; using %r", spec_filenames[0])
     
     return spec_filenames[0]
 # end of fetch

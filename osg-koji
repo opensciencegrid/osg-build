@@ -7,6 +7,8 @@ import sys
 import tempfile
 import urllib2
 
+from optparse import OptionParser
+
 from osgbuild.constants import (
     DATA_FILE_SEARCH_PATH,
     KOJI_USER_CONFIG_DIR,     # old koji config dir
@@ -20,6 +22,7 @@ from osgbuild.utils import (
     safe_makedirs,
     slurp,
     unslurp)
+
 
 
 # subject, openssl 0.9.8 hash, openssl 1.x hash
@@ -66,12 +69,35 @@ necessary files in %s.""" % (PROGRAM_NAME, OSG_KOJI_USER_CONFIG_DIR)
 EXTRA_HELP = """
 %s adds the following commands:
 	setup                     Initialize the configuration in %s
+                                  See "setup --help" for options.
 """ % (PROGRAM_NAME, OSG_KOJI_USER_CONFIG_DIR)
 
 
 class Error(Exception):
     """Base class for expected exceptions."""
     pass
+
+
+def setup_parse_args(args):
+    """Parse the arguments given on the command line for the setup command.
+    Return the 'options' object, containing the keyword arguments.
+    """
+    
+    parser = OptionParser("""%prog setup [options]""")
+    
+    parser.add_option(
+        "-u", "--usercert", "--user-cert", dest="user_cert", metavar="FILE",
+        default=os.path.join(GLOBUS_DIR, "usercert.pem"),
+        help="Path to user certificate file. Default: %default")
+    
+    parser.add_option(
+        "-k", "--userkey", "--user-key", dest="user_key", metavar="FILE",
+        default=os.path.join(GLOBUS_DIR, "userkey.pem"),
+        help="Path to user private key file. Default: %default")
+    
+    options = parser.parse_args(args)[0]
+
+    return options
 
 
 def get_openssl_version():
@@ -173,7 +199,7 @@ def setup_koji_server_cert():
         print "Not writing server cert file %r" % new_server_cert_path
 
 
-def setup_koji_client_cert():
+def setup_koji_client_cert(user_cert, user_key):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
     if (os.path.exists(new_client_cert_path) and
@@ -196,34 +222,32 @@ def setup_koji_client_cert():
             os.umask(old_umask)
             success = True
 
-    if not success and os.path.isdir(GLOBUS_DIR):
-        usercert = os.path.join(GLOBUS_DIR, "usercert.pem")
-        userkey = os.path.join(GLOBUS_DIR, "userkey.pem")
-        if os.path.isfile(usercert) and os.path.isfile(userkey):
+    if not success:
+        if os.path.isfile(user_cert) and os.path.isfile(user_key):
             old_umask = os.umask(0077)
             safe_make_backup(new_client_cert_path)
-            os.system("cat %r %r > %r" % (usercert, userkey, new_client_cert_path))
+            os.system("cat %r %r > %r" % (user_cert, user_key, new_client_cert_path))
             os.umask(old_umask)
-            print ("%r written from %r and %r" % (new_client_cert_path, usercert, userkey))
             success = True
+            print ("Created %r from %r and %r" % (new_client_cert_path, user_cert, user_key))
 
     if not success:
         print ("""
-Could not find user key and cert in %s.
+Could not find user key (%r) and/or cert (%r).
 You must manually copy your certs:
 
     cat usercert.pem userkey.pem > %s
     chmod 0600 %s
 
 where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
-""" % (GLOBUS_DIR, new_client_cert_path, new_client_cert_path))
+""" % (user_cert, user_key, new_client_cert_path, new_client_cert_path))
     
 
-def run_setup():
+def run_setup(user_cert, user_key):
     safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
     setup_koji_config_file()
     setup_koji_server_cert()
-    setup_koji_client_cert()
+    setup_koji_client_cert(user_cert, user_key)
 
     if (not os.path.exists(KOJI_USER_CONFIG_DIR) and
             ask_yn("Create symlink %s -> %s ?" % (KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR))):
@@ -254,7 +278,8 @@ def main(argv=None):
     try:
         if len(argv) > 1:
             if argv[1] == "setup":
-                run_setup()
+                options = setup_parse_args(argv[2:])
+                run_setup(options.user_cert, options.user_key)
             elif argv[1] == "help":
                 os.system("koji " + ' '.join(argv[1:]))
                 print EXTRA_HELP

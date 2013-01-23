@@ -1,7 +1,14 @@
 #!/usr/bin/python
 """A package promotion script for OSG"""
 # TODO: Implement --wiki
-# TODO: Do not attempt to promote if the build is already in the destination
+# TODO: Do not attempt to promote a build if the build is already in the destination
+# TODO This code needs rewriting to use less globals and be less brittle.
+#      mostly because the above two todo items, while they look trivial, and
+#      should be trivial, aren't.
+#      The mix of what's in the 'Promoter' class and what isn't is also
+#      inconsistent.
+
+
 
 import glob
 import re
@@ -52,8 +59,9 @@ def parse_cmdline_args(argv):
                       help="Promote only el6 packages.")
     parser.add_option("--ignore-rejects", dest="ignore_rejects", action="store_true", default=False,
                       help="Ignore rejections due to version mismatch between dvers or missing package for one dver")
-    parser.add_option("--output-format", "--of", default='old', type='choice', choices=['old', 'new', 'relnote', 'none'],
-                      help="Valid output formats are: old, new, relnote, none")
+    of_choices = ['old', 'prerelnote', 'relnote', 'none']
+    parser.add_option("--output-format", "--of", default='old', type='choice', choices=of_choices,
+                      help="Valid output formats are: " + ", ".join(of_choices))
     parser.add_option("--no-date", "--nodate", default=False, action="store_true",
                       help="Do not add the date to the wiki code")
     parser.add_option("--regen", default=False, action="store_true",
@@ -94,7 +102,6 @@ def parse_cmdline_args(argv):
 
 def get_latest_build(package, tag):
     """Return the NVR of the latest build of a package in a tag, or None"""
-    global ksession
     data = ksession.listTagged(tag, latest=True, package=package)
     if not data:
         return None
@@ -108,7 +115,6 @@ def get_latest_build(package, tag):
 
 
 def get_build_uri(build):
-    global ksession
     buildinfo = ksession.getBuild(build)
     return ("https://koji-hub.batlab.org/koji/buildinfo?buildID=%d" % int(buildinfo['id']))
 
@@ -124,25 +130,23 @@ def split_nvr(build):
 
 def get_tagged_builds(tag):
     """Return a list of NVRs of all builds in a tag"""
-    global ksession
     data = ksession.listTagged(tag)
     return [x['nvr'] for x in data]
     
 
 def get_tagged_builds_latest(tag):
     """Return a list of NVRs of the latest builds of each package in a tag"""
-    global ksession
     data = ksession.listTagged(tag, latest=True)
     return [x['nvr'] for x in data]
 
 
 def get_tagged_packages(tag):
     """Return all package names in a tag"""
-    global ksession
     data = ksession.listPackages(tagID=ksession.getTag(tag)['id'], inherited=True)
     return [x['package_name'] for x in data]
     
 
+# TODO This should not raise an exception
 def get_tag(pattern, dver=None):
     """Return the name of a koji tag matching 'pattern' for 'dver'.
     For example, get_tag('development', 'el5') returns 'el5-osg-development'
@@ -150,7 +154,6 @@ def get_tag(pattern, dver=None):
     Raise an Exception if no matching tag is found.
 
     """
-    global kwrap
     def get_first_tag(match, terms):
         try:
             return kwrap.search_names(terms, 'tag', match)[0]
@@ -174,11 +177,9 @@ def split_dver(build):
     
     """
     pattern = re.compile(r".(el\d)$")
-    removed = pattern.sub("", build)
+    nvr_no_dver = pattern.sub("", build)
     dver = pattern.search(build)
-    if dver:
-        dver = dver.group(1)
-    return (removed, dver)
+    return (nvr_no_dver, dver and dver.group(1) or "")
 
 
 def get_build_in_tag(tag, pkg_or_build):
@@ -188,9 +189,6 @@ def get_build_in_tag(tag, pkg_or_build):
     package. If pkg_or_build is a build, it is returned unchanged.
 
     """
-    global tagged_packages_cache
-    global tagged_builds_cache
-
     if (not tagged_packages_cache or tagged_packages_cache.get(tag) is None
             or not tagged_builds_cache or tagged_builds_cache.get(tag) is None):
         populate_caches(tag)
@@ -223,9 +221,6 @@ def get_builds(tag_base, pkg_or_build):
     In case of a rejection (or no matching packages found at all), an
     empty dict is returned.
     """
-    global dvers
-    global options
-
     builds = {}
     # Find each build for all dvers matching pkg_or_build
     for dver in dvers:
@@ -278,9 +273,6 @@ class Promoter(object):
         self.tag_pkg_args for each tag it should be added to.
         
         """
-        global dvers
-        global options
-
         builds = get_builds(self.from_tag_base, pkg_or_build)
         if not builds and not options.ignore_rejects:
             self.rejects.append(pkg_or_build)
@@ -306,10 +298,6 @@ class Promoter(object):
         Return a list of builds successfully promoted.
 
         """
-        global kwrap
-        global ksession
-        global options
-
         promoted_builds = {}
 
         printf("--- Tagging builds")
@@ -357,9 +345,6 @@ class Promoter(object):
 
 
 def write_twiki(builds):
-    global options
-    global dvers
-
     out = sys.stdout
     first = True
     if options.output_format == 'relnote':
@@ -370,22 +355,8 @@ def write_twiki(builds):
             for build_no_dver in sorted(builds):
                 build = builds[build_no_dver][dver]
                 out.write("   * [[%s][%s]]\n" % (get_build_uri(build), build))
-    elif options.output_format == 'new':
-        # New format (not used yet)
-        # | DATE | build-1-2.osg | el5 | el6 | |
-        for build_no_dver in sorted(builds):
-            if first and not options.no_date:
-                out.write("| %s |" % time.strftime("%Y-%m-%d"))
-                first = False
-            else:
-                out.write("||")
-            out.write(" %(build_no_dver)s |" % locals())
-            for dver in sorted(builds[build_no_dver]):
-                build = builds[build_no_dver][dver]
-                out.write(" [[%s][%s]]" % (get_build_uri(build), dver))
-            out.write(" | |\n")
-    elif options.output_format == 'old':
-        # Old (current) format
+    elif options.output_format == 'old' or options.output_format == 'prerelnote':
+        # Old (current) format, used in PreReleaseNotes
         # | DATE | build-1-2.osg (el5+el6) |
         for build_no_dver in sorted(builds):
             if first and not options.no_date:
@@ -403,32 +374,28 @@ def write_twiki(builds):
     elif options.output_format == 'none':
         pass
     else:
-        print "Unknown output format!"
+        # Sanity check, but optparse should have caught this already
+        print >> sys.stderr, "Unknown output format!"
 
         
-def init_koji_session(login):
-    "Connect to koji-hub"
+def init_koji_session(do_login):
+    "Connect to koji-hub. Authenticate if 'do_login' is True."
     global kwrap
     global ksession
 
     kwrap = kojiinter.KojiLibInter()
     kwrap.read_config_file()
-    kwrap.init_koji_session(login=login)
+    kwrap.init_koji_session(login=do_login)
     ksession = kwrap.kojisession
 
 
 def populate_caches(tag):
     "Fill up builds cache and packages cache for tag"
-    global tagged_builds_cache
-    global tagged_packages_cache
-
     tagged_builds_cache[tag] = get_tagged_builds(tag)
     tagged_packages_cache[tag] = [split_nvr(x)[0] for x in tagged_builds_cache[tag]]
 
 
 def main(argv=None):
-    global kwrap
-    global ksession
     global options
     global dvers
 

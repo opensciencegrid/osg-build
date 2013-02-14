@@ -83,11 +83,11 @@ class SRPMBuild(object):
             "rhel " + rhel,
             "dist ." + self.buildopts.get('distro_tag', 'osg.el' + rhel),
         ]
-        for rel in REDHAT_RELEASES:
-            if rel == rhel:
-                defines.append("el%s 1" % rel)
+        for dver in DVERS:
+            if dver == rhel:
+                defines.append("el%s 1" % dver)
             else:
-                defines.append("el%s 0" % rel)
+                defines.append("el%s 0" % dver)
         if rhel == '5':
             defines += [
                 "_source_filedigest_algorithm 1",

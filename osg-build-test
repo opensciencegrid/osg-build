@@ -386,14 +386,14 @@ class TestMisc(XTestCase):
         buildopts_el = dict()
         build_el = dict()
         defines_el = dict()
-        for rhel in ['5', '6']:
-            buildopts_el[rhel] = DEFAULT_BUILDOPTS_COMMON.copy()
-            buildopts_el[rhel]['redhat_release'] = rhel
-            buildopts_el[rhel].update(DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE[rhel])
-            build_el[rhel] = srpm.SRPMBuild(".", buildopts_el[rhel], None, None)
-            defines_el[rhel] = build_el[rhel].get_rpmbuild_defines(True)
-            self.assertTrue("--define=rhel %s" % rhel in defines_el[rhel],
-                            "%%rhel not set correctly for el%s build" % rhel)
+        for dver in ['5', '6']:
+            buildopts_el[dver] = DEFAULT_BUILDOPTS_COMMON.copy()
+            buildopts_el[dver]['redhat_release'] = dver
+            buildopts_el[dver].update(DEFAULT_BUILDOPTS_BY_DVER[dver])
+            build_el[dver] = srpm.SRPMBuild(".", buildopts_el[dver], None, None)
+            defines_el[dver] = build_el[dver].get_rpmbuild_defines(True)
+            self.assertTrue("--define=rhel %s" % dver in defines_el[dver],
+                            "%%rhel not set correctly for el%s build" % dver)
 
         self.assertTrue('--define=el5 1' in defines_el['5'],
                         "%el5 not set for el5 build")

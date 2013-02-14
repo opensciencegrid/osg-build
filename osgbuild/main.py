@@ -375,6 +375,11 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "--no-svn", "--nosvn", action="store_false", dest="svn",
         help="Do not build package directly from SVN "
         "(default for scratch builds)")
+    koji_group.add_option(
+        "--upcoming", action="callback",
+        callback=parser_targetopts_callback,
+        type=None,
+        help="Target build for the 'upcoming' osg repos.")
 
     for grp in [prebuild_group, rpmbuild_mock_group, mock_group, koji_group]:
         parser.add_option_group(grp)
@@ -437,11 +442,16 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
         for dver in targetopts_by_dver:
             targetopts_by_dver[dver]['koji_tag'] = 'TARGET'
         return
+    elif opt_str == '--upcoming': # Also HACK
+        for dver in DVERS:
+            targetopts_by_dver[dver] = DEFAULT_BUILDOPTS_BY_DVER[dver].copy()
+            targetopts_by_dver[dver]['koji_target'] = 'el%s-osg-upcoming' % dver
+        return
     else:
         dver = get_dver_from_string(value)
 
     if not dver:
-        raise OptionValueError('Unable to determine redhat release in parameter %s: %s' % (opt_str, value))
+        raise OptionValueError('Unable to determine redhat release in parameter %r: %r' % (opt_str, value))
 
     targetopts_by_dver.setdefault(dver, DEFAULT_BUILDOPTS_BY_DVER[dver].copy())
 

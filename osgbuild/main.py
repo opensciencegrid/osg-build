@@ -153,7 +153,7 @@ def init(argv):
     """Initialization. Get build options and packages.
 
     """
-    options, args, optnames = parse_cmdline_args(argv)
+    options, args = parse_cmdline_args(argv)
 
     if options.version:
         print_version_and_exit()
@@ -163,7 +163,7 @@ def init(argv):
         set_loglevel(options.loglevel)
 
     task = get_task(args)
-    buildopts = get_buildopts(options, optnames, task)
+    buildopts = get_buildopts(options, task)
     set_loglevel(buildopts.get('loglevel', 'INFO'))
 
     if len(args) < 2:
@@ -193,7 +193,6 @@ def parse_cmdline_args(argv):
     """Parse the arguments given on the command line. Return a tuple containing
     options:    the options object, containing the keyword arguments
     args:       a list containing the positional arguments left over
-    optnames:   a list of the option names (valid attributes of 'options')
 
     """
     parser = OptionParser("""
@@ -377,15 +376,12 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         help="Do not build package directly from SVN "
         "(default for scratch builds)")
 
-    optnames = [x.dest for x in parser.option_list if x.dest is not None]
     for grp in [prebuild_group, rpmbuild_mock_group, mock_group, koji_group]:
         parser.add_option_group(grp)
-        optnames.extend([x.dest for x in grp.option_list if x.dest is not None])
-    optnames = set(optnames)
 
     options, args = parser.parse_args(argv[1:])
 
-    return (options, args, optnames)
+    return (options, args)
 # end of parse_cmdline_args()
 
 
@@ -487,11 +483,22 @@ def get_task(args):
 # end of get_task()
 
 
-def get_buildopts(options, optnames, task):
+def get_buildopts(options, task):
     """Return a dict of the build options to use, based on the config file and
     command-line arguments.
 
+    The format of the config file is simple: there's one section, [options],
+    and the canonical name of every command-line argument can be used as an
+    option.
+
+    This has two implications: first, you should be able to override any option
+    with a subsequent option. Second, I can't set a 'default' value for any of
+    the options in the OptionParser object, because I need to distinguish
+    between the option not having been specified, and the option explicitly
+    being the default.
+
     """
+
     # Hack: if the task is "allbuild", use a different set of
     # defaults, ignore the config file, and most options.
     if task == 'allbuild':
@@ -509,7 +516,7 @@ def get_buildopts(options, optnames, task):
     buildopts.update(cfg_items)
 
     # Overrides from command line
-    for optname in optnames:
+    for optname in options.__dict__.keys():
         optval = getattr(options, optname, None)
         if optval is not None:
             buildopts[optname] = optval

@@ -359,6 +359,15 @@ class TestKoji(XTestCase):
         self.assertTrue(
             regex_in_list(r".*kojisession.build\([^,]+?, 'el[56]-osg', " + re.escape("{'scratch': True}") + ", None\)", out_list))
 
+    def test_koji_lib_upcoming(self):
+        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el5-osg-upcoming'", out_list))
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el6-osg-upcoming'", out_list))
+
+
+
+
 class TestKojiLong(XTestCase):
     def setUp(self):
         self.pkg_dir = common_setUp(opj(TRUNK, "koji"),

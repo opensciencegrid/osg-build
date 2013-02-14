@@ -64,7 +64,7 @@ ALLBUILD_BUILDOPTS.update({
 ALLBUILD_ALLOWED_OPTNAMES = [
     'koji_backend', 'kojilogin', 'koji_wrapper', 'no_wait', 'scratch']
 
-DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE = {
+DEFAULT_BUILDOPTS_BY_DVER = {
     '5': {
         'distro_tag': 'osg.el5',
         'koji_tag': 'el5-osg',
@@ -79,7 +79,7 @@ DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE = {
     }
 }
 
-REDHAT_RELEASES = DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE.keys()
+DVERS = DEFAULT_BUILDOPTS_BY_DVER.keys()
 
 BUGREPORT_EMAIL = "osg-software@opensciencegrid.org"
 

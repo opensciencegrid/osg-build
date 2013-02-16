@@ -2,7 +2,7 @@
 import re
 import os
 
-from osgbuild.constants import SVN_ROOT
+from osgbuild.constants import SVN_ROOT, SVN_TRUNK_PATH, SVN_UPCOMING_PATH
 from osgbuild.error import Error, SVNError, UsageError
 from osgbuild import utils
 
@@ -80,6 +80,31 @@ def verify_package_info(package_info):
     return False
 
         
+def verify_correct_branch(package_dir, buildopts):
+    """Check that the user is not trying to build from trunk into upcoming, or
+    vice versa.
+
+    """
+    package_info = get_package_info(package_dir)
+    url = package_info['canon_url']
+    for dver in buildopts['enabled_dvers']:
+        if buildopts['targetopts_by_dver'][dver]['koji_target'].endswith('osg-upcoming'):
+            if re.search(SVN_TRUNK_PATH, url):
+                raise Error("""\
+Error: Incorrect branch for koji build
+Not allowed to build into the upcoming targets from
+trunk (SVN/%s)!  Either move the package dir into the
+upcoming area (SVN/%s) or a separate branch, or do not build
+it for the upcoming targets (i.e. do not pass the --upcoming,
+or the --koji-target el5-osg-upcoming or el6-osg-upcoming flags).""" % (SVN_TRUNK_PATH, SVN_UPCOMING_PATH))
+        else:
+            if re.search(SVN_UPCOMING_PATH, url):
+                raise Error("""\
+Error: Incorrect branch for koji build
+Only allowed to build packages from the upcoming area (SVN/%s)
+into the upcoming targets.  Either move the package dir
+into trunk (SVN/%s) or a separate branch, or pass the
+--upcoming flag.""" % (SVN_UPCOMING_PATH, SVN_TRUNK_PATH))
 
 
 

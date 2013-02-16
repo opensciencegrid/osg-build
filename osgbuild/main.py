@@ -60,6 +60,7 @@ def main(argv):
             if not svn.verify_working_dir(pkg):
                 print "Exiting"
                 return 1
+            svn.verify_correct_branch(pkg, buildopts)
     else:
         # verify package dirs
         for pkg in package_dirs:

@@ -1,4 +1,4 @@
-VERSION = 1.2.4
+VERSION = 1.2.5
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osgbuild
@@ -65,6 +65,10 @@ release: dist
 test:
 	pylint -E osg-build osg-build-test osg-promote osg-koji $(PYDIR)/*.py
 	python osg-build-test -v TestSuiteAll
+
+shorttest:
+	pylint -E osg-build osg-build-test osg-promote osg-koji $(PYDIR)/*.py
+	python osg-build-test -v TestSuiteShort
 
 lint:
 	-pylint --rcfile=pylintrc osg-build osg-build-test osg-promote osg-koji $(PYDIR)/*.py

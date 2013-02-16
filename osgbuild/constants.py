@@ -29,6 +29,8 @@ DATA_FILE_SEARCH_PATH = [sys.path[0],
                          DATA_DIR]
 
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
+SVN_TRUNK_PATH = "native/redhat/trunk"
+SVN_UPCOMING_PATH = "native/redhat/upcoming"
 CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.6.0"
 
 

@@ -91,10 +91,9 @@ def main(argv):
                 svn.koji(pkg, kojiinter.KojiInter(dver_buildopts), dver_buildopts)
 
         else:
-            targetopts_by_dver = buildopts['targetopts_by_dver']
-            for dver in targetopts_by_dver:
+            for dver in buildopts['enabled_dvers']:
                 dver_buildopts = buildopts.copy()
-                dver_buildopts.update(targetopts_by_dver[dver])
+                dver_buildopts.update(buildopts['targetopts_by_dver'][dver])
 
                 mock_obj = None
                 koji_obj = None
@@ -410,11 +409,13 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
     targetopts_by_dver['5']['koji_tag'] is the koji tag to use when building
     for EL 5.
 
-    Figure out the redhat release that an option is meant for from the
-    value, and set that option in the dict for that redhat release.
+    enabled_dvers is the set of dvers to actually build for, which the --el5,
+    --el6 and --redhat-release arguments affect. dvers may also be
+    implicitly turned on by other arguments, e.g. specifying
+    --koji-tag=el5-foobar will implicitly turn on el5 builds.
 
     Also handle --ktt (--koji-tag-and-target), which sets both koji_tag
-    and koji_target.
+    and koji_target, and --upcoming, which sets the target for both dvers.
 
     """
     # for options that have aliases, option.dest gives us the
@@ -426,42 +427,51 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
     # because parser.values is None until we actually run parser.parse_args().
     if not getattr(parser.values, 'targetopts_by_dver', None):
         parser.values.targetopts_by_dver = dict()
+        for dver in DVERS:
+            parser.values.targetopts_by_dver[dver] = DEFAULT_BUILDOPTS_BY_DVER[dver].copy()
     targetopts_by_dver = parser.values.targetopts_by_dver
+
+    # We also have enabled_dvers for determining which dvers to build for.
+    if not getattr(parser.values, 'enabled_dvers', None):
+        parser.values.enabled_dvers = set()
+    enabled_dvers = parser.values.enabled_dvers
 
     dver = None
     if value is None:
         value = ''
     if opt_name == 'redhat_release':
         if opt_str == '--el5':
-            dver = '5'
+            enabled_dvers.add('5')
         elif opt_str == '--el6':
-            dver = '6'
+            enabled_dvers.add('6')
         elif opt_str == '--redhat-release':
-            dver = value
+            if value in DVERS:
+                enabled_dvers.add(value)
+            else:
+                raise OptionValueError("Invalid redhat release value: %r" % value)
     elif opt_name == 'koji_tag' and value == 'TARGET': # HACK
         for dver in targetopts_by_dver:
             targetopts_by_dver[dver]['koji_tag'] = 'TARGET'
-        return
     elif opt_str == '--upcoming': # Also HACK
         for dver in DVERS:
-            targetopts_by_dver[dver] = DEFAULT_BUILDOPTS_BY_DVER[dver].copy()
             targetopts_by_dver[dver]['koji_target'] = 'el%s-osg-upcoming' % dver
-        return
     else:
         dver = get_dver_from_string(value)
 
-    if not dver:
-        raise OptionValueError('Unable to determine redhat release in parameter %r: %r' % (opt_str, value))
+        if not dver:
+            raise OptionValueError('Unable to determine redhat release in parameter %r: %r' % (opt_str, value))
 
-    targetopts_by_dver.setdefault(dver, DEFAULT_BUILDOPTS_BY_DVER[dver].copy())
+        if dver not in enabled_dvers:
+            enabled_dvers.add(dver)
+            print "Implicitly enabled building for el%s due to %r argument %r" % (dver, opt_str, value)
 
-    if opt_name == 'ktt':
-        targetopts_by_dver[dver]['koji_tag'] = value
-        targetopts_by_dver[dver]['koji_target'] = value
-    elif opt_name != 'redhat_release':
-        targetopts_by_dver[dver][opt_name] = value
-    if not verify_release_in_targetopts_by_dver(targetopts_by_dver[dver]):
-        raise OptionValueError('Inconsistent redhat release in parameter %s: %s' % (opt_str, value))
+        if opt_name == 'ktt':
+            targetopts_by_dver[dver]['koji_tag'] = value
+            targetopts_by_dver[dver]['koji_target'] = value
+        else:
+            targetopts_by_dver[dver][opt_name] = value
+        if not verify_release_in_targetopts_by_dver(targetopts_by_dver[dver]):
+            raise OptionValueError('Inconsistent redhat release in parameter %s: %s' % (opt_str, value))
 # end of parser_targetopts_callback()
     
 
@@ -547,16 +557,21 @@ def get_buildopts(options, task):
         else:
             buildopts['cache_prefix'] = WEB_CACHE_PREFIX
 
-    # TODO lots of hacks here
-    targetopts_by_dver = getattr(options, 'targetopts_by_dver', None)
-    if not targetopts_by_dver:
+    # If nothing has set targetopts_by_dver, set it here
+    if not buildopts.get('targetopts_by_dver', None):
+        buildopts['targetopts_by_dver'] = dict()
+        for dver in DVERS:
+            buildopts['targetopts_by_dver'][dver] = DEFAULT_BUILDOPTS_BY_DVER[dver].copy()
+
+    # Which distro versions are we building for? If not specified on the
+    # command line, either build for all (koji) or the dver of the local machine
+    # (others)
+    enabled_dvers = getattr(options, 'enabled_dvers', None)
+    if not enabled_dvers:
         if task == 'koji':
-            buildopts['targetopts_by_dver'] = (DEFAULT_BUILDOPTS_BY_DVER.copy())
+            buildopts['enabled_dvers'] = set(DVERS)
         else:
-            dver = get_local_machine_dver()
-            buildopts['targetopts_by_dver'] = {dver: DEFAULT_BUILDOPTS_BY_DVER[dver].copy()}
-    else:
-        buildopts['targetopts_by_dver'] = targetopts_by_dver
+            buildopts['enabled_dvers'] = set([get_local_machine_dver()])
 
     # Hack: make --mock-config on command line override
     # --mock-config-from-koji from config file

@@ -98,11 +98,14 @@ def main(argv):
 
                 mock_obj = None
                 koji_obj = None
-                if (task == 'koji' or
-                        (task == 'mock' and
-                         dver_buildopts['mock_config_from_koji'])):
+                if task == 'koji':
                     koji_obj = kojiinter.KojiInter(dver_buildopts)
                 if task == 'mock':
+                    if dver_buildopts['mock_config_from_koji']:
+                        # HACK: We don't want to log in to koji just to get a mock config
+                        dver_buildopts_ = dver_buildopts.copy()
+                        dver_buildopts_['dry_run'] = True
+                        koji_obj = kojiinter.KojiInter(dver_buildopts_)
                     mock_obj = mock.Mock(dver_buildopts, koji_obj)
                 
                 if buildopts['svn'] and task == 'koji':

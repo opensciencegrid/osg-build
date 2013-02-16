@@ -50,6 +50,9 @@ def main(argv):
     koji_obj = None
     mock_obj = None
 
+    if task == 'allbuild':
+        log.warning("The 'allbuild' task is deprecated. The 'koji' task now "
+                    "builds on all supported distro versions by default.")
     # checks
     if task == 'allbuild' or (task == 'koji' and buildopts['svn']):
         # verify svn working dirs
@@ -57,6 +60,7 @@ def main(argv):
             if not svn.verify_working_dir(pkg):
                 print "Exiting"
                 return 1
+            svn.verify_correct_branch(pkg, buildopts)
     else:
         # verify package dirs
         for pkg in package_dirs:
@@ -68,9 +72,8 @@ def main(argv):
                     " isn't a package directory "
                     "(must have either osg/ or upstream/ dirs or both)")
 
-    if (task == 'koji' and not buildopts['scratch'] and
-            not buildopts['svn']):
-        log.warning("Non-scratch Koji builds should be from SVN!")
+    if (task == 'koji' and not buildopts['scratch'] and not buildopts['svn']):
+        raise UsageError("Non-scratch Koji builds must be from SVN!")
 
     # main loop 
     # HACK
@@ -80,36 +83,33 @@ def main(argv):
         if task == 'allbuild':
             # allbuild is special--we ignore most options and use
             # a slightly different set of defaults.
-            for rel in REDHAT_RELEASES:
-                rel_buildopts = buildopts.copy()
-                rel_buildopts.update(
-                    DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE[rel])
+            for dver in DVERS:
+                dver_buildopts = buildopts.copy()
+                dver_buildopts.update(DEFAULT_BUILDOPTS_BY_DVER[dver])
                 for key in ALLBUILD_ALLOWED_OPTNAMES:
-                    rel_buildopts[key] = buildopts[key]
+                    dver_buildopts[key] = buildopts[key]
 
-                svn.koji(pkg, kojiinter.KojiInter(rel_buildopts),
-                         rel_buildopts)
+                svn.koji(pkg, kojiinter.KojiInter(dver_buildopts), dver_buildopts)
 
         else:
-            targetparams = buildopts['targetparams']
-            for rel in targetparams:
-                rel_buildopts = buildopts.copy()
-                rel_buildopts.update(targetparams[rel])
+            for dver in buildopts['enabled_dvers']:
+                dver_buildopts = buildopts.copy()
+                dver_buildopts.update(buildopts['targetopts_by_dver'][dver])
 
                 mock_obj = None
                 koji_obj = None
                 if (task == 'koji' or
                         (task == 'mock' and
-                         rel_buildopts['mock_config_from_koji'])):
-                    koji_obj = kojiinter.KojiInter(rel_buildopts)
+                         dver_buildopts['mock_config_from_koji'])):
+                    koji_obj = kojiinter.KojiInter(dver_buildopts)
                 if task == 'mock':
-                    mock_obj = mock.Mock(rel_buildopts, koji_obj)
+                    mock_obj = mock.Mock(dver_buildopts, koji_obj)
                 
                 if buildopts['svn'] and task == 'koji':
-                    task_ids.append(svn.koji(pkg, koji_obj, rel_buildopts))
+                    task_ids.append(svn.koji(pkg, koji_obj, dver_buildopts))
                 else:
                     builder = srpm.SRPMBuild(pkg,
-                                             rel_buildopts,
+                                             dver_buildopts,
                                              mock_obj=mock_obj,
                                              koji_obj=koji_obj)
                     builder.maybe_autoclean()
@@ -153,7 +153,7 @@ def init(argv):
     """Initialization. Get build options and packages.
 
     """
-    options, args, optnames = parse_cmdline_args(argv)
+    options, args = parse_cmdline_args(argv)
 
     if options.version:
         print_version_and_exit()
@@ -163,7 +163,7 @@ def init(argv):
         set_loglevel(options.loglevel)
 
     task = get_task(args)
-    buildopts = get_buildopts(options, optnames, task)
+    buildopts = get_buildopts(options, task)
     set_loglevel(buildopts.get('loglevel', 'INFO'))
 
     if len(args) < 2:
@@ -193,7 +193,6 @@ def parse_cmdline_args(argv):
     """Parse the arguments given on the command line. Return a tuple containing
     options:    the options object, containing the keyword arguments
     args:       a list containing the positional arguments left over
-    optnames:   a list of the option names (valid attributes of 'options')
 
     """
     parser = OptionParser("""
@@ -201,7 +200,7 @@ def parse_cmdline_args(argv):
 
 Valid tasks are:
 allbuild     Build out of SVN using koji for all supported platforms into the
-             default tags/targets for each platform
+             default tags/targets for each platform (deprecated)
 koji         Build using koji
 lint         Discover potential package problems using rpmlint
 mock         Build using mock(1) on the local machine
@@ -229,12 +228,12 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "-C", "--config-file",
         help="The file to get configuration for this script.")
     parser.add_option(
-        "--el5", action="callback", callback=parser_targetparams_callback,
+        "--el5", action="callback", callback=parser_targetopts_callback,
         type=None,
         dest="redhat_release",
         help="Build for RHEL 5-compatible. Equivalent to --redhat-release=5")
     parser.add_option(
-        "--el6", action="callback", callback=parser_targetparams_callback,
+        "--el6", action="callback", callback=parser_targetopts_callback,
         type=None,
         dest="redhat_release",
         help="Build for RHEL 6-compatible. Equivalent to --redhat-release=6")
@@ -247,7 +246,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         help="Display less information. Equivalent to --loglevel=warning")
     parser.add_option(
         "--redhat-release", action="callback",
-        callback=parser_targetparams_callback,
+        callback=parser_targetopts_callback,
         dest="redhat_release",
         type="string",
         help="The version of the distribution to build the package for. "
@@ -306,6 +305,9 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "--dry-run", action="store_true",
         help="Do not invoke koji, only show what would be done.")
     koji_group.add_option(
+        "--getfiles", "--get-files", action="store_true", dest="getfiles",
+        help="Download finished products and logfiles")
+    koji_group.add_option(
         "--koji-backend", dest="koji_backend",
         help="The back end to use for invoking koji. Valid values are: "
         "'shell', 'kojilib'. If not specified, will try to use kojilib and use "
@@ -317,14 +319,14 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     koji_group.add_option(
         "--koji-target",
         action="callback",
-        callback=parser_targetparams_callback,
+        callback=parser_targetopts_callback,
         type="string",
         help="The koji target to use for building. Default: "
         "el5-osg or el6-osg depending on --redhat-release")
     koji_group.add_option(
         "--koji-tag",
         action="callback",
-        callback=parser_targetparams_callback,
+        callback=parser_targetopts_callback,
         type="string",
         help="The koji tag to add packages to. The special value TARGET "
         "uses the destination tag defined in the koji target. Default: "
@@ -332,7 +334,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     koji_group.add_option(
         "--koji-target-and-tag", "--ktt",
         action="callback",
-        callback=parser_targetparams_callback,
+        callback=parser_targetopts_callback,
         type="string",
         dest="ktt",
         metavar='ARG',
@@ -341,10 +343,12 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         " --koji-tag ARG'.")
     koji_group.add_option(
         "--koji-wrapper", action="store_true", dest="koji_wrapper",
-        help="Use the 'osg-koji' koji wrapper. (Default)")
+        help="Use the 'osg-koji' koji wrapper if using the 'shell' backend. "
+        "(Default)")
     koji_group.add_option(
         "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
-        help="Do not use the 'osg-koji' koji wrapper, even if found.")
+        help="Do not use the 'osg-koji' koji wrapper if using the 'shell' "
+        "backend, even if found.")
     koji_group.add_option(
         "--no-wait", "--nowait", action="store_true", dest="no_wait",
         help="Do not wait for the build to finish")
@@ -372,22 +376,21 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         help="Do not build package directly from SVN "
         "(default for scratch builds)")
     koji_group.add_option(
-        "--getfiles", "--get-files", action="store_true", dest="getfiles",
-        help="Download finished products and logfiles")
+        "--upcoming", action="callback",
+        callback=parser_targetopts_callback,
+        type=None,
+        help="Target build for the 'upcoming' osg repos.")
 
-    optnames = [x.dest for x in parser.option_list if x.dest is not None]
     for grp in [prebuild_group, rpmbuild_mock_group, mock_group, koji_group]:
         parser.add_option_group(grp)
-        optnames.extend([x.dest for x in grp.option_list if x.dest is not None])
-    optnames = set(optnames)
 
     options, args = parser.parse_args(argv[1:])
 
-    return (options, args, optnames)
+    return (options, args)
 # end of parse_cmdline_args()
 
 
-def get_el_release_from_string(s):
+def get_dver_from_string(s):
     """Get the EL major version from a string containing it.
     Return None if not found."""
     match = re.search(r'\bel(\d+)\b', s)
@@ -397,19 +400,23 @@ def get_el_release_from_string(s):
         return None
 
 
-def parser_targetparams_callback(option, opt_str, value, parser, *args,
-                                **kwargs):
-    """Handle options in the 'targetparams' set, such as --koji-tag,
-    --redhat-release, etc. targetparams is a dict keyed by redhat release
-    and the values are dicts containing the options to use for building
-    with that release. For example, targetparams['5']['koji_tag'] is the
-    koji tag to use when building for RHEL 5.
+def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
+    """Handle options in the 'targetopts_by_dver' set, such as --koji-tag,
+    --redhat-release, etc.
+    
+    targetopts_by_dver is a dict keyed by redhat release (aka 'distro
+    version' or 'dver' for short) The values of targetopts_by_dver are dicts
+    containing the options to use for building with that dver. For example,
+    targetopts_by_dver['5']['koji_tag'] is the koji tag to use when building
+    for EL 5.
 
-    Figure out the redhat release that an option is meant for from the
-    value, and set that option in the dict for that redhat release.
+    enabled_dvers is the set of dvers to actually build for, which the --el5,
+    --el6 and --redhat-release arguments affect. dvers may also be
+    implicitly turned on by other arguments, e.g. specifying
+    --koji-tag=el5-foobar will implicitly turn on el5 builds.
 
     Also handle --ktt (--koji-tag-and-target), which sets both koji_tag
-    and koji_target.
+    and koji_target, and --upcoming, which sets the target for both dvers.
 
     """
     # for options that have aliases, option.dest gives us the
@@ -417,41 +424,56 @@ def parser_targetparams_callback(option, opt_str, value, parser, *args,
     # what the user typed in)
     opt_name = option.dest
 
-    if not getattr(parser.values, 'targetparams', None):
-        parser.values.targetparams = dict()
-    targetparams = parser.values.targetparams
-    rel = None
-    if value is None: value = ''
+    # We create parser.values.targetopts_by_dver here instead of ahead of time
+    # because parser.values is None until we actually run parser.parse_args().
+    if not getattr(parser.values, 'targetopts_by_dver', None):
+        parser.values.targetopts_by_dver = dict()
+        for dver in DVERS:
+            parser.values.targetopts_by_dver[dver] = DEFAULT_BUILDOPTS_BY_DVER[dver].copy()
+    targetopts_by_dver = parser.values.targetopts_by_dver
+
+    # We also have enabled_dvers for determining which dvers to build for.
+    if not getattr(parser.values, 'enabled_dvers', None):
+        parser.values.enabled_dvers = set()
+    enabled_dvers = parser.values.enabled_dvers
+
+    dver = None
+    if value is None:
+        value = ''
     if opt_name == 'redhat_release':
         if opt_str == '--el5':
-            rel = '5'
+            enabled_dvers.add('5')
         elif opt_str == '--el6':
-            rel = '6'
+            enabled_dvers.add('6')
         elif opt_str == '--redhat-release':
-            rel = value
+            if value in DVERS:
+                enabled_dvers.add(value)
+            else:
+                raise OptionValueError("Invalid redhat release value: %r" % value)
     elif opt_name == 'koji_tag' and value == 'TARGET': # HACK
-        for rel in targetparams:
-            targetparams[rel]['koji_tag'] = 'TARGET'
-        return
+        for dver in targetopts_by_dver:
+            targetopts_by_dver[dver]['koji_tag'] = 'TARGET'
+    elif opt_str == '--upcoming': # Also HACK
+        for dver in DVERS:
+            targetopts_by_dver[dver]['koji_target'] = 'el%s-osg-upcoming' % dver
     else:
-        rel = get_el_release_from_string(value)
+        dver = get_dver_from_string(value)
 
-    if not rel:
-        raise OptionValueError('Unable to determine redhat release '
-                               'in parameter %s: %s' % (opt_str, value))
+        if not dver:
+            raise OptionValueError('Unable to determine redhat release in parameter %r: %r' % (opt_str, value))
 
-    targetparams.setdefault(rel,
-        DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE[rel].copy())
+        if dver not in enabled_dvers:
+            enabled_dvers.add(dver)
+            print "Implicitly enabled building for el%s due to %r argument %r" % (dver, opt_str, value)
 
-    if opt_name == 'ktt':
-        targetparams[rel]['koji_tag'] = value
-        targetparams[rel]['koji_target'] = value
-    elif opt_name != 'redhat_release':
-        targetparams[rel][opt_name] = value
-    if not verify_release_in_targetparams(targetparams[rel]):
-        raise OptionValueError('Inconsistent redhat release '
-                               'in parameter %s: %s' % (opt_str, value))
-# end of parser_targetparams_callback()
+        if opt_name == 'ktt':
+            targetopts_by_dver[dver]['koji_tag'] = value
+            targetopts_by_dver[dver]['koji_target'] = value
+        else:
+            targetopts_by_dver[dver][opt_name] = value
+        if not verify_release_in_targetopts_by_dver(targetopts_by_dver[dver]):
+            raise OptionValueError('Inconsistent redhat release in parameter %s: %s' % (opt_str, value))
+# end of parser_targetopts_callback()
     
 
 
@@ -472,8 +494,7 @@ def get_task(args):
     matching_tasks = [x for x in valid_tasks if x.startswith(task)]
 
     if len(matching_tasks) > 1:
-        raise UsageError('Ambiguous task. Matching tasks are:' +
-                         ", ".join(matching_tasks))
+        raise UsageError('Ambiguous task. Matching tasks are:' + ", ".join(matching_tasks))
     elif not matching_tasks:
         raise UsageError('No valid task')
     else:
@@ -483,11 +504,22 @@ def get_task(args):
 # end of get_task()
 
 
-def get_buildopts(options, optnames, task):
+def get_buildopts(options, task):
     """Return a dict of the build options to use, based on the config file and
     command-line arguments.
 
+    The format of the config file is simple: there's one section, [options],
+    and the canonical name of every command-line argument can be used as an
+    option.
+
+    This has two implications: first, you should be able to override any option
+    with a subsequent option. Second, I can't set a 'default' value for any of
+    the options in the OptionParser object, because I need to distinguish
+    between the option not having been specified, and the option explicitly
+    being the default.
+
     """
+
     # Hack: if the task is "allbuild", use a different set of
     # defaults, ignore the config file, and most options.
     if task == 'allbuild':
@@ -505,17 +537,15 @@ def get_buildopts(options, optnames, task):
     buildopts.update(cfg_items)
 
     # Overrides from command line
-    for optname in optnames:
+    for optname in options.__dict__.keys():
         optval = getattr(options, optname, None)
         if optval is not None:
             buildopts[optname] = optval
 
     # Special case for working_directory being TEMP
     if buildopts['working_directory'].upper() == 'TEMP':
-        buildopts['working_directory'] = (
-            tempfile.mkdtemp(prefix='osg-build-'))
-        log.debug('Working directory is %s',
-                  buildopts['working_directory'])
+        buildopts['working_directory'] = (tempfile.mkdtemp(prefix='osg-build-'))
+        log.debug('Working directory is %s', buildopts['working_directory'])
 
     # Special case for cache_prefix being AFS or VDT
     if buildopts['cache_prefix'].upper() == 'AFS':
@@ -528,18 +558,21 @@ def get_buildopts(options, optnames, task):
         else:
             buildopts['cache_prefix'] = WEB_CACHE_PREFIX
 
-    # TODO lots of hacks here
-    targetparams = getattr(options, 'targetparams', None)
-    if not targetparams:
+    # If nothing has set targetopts_by_dver, set it here
+    if not buildopts.get('targetopts_by_dver', None):
+        buildopts['targetopts_by_dver'] = dict()
+        for dver in DVERS:
+            buildopts['targetopts_by_dver'][dver] = DEFAULT_BUILDOPTS_BY_DVER[dver].copy()
+
+    # Which distro versions are we building for? If not specified on the
+    # command line, either build for all (koji) or the dver of the local machine
+    # (others)
+    enabled_dvers = getattr(options, 'enabled_dvers', None)
+    if not enabled_dvers:
         if task == 'koji':
-            buildopts['targetparams'] = (
-                DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE.copy())
+            buildopts['enabled_dvers'] = set(DVERS)
         else:
-            rh_rel = get_local_machine_rh_rel()
-            buildopts['targetparams'] = {
-                rh_rel: DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE[rh_rel].copy()}
-    else:
-        buildopts['targetparams'] = targetparams
+            buildopts['enabled_dvers'] = set([get_local_machine_dver()])
 
     # Hack: make --mock-config on command line override
     # --mock-config-from-koji from config file
@@ -572,8 +605,7 @@ def read_config_file(given_cfg_file=None):
         if os.path.exists(DEFAULT_CONFIG_FILE):
             cfg_file = DEFAULT_CONFIG_FILE
         else:
-            log.debug("Didn't find default config at %s",
-                      DEFAULT_CONFIG_FILE)
+            log.debug("Didn't find default config at %s", DEFAULT_CONFIG_FILE)
             if os.path.exists(ALT_DEFAULT_CONFIG_FILE):
                 cfg_file = ALT_DEFAULT_CONFIG_FILE
 
@@ -584,8 +616,7 @@ def read_config_file(given_cfg_file=None):
             log.debug("Read default config from %s", cfg_file)
             return cfg.items('options')
         except ConfigParser.Error, err:
-            log.warning("Error reading configuration from %s: %s",
-                        cfg_file, str(err))
+            log.warning("Error reading configuration from %s: %s", cfg_file, str(err))
     else:
         return {}
 
@@ -617,16 +648,16 @@ def all(iterable):
     
 
 
-def verify_release_in_targetparams(targetparams):
+def verify_release_in_targetopts_by_dver(targetopts_by_dver):
     """Verify that the values for distro_tag, koji_target and koji_tag are
     consistent. If consistent, return the release; else, return None.
     Also return None if none of the values are specified.
     """
     redhat_release, distro_tag, koji_target, koji_tag = (
-        targetparams.get('redhat_release'),
-        targetparams.get('distro_tag'),
-        targetparams.get('koji_target'),
-        targetparams.get('koji_tag'))
+        targetopts_by_dver.get('redhat_release'),
+        targetopts_by_dver.get('distro_tag'),
+        targetopts_by_dver.get('koji_target'),
+        targetopts_by_dver.get('koji_tag'))
     if koji_tag == 'TARGET': # HACK
         koji_tag = None
     def same_or_none2(a, b):
@@ -635,9 +666,9 @@ def verify_release_in_targetparams(targetparams):
         return all((same_or_none2(args[x], args[y]) for x in range(len(args)) for y in range(x, len(args))))
 
     # Verify consistency
-    dist_rel = get_el_release_from_string(distro_tag)
-    target_rel = get_el_release_from_string(koji_target)
-    tag_rel = get_el_release_from_string(koji_tag)
+    dist_rel = get_dver_from_string(distro_tag)
+    target_rel = get_dver_from_string(koji_target)
+    tag_rel = get_dver_from_string(koji_tag)
 
     if not same_or_none(redhat_release, dist_rel, tag_rel, target_rel):
         return None
@@ -646,8 +677,8 @@ def verify_release_in_targetparams(targetparams):
     return rel
 
 
-def get_local_machine_rh_rel():
-    "Return the major redhat release of the local machine or None"
+def get_local_machine_dver():
+    "Return the distro version (i.e. major redhat release) of the local machine or None"
     redhat_release_contents = utils.slurp('/etc/redhat-release')
     try:
         match = re.search(r'release (\d)', redhat_release_contents)

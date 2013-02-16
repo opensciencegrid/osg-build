@@ -1,0 +1,8 @@
+* Fri Feb 15 2013 Matyas Selmeci <matyas@cs.wisc.edu> - 1.2.5
+- new flag, "--upcoming" for building packages into the new
+  el[56]-osg-upcoming koji targets.
+- warning for doing a non-svn non-scratch koji build changed into error.
+- error on attempt to do a non-scratch koji build using the upcoming targets
+  when building from trunk, or from using non-upcoming targets when building
+  from the upcoming area in svn
+

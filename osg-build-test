@@ -359,6 +359,44 @@ class TestKoji(XTestCase):
         self.assertTrue(
             regex_in_list(r".*kojisession.build\([^,]+?, 'el[56]-osg', " + re.escape("{'scratch': True}") + ", None\)", out_list))
 
+    def test_koji_lib_upcoming(self):
+        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el5-osg-upcoming'", out_list))
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el6-osg-upcoming'", out_list))
+
+    def test_koji_lib_upcoming2(self):
+        # Make sure that passing --el5 turns off el6 builds even with --upcoming.
+        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", "--el5", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el5-osg-upcoming'", out_list))
+        self.assertFalse(regex_in_list(r".*kojisession.build\([^,]+?, 'el6-osg-upcoming'", out_list))
+
+    def test_koji_shell_upcoming(self):
+        output = backtick_osg_build(self.kdr_shell + ["--el5", "--upcoming", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji build el5-osg-upcoming.*", out_list),
+            "not building for el5-upcoming")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji build el6-osg-upcoming.*", out_list),
+            "falsely building for el6-upcoming")
+
+    def test_verify_correct_branch(self):
+        try:
+            output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(SVN_ROOT, SVN_TRUNK_PATH, "koji")])
+        except CalledProcessError, err:
+            out_list = err.output.split("\n")
+            self.assertTrue(
+                regex_in_list(r"Error: Incorrect branch for koji build", out_list),
+                "did not detect attempt to build for wrong branch (wrong error message)")
+            return
+        self.fail("did not detect attempt to build for wrong branch (no error message)") 
+
+
+
+
+
 class TestKojiLong(XTestCase):
     def setUp(self):
         self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
@@ -386,14 +424,14 @@ class TestMisc(XTestCase):
         buildopts_el = dict()
         build_el = dict()
         defines_el = dict()
-        for rhel in ['5', '6']:
-            buildopts_el[rhel] = DEFAULT_BUILDOPTS_COMMON.copy()
-            buildopts_el[rhel]['redhat_release'] = rhel
-            buildopts_el[rhel].update(DEFAULT_BUILDOPTS_BY_REDHAT_RELEASE[rhel])
-            build_el[rhel] = srpm.SRPMBuild(".", buildopts_el[rhel], None, None)
-            defines_el[rhel] = build_el[rhel].get_rpmbuild_defines(True)
-            self.assertTrue("--define=rhel %s" % rhel in defines_el[rhel],
-                            "%%rhel not set correctly for el%s build" % rhel)
+        for dver in ['5', '6']:
+            buildopts_el[dver] = DEFAULT_BUILDOPTS_COMMON.copy()
+            buildopts_el[dver]['redhat_release'] = dver
+            buildopts_el[dver].update(DEFAULT_BUILDOPTS_BY_DVER[dver])
+            build_el[dver] = srpm.SRPMBuild(".", buildopts_el[dver], None, None)
+            defines_el[dver] = build_el[dver].get_rpmbuild_defines(True)
+            self.assertTrue("--define=rhel %s" % dver in defines_el[dver],
+                            "%%rhel not set correctly for el%s build" % dver)
 
         self.assertTrue('--define=el5 1' in defines_el['5'],
                         "%el5 not set for el5 build")

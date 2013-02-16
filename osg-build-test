@@ -365,6 +365,25 @@ class TestKoji(XTestCase):
         self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el5-osg-upcoming'", out_list))
         self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el6-osg-upcoming'", out_list))
 
+    def test_koji_lib_upcoming2(self):
+        # Make sure that passing --el5 turns off el6 builds even with --upcoming.
+        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", "--el5", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'el5-osg-upcoming'", out_list))
+        self.assertFalse(regex_in_list(r".*kojisession.build\([^,]+?, 'el6-osg-upcoming'", out_list))
+
+    def test_koji_shell_upcoming(self):
+        output = backtick_osg_build(self.kdr_shell + ["--el5", "--upcoming", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji build el5-osg-upcoming.*", out_list),
+            "not building for el5-upcoming")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji build el6-osg-upcoming.*", out_list),
+            "falsely building for el6-upcoming")
+
+
+
 
 
 

@@ -11,6 +11,8 @@ if [ $# -ne 2 ]; then
     exit 1
 fi
 
+KOJI=${KOJI:-osg-koji}
+
 tag1=$1
 tag2=$2
 
@@ -19,8 +21,8 @@ file2=`mktemp -t koji-$tag2-XXXXXX`
 
 echo "Comparing '$tag1' to '$tag2'"
 
-koji list-tagged --latest $tag1 | awk '{print $1}' > $file1
-koji list-tagged --latest $tag2 | awk '{print $1}' > $file2
+$KOJI list-tagged --latest $tag1 | awk '{print $1}' > $file1
+$KOJI list-tagged --latest $tag2 | awk '{print $1}' > $file2
 
 diff -u $file1 $file2 | grep -v -- "---" | grep  '^\-' | cut -b 2-
 

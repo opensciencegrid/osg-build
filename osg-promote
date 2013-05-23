@@ -37,7 +37,8 @@ VALID_ROUTES = {
     "testing": ["osg-development", "osg-testing"],
     "contrib": ["osg-development", "osg-contrib"],
     "release": ["osg-testing", "osg-prerelease"],
-    "prerelease": ["osg-testing", "osg-prerelease"]}
+    "prerelease": ["osg-testing", "osg-prerelease"],
+    "upcoming": ["osg-upcoming-development", "osg-upcoming-testing"],}
 
 def any(iterable):
     for element in iterable:

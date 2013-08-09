@@ -82,19 +82,19 @@ def setup_parse_args(args):
     """Parse the arguments given on the command line for the setup command.
     Return the 'options' object, containing the keyword arguments.
     """
-    
+
     parser = OptionParser("""%prog setup [options]""")
-    
+
     parser.add_option(
         "-u", "--usercert", "--user-cert", dest="user_cert", metavar="FILE",
         default=os.path.join(GLOBUS_DIR, "usercert.pem"),
         help="Path to user certificate file. Default: %default")
-    
+
     parser.add_option(
         "-k", "--userkey", "--user-key", dest="user_key", metavar="FILE",
         default=os.path.join(GLOBUS_DIR, "userkey.pem"),
         help="Path to user private key file. Default: %default")
-    
+
     options = parser.parse_args(args)[0]
 
     return options
@@ -112,7 +112,7 @@ def get_openssl_version():
 def checked_download(dest, url, descr=None):
     """Download a file from 'url' to 'dest'. 'descr' is an optional text
     description of a file, for a more informative error message.
-    
+
     """
     if os.path.isdir(dest):
         realdest = os.path.join(dest, os.path.basename(url))
@@ -144,7 +144,7 @@ def create_ca_bundle(working_dir="."):
                 not glob.glob(os.path.join(working_dir, 'doegrids', '*.0'))):
             raise Error("DOEGrids certs tarball does not have expected contents")
         os.rename(os.path.join(working_dir, 'doegrids'), certs_dir)
-        
+
         # Download DigiCert grid certificates
         for cert in DIGICERT_CA_CERTS:
             checked_download(certs_dir, os.path.join(DIGICERT_GRID_BASEURL, cert['098hash']+".0"))
@@ -207,14 +207,14 @@ def setup_koji_client_cert(user_cert, user_key):
 
         print "Not writing client cert file %r" % new_client_cert_path
         return
-        
+
     success = False
 
     if (os.path.exists(KOJI_USER_CONFIG_DIR) and
             (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
             not os.path.samefile(KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR)) and
             os.path.isfile(OLD_CLIENT_CERT_FILE)):
-            
+
         if ask_yn("Copy client cert from '" + OLD_CLIENT_CERT_FILE + "' ?"):
             old_umask = os.umask(0077)
             safe_make_backup(new_client_cert_path)
@@ -241,7 +241,7 @@ You must manually copy your certs:
 
 where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
 """ % (user_cert, user_key, new_client_cert_path, new_client_cert_path))
-    
+
 
 def run_setup(user_cert, user_key):
     safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
@@ -251,9 +251,9 @@ def run_setup(user_cert, user_key):
 
     if (not os.path.exists(KOJI_USER_CONFIG_DIR) and
             ask_yn("Create symlink %s -> %s ?" % (KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR))):
-        
+
         os.symlink(OSG_KOJI_USER_CONFIG_DIR, KOJI_USER_CONFIG_DIR)
-        
+
 
 
 def verify_koji_dir(config_dir):
@@ -261,7 +261,7 @@ def verify_koji_dir(config_dir):
             (KOJI_CONFIG_FILE, "Koji configuration file"),
             (CLIENT_CERT_FILE, "User certificate file (client cert)"),
             (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
-            
+
         if not os.path.exists(os.path.join(config_dir, path)):
             raise Error("%s (%s) not found in config directory (%s).\n%s" % (descr, path, config_dir, RUN_SETUP_MSG))
 
@@ -310,7 +310,7 @@ def main(argv=None):
     except Exception, e:
         print >> sys.stderr, "Unhandled exception: " + str(e)
         raise
-              
+
     return 0
 
 if __name__ == "__main__":

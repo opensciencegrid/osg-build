@@ -82,6 +82,7 @@ class SRPMBuild(object):
             "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
             "rhel " + rhel,
             "dist ." + self.buildopts.get('distro_tag', 'osg.el' + rhel),
+            "osg 1",
         ]
         for dver in DVERS:
             if dver == rhel:
@@ -234,7 +235,7 @@ class SRPMBuild(object):
     def rpmbuild(self):
         """rpmbuild task.
         Build the package using rpmbuild on the local machine.
-        
+
         """
         srpm = self.prebuild()
         utils.safe_makedirs(self.results_dir)

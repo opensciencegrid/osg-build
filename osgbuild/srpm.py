@@ -71,7 +71,7 @@ class SRPMBuild(object):
                     log.debug("autoclean removing " + udir)
                     shutil.rmtree(udir)
 
-    
+
     def get_rpmbuild_defines(self, prebuild):
         """Get a list of --define arguments to pass to rpmbuild based on the
         working dir and the subdirectories specified in the WD_* constants.
@@ -100,24 +100,24 @@ class SRPMBuild(object):
         if prebuild:
             defines += [
                 "_topdir " + self.prebuild_dir,
-                "_builddir " + self.prebuild_dir,
-                "_buildrootdir " + self.prebuild_dir,
-                "_rpmdir " + self.prebuild_dir,
-                "_sourcedir " + self.prebuild_dir,
-                "_specdir " + self.prebuild_dir,
-                "_srcrpmdir " + self.prebuild_dir,
-                "_tmppath " + self.prebuild_dir
+                "_builddir " + "%{_topdir}",
+                "_buildrootdir " + "%{_topdir}",
+                "_rpmdir " + "%{_topdir}",
+                "_sourcedir " + "%{_topdir}",
+                "_specdir " + "%{_topdir}",
+                "_srcrpmdir " + "%{_topdir}",
+                "_tmppath " + "%{_topdir}"
             ]
         else:
             defines += [
                 "_topdir " + self.results_dir,
-                "_builddir " + os.path.join(self.results_dir, "BUILD"),
-                "_buildrootdir " + os.path.join(self.results_dir, "BUILDROOT"),
-                "_rpmdir " + self.results_dir,
-                "_sourcedir " + self.results_dir,
-                "_specdir " + self.results_dir,
-                "_srcrpmdir " + self.results_dir,
-                "_tmppath " + os.path.join(self.results_dir, "tmp")
+                "_builddir " + "%{_topdir}/BUILD",
+                "_buildrootdir " + "%{_topdir}/BUILDROOT",
+                "_rpmdir " + "%{_topdir}",
+                "_sourcedir " + "%{_topdir}",
+                "_specdir " + "%{_topdir}",
+                "_srcrpmdir " + "%{_topdir}",
+                "_tmppath " + "%{_topdir}/tmp"
             ]
 
         return ['--define=' + d for d in defines]

@@ -17,7 +17,6 @@ Wishlist:
 # TODO Shouldn't need koji access for 'rpmbuild', but currently does since it
 # gets the values for the --repo arg -- which is only used for koji builds.
 # Make it so.
-# TODO In some places, a dver is 'el5', in others, just '5'. Fix that -- use el5.
 import logging
 from optparse import OptionGroup, OptionParser, OptionValueError
 import re
@@ -244,7 +243,7 @@ def repo_hints(targets):
                 osg_match = re.match(r'osg-(\d+\.\d+)-el\d+', target)
                 if osg_match:
                     osgver = osg_match.group(1)
-                    __repo_hints_cache[osgver] = __repo_hints_cache['osg-%s' % osgver] = {'target': 'osg-%s-el%%s' % osgver, 'tag': 'osg-el%s'}
+                    __repo_hints_cache[osgver] = __repo_hints_cache['osg-%s' % osgver] = {'target': 'osg-%s-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
 
     return __repo_hints_cache
 
@@ -486,7 +485,7 @@ def get_dver_from_string(s):
     Return None if not found."""
     if not s:
         return None
-    match = re.search(r'\bel(\d+)\b', s)
+    match = re.search(r'\b(el\d+)\b', s)
     if match is not None:
         return match.group(1)
     else:
@@ -495,12 +494,12 @@ def get_dver_from_string(s):
 def target_for_repo_hint(repo_hint, dver):
     hints = repo_hints(valid_koji_targets())
     if repo_hint in hints:
-        return hints[repo_hint]['target'] % dver
+        return hints[repo_hint]['target'] % {'dver': dver}
     else:
         raise UsageError("'%s' is not a valid repo.\nValid repos are: %s" % (repo_hint, ", ".join(sorted(hints.keys()))))
 
 def tag_for_repo_hint(repo_hint, dver):
-    return repo_hints(valid_koji_targets())[repo_hint]['tag'] % dver
+    return repo_hints(valid_koji_targets())[repo_hint]['tag'] % {'dver': dver}
 
 def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs): # unused-args: pylint:disable=W0613
     """Handle options in the 'targetopts_by_dver' set, such as --koji-tag,
@@ -544,14 +543,14 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
         value = ''
     if opt_name == 'redhat_release':
         if opt_str == '--el5':
-            enabled_dvers.add('5')
+            enabled_dvers.add('el5')
         elif opt_str == '--el6':
-            enabled_dvers.add('6')
+            enabled_dvers.add('el6')
         elif opt_str == '--el7':
-            enabled_dvers.add('7')
+            enabled_dvers.add('el7')
         elif opt_str == '--redhat-release':
-            if value in DVERS:
-                enabled_dvers.add(value)
+            if 'el' + value in DVERS:
+                enabled_dvers.add('el' + value)
             else:
                 raise OptionValueError("Invalid redhat release value: %r" % value)
     elif opt_name == 'koji_tag' and value == 'TARGET': # HACK
@@ -762,7 +761,7 @@ def all(iterable): # disable "redefined-builtin" check: pylint: disable=W0622
 
 def verify_release_in_targetopts_by_dver(targetopts_by_dver):
     """Verify that the values for distro_tag, koji_target and koji_tag are
-    consistent. If consistent, return the release; else, return None.
+    consistent. If consistent, return the dver; else, return None.
     Also return None if none of the values are specified.
     """
     redhat_release, distro_tag, koji_target, koji_tag = (
@@ -770,6 +769,7 @@ def verify_release_in_targetopts_by_dver(targetopts_by_dver):
         targetopts_by_dver.get('distro_tag'),
         targetopts_by_dver.get('koji_target'),
         targetopts_by_dver.get('koji_tag'))
+    dver = 'el' + str(redhat_release)
     if koji_tag == 'TARGET': # HACK
         koji_tag = None
     def same_or_none2(a, b):
@@ -778,23 +778,22 @@ def verify_release_in_targetopts_by_dver(targetopts_by_dver):
         return all((same_or_none2(args[x], args[y]) for x in range(len(args)) for y in range(x, len(args))))
 
     # Verify consistency
-    dist_rel = get_dver_from_string(distro_tag)
-    target_rel = get_dver_from_string(koji_target)
-    tag_rel = get_dver_from_string(koji_tag)
+    dist_dver = get_dver_from_string(distro_tag)
+    target_dver = get_dver_from_string(koji_target)
+    tag_dver = get_dver_from_string(koji_tag)
 
-    if not same_or_none(redhat_release, dist_rel, tag_rel, target_rel):
+    if not same_or_none(dver, dist_dver, tag_dver, target_dver):
         return None
 
-    rel = redhat_release or dist_rel or target_rel or tag_rel
-    return rel
+    return dver or dist_dver or target_dver or tag_dver
 
 
 def get_local_machine_dver():
-    "Return the distro version (i.e. major redhat release) of the local machine or None"
+    "Return the distro version (e.g. 'el5', 'el6', 'el7') of the local machine or None"
     redhat_release_contents = utils.slurp('/etc/redhat-release')
     try:
         match = re.search(r'release (\d)', redhat_release_contents)
-        return match.group(1)
+        return 'el' + match.group(1)
     except (TypeError, AttributeError):
         return None
 

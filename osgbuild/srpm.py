@@ -85,10 +85,10 @@ class SRPMBuild(object):
             "osg 1",
         ]
         for dver in DVERS:
-            if dver == rhel:
-                defines.append("el%s 1" % dver)
+            if dver == 'el' + rhel:
+                defines.append("%s 1" % dver)
             else:
-                defines.append("el%s 0" % dver)
+                defines.append("%s 0" % dver)
         if rhel == '5':
             defines += [
                 "_source_filedigest_algorithm 1",

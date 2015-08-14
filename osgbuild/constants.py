@@ -83,21 +83,21 @@ DEFAULT_BUILDOPTS_COMMON = {
 }
 
 DEFAULT_BUILDOPTS_BY_DVER = {
-    '5': {
+    'el5': {
         'distro_tag': 'osg.el5',
         'koji_tag': None,
         'koji_target': None,
         'redhat_release': '5',
         'repo': 'osg',
     },
-    '6': {
+    'el6': {
         'distro_tag': 'osg.el6',
         'koji_tag': None,
         'koji_target': None,
         'redhat_release': '6',
         'repo': 'osg',
     },
-    '7': {
+    'el7': {
         'distro_tag': 'osg.el7',
         'koji_tag': None,
         'koji_target': None,
@@ -107,22 +107,22 @@ DEFAULT_BUILDOPTS_BY_DVER = {
 }
 
 REPO_HINTS_STATIC = {
-    'osg': {'target': 'osg-el%s', 'tag': 'osg-el%s'},
-    'upcoming': {'target': 'osg-upcoming-el%s', 'tag': 'osg-el%s'},
-    'internal': {'target': 'osg-el%s-internal', 'tag': 'osg-el%s'},
-    'hcc': {'target': 'hcc-el%s', 'tag': 'hcc-el%s'},
-    'uscms': {'target': 'uscms-el%s', 'tag': 'uscms-el%s'},
-    'condor': {'target': 'condor-el%s', 'tag': 'condor-el%s'},
-    'perfsonar': {'target': 'perfsonar-el%s', 'tag': 'perfsonar-el%s'},
+    'osg': {'target': 'osg-%(dver)s', 'tag': 'osg-%(dver)s'},
+    'upcoming': {'target': 'osg-upcoming-%(dver)s', 'tag': 'osg-%(dver)s'},
+    'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
+    'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},
+    'uscms': {'target': 'uscms-%(dver)s', 'tag': 'uscms-%(dver)s'},
+    'condor': {'target': 'condor-%(dver)s', 'tag': 'condor-%(dver)s'},
+    'perfsonar': {'target': 'perfsonar-%(dver)s', 'tag': 'perfsonar-%(dver)s'},
 }
 
-DEFAULT_DVERS = ['6', '7']
+DEFAULT_DVERS = ['el6', 'el7']
 DEFAULT_DVERS_BY_REPO = {
-    '3.2': ['5', '6'],
-    'osg-3.2': ['5', '6'],
-    '3.3': ['6', '7'],
-    'osg-3.3': ['6', '7'],
-    'internal': ['5', '6', '7'],
+    '3.2': ['el5', 'el6'],
+    'osg-3.2': ['el5', 'el6'],
+    '3.3': ['el6', 'el7'],
+    'osg-3.3': ['el6', 'el7'],
+    'internal': ['el5', 'el6', 'el7'],
 }
 DVERS = DEFAULT_BUILDOPTS_BY_DVER.keys()
 

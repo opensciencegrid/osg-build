@@ -1,3 +1,5 @@
+- Change osg-promote table layout to sort by build and put the build first (SOFTWARE-2116)
+
 * Mon Aug 17 2015 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.6.1
 - Make el6 and el7 the default dvers for trunk
 - Fix unit tests to work with osg-el5 koji target missing

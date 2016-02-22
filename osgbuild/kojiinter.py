@@ -88,7 +88,7 @@ def download_koji_file(task_id, filename, destdir):
     in destdir/task_id/filename
 
     """
-    url = "http://koji-hub.batlab.org/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
+    url = KOJI_HUB + "/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
     log.debug('Retrieving ' + url)
     handle = urllib2.urlopen(url)
     utils.safe_makedirs(destdir)

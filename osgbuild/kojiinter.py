@@ -412,7 +412,7 @@ class KojiLibInter(object):
             self.user = user or get_cn()
         else:
             self.user = user or "osgbuild"
-        self.weburl = os.path.join(HTTPS_KOJI_HUB, "koji")
+        self.weburl = os.path.join(KOJI_WEB, "koji")
         self.dry_run = dry_run
 
 

@@ -462,7 +462,7 @@ class KojiHelper(kojiinter.KojiLibInter):
     def get_build_uri(self, build_nvr):
         """Return a URI to the kojiweb page of the build with the given NVR"""
         buildinfo = self.koji_get_build(build_nvr)
-        return "%s/koji/buildinfo?buildID=%d" % (constants.HTTPS_KOJI_HUB, int(buildinfo['id']))
+        return "%s/koji/buildinfo?buildID=%d" % (constants.KOJI_WEB, int(buildinfo['id']))
 
     def koji_get_build(self, build_nvr):
         return self.kojisession.getBuild(build_nvr)

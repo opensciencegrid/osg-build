@@ -56,6 +56,7 @@ install-python26: install-common
 
 	for script in $(MAIN_SCRIPT) $(EXTRA_SCRIPTS); do \
 		sed -i -e '1s#/usr/bin/python#/usr/bin/python26#' $(DESTDIR)/$(BINDIR)/$$script; \
+		sed -i -e '1s#/usr/bin/env python$$#/usr/bin/python26#' $(DESTDIR)/$(BINDIR)/$$script; \
 	done
 
 

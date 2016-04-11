@@ -1,3 +1,5 @@
+- osg-koji setup: add CILogon-OSG CA cert to osg-ca-certs.crt (SOFTWARE-2273)
+
 * Fri Feb 19 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.6.2
 - Change osg-promote table layout to sort by build and put the build first (SOFTWARE-2116)
 

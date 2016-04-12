@@ -39,6 +39,11 @@ DIGICERT_CA_CERTS = [
     {'subject': "/C=US/O=DigiCert Grid/OU=www.digicert.com/CN=DigiCert Grid Trust CA",
     '098hash': "38f7145f",
     '1xhash': "67707166"}]
+CILOGON_OSG_CA_CERT = {
+    'subject': "/DC=org/DC=cilogon/C=US/O=CILogon/CN=CILogon OSG CA 1",
+    '098hash': "d690e530",
+    '1xhash': "70d35895"}
+CILOGON_OSG_CA_CERT_URL = "https://cilogon.org/cilogon-osg.pem"
 
 CSL_KOJI_PATH = "/p/vdt/workspace/koji-1.6.0"
 
@@ -121,6 +126,36 @@ def checked_download(dest, url, descr=None):
             raise Error("Error downloading from %s to %s: %s" % (url, realdest, str(e)))
     return realdest
 
+
+openssl_major = None
+def validate_cert(cert_path, cert):
+    """Verify that the cert file at 'cert_path' has the same hash and subject
+    as in 'cert'. Raise an Error if not.
+
+    """
+    global openssl_major
+
+    if openssl_major is None:
+        openssl_major = int(get_openssl_version()[0])
+
+    expected_subject = "subject= " + cert['subject']
+    if openssl_major == 0:
+        expected_hash = cert['098hash']
+    else:
+        expected_hash = cert['1xhash']
+    real_subject = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-subject"])
+    real_hash = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-hash"])
+    if real_subject != expected_subject:
+        raise Error(("Subject for %s doesn't match expected:\n"
+                     "Expected: %r, got: %r") %
+                    (cert_path, expected_subject, real_subject))
+    if real_hash != expected_hash:
+        raise Error(("Hash for %s doesn't match expected:\n"
+                     "Expected: %r, got: %r") %
+                    (cert_path, expected_hash, real_hash))
+
+
+
 def create_ca_bundle(working_dir="."):
     """Create the ca-bundle.crt file in working_dir"""
     if os.path.isdir(GRID_CERTS_DIR):
@@ -132,29 +167,24 @@ def create_ca_bundle(working_dir="."):
         # Download DigiCert grid certificates
         for cert in DIGICERT_CA_CERTS:
             checked_download(certs_dir, os.path.join(DIGICERT_GRID_BASEURL, cert['098hash']+".0"))
+        # Download CILogon-OSG cert
+        checked_download(certs_dir, CILOGON_OSG_CA_CERT_URL)
 
     bundle_contents = ""
-    openssl_major = int(get_openssl_version()[0])
+
+    # Add DigiCert certs
     for cert in DIGICERT_CA_CERTS:
-        expected_subject = "subject= " + cert['subject']
-        if openssl_major == 0:
-            expected_hash = cert['098hash']
-        else:
-            expected_hash = cert['1xhash']
         cert_fname = cert['098hash'] + ".0"
         cert_path = os.path.join(certs_dir, cert_fname)
-        real_subject = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-subject"])
-        real_hash = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-hash"])
-        if real_subject != expected_subject:
-            raise Error(("Subject for %s doesn't match expected:\n"
-                         "Expected: %r, got: %r") %
-                        (cert_fname, expected_subject, real_subject))
-        if real_hash != expected_hash:
-            raise Error(("Hash for %s doesn't match expected:\n"
-                         "Expected: %r, got: %r") %
-                        (cert_fname, expected_hash, real_hash))
-        else:
-            bundle_contents += slurp(cert_path) + "\n"
+        validate_cert(cert_path, cert)
+        bundle_contents += slurp(cert_path) + "\n"
+
+    # Add CILogon-OSG cert
+    cert_fname = os.path.basename(CILOGON_OSG_CA_CERT_URL)
+    cert_path = os.path.join(certs_dir, cert_fname)
+    validate_cert(cert_path, CILOGON_OSG_CA_CERT)
+    bundle_contents += slurp(cert_path) + "\n"
+
     bundle_filename = os.path.join(working_dir, "ca-bundle.crt")
     unslurp(bundle_filename, bundle_contents)
     print "Wrote CA cert bundle %r" % bundle_filename

@@ -42,7 +42,7 @@ log = logging.getLogger('osgbuild')
 log.setLevel(logging.INFO)
 log_consolehandler = logging.StreamHandler()
 log_consolehandler.setLevel(logging.INFO)
-log_formatter = logging.Formatter("%(levelname)s:osg-build:%(message)s")
+log_formatter = logging.Formatter(" >> %(message)s")
 log_consolehandler.setFormatter(log_formatter)
 log.addHandler(log_consolehandler)
 log.propagate = False

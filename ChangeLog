@@ -1,3 +1,6 @@
+Unreleased
+- Make osg-build log messages look nicer
+
 * Thu Aug 04 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.7.0
 - Add three-way diff functionality (--diff3 or -3) to osg-import-srpm
 

@@ -355,7 +355,7 @@ class TestPromoter(unittest.TestCase):
                 build = promoter.Build.new_from_nvr(nvr)
                 if not real_promotions:
                     promoted_builds[tag] = [build]
-                build_uri = "%s/koji/buildinfo?buildID=%d" % (constants.HTTPS_KOJI_HUB, 319)
+                build_uri = "%s/koji/buildinfo?buildID=%d" % (constants.KOJI_WEB, 319)
                 expected_lines.append("| %s | [%s|%s] |" % (tag, build.nvr, build_uri))
         expected_lines.append("")
         promoter.write_jira(self.kojihelper, promoted_builds, self.multi_routes, out)

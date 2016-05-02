@@ -145,7 +145,7 @@ def main(argv):
     if kojiinter.KojiInter.backend and task_ids:
         print "Koji task ids are:", task_ids
         for tid in task_ids:
-            print HTTPS_KOJI_HUB + "/koji/taskinfo?taskID=" + str(tid)
+            print KOJI_WEB + "/koji/taskinfo?taskID=" + str(tid)
         if not buildopts['no_wait']:
             ret = kojiinter.KojiInter.backend.watch_tasks_with_retry(task_ids)
             # TODO This is not implemented for the KojiShellInter backend

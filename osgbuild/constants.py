@@ -21,8 +21,8 @@ KOJI_CONF = "osg-koji-site.conf"
 OLD_KOJI_CONF = "osg-koji.conf"
 DATA_DIR = "/usr/share/osg-build"
 
-KOJI_HUB = "http://koji-hub.batlab.org"
-HTTPS_KOJI_HUB = "https://koji-hub.batlab.org"
+KOJI_HUB = "http://koji.chtc.wisc.edu"
+KOJI_WEB = "https://koji.chtc.wisc.edu"
 
 DATA_FILE_SEARCH_PATH = [sys.path[0],
                          os.path.join(sys.path[0], "data"),

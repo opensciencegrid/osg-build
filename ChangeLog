@@ -1,3 +1,5 @@
+- Rename koji-hub.batlab.org to koji.chtc.wisc.edu (SOFTWARE-2175)
+
 * Tue Apr 12 2016 Matyas Selmeci <matyas@cs.wisc.edu> - 1.6.3
 - osg-koji setup: add CILogon-OSG CA cert to osg-ca-certs.crt (SOFTWARE-2273)
 

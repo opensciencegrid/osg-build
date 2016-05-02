@@ -88,7 +88,7 @@ def download_koji_file(task_id, filename, destdir):
     in destdir/task_id/filename
 
     """
-    url = "http://koji-hub.batlab.org/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
+    url = KOJI_HUB + "/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
     log.debug('Retrieving ' + url)
     handle = urllib2.urlopen(url)
     utils.safe_makedirs(destdir)
@@ -412,7 +412,7 @@ class KojiLibInter(object):
             self.user = user or get_cn()
         else:
             self.user = user or "osgbuild"
-        self.weburl = os.path.join(HTTPS_KOJI_HUB, "koji")
+        self.weburl = os.path.join(KOJI_WEB, "koji")
         self.dry_run = dry_run
 
 

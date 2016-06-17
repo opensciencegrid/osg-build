@@ -84,7 +84,8 @@ def main(argv):
                 print "Exiting"
                 return 1
 
-            vcs.verify_correct_branch(pkg, buildopts)
+            if not buildopts['scratch']:
+                vcs.verify_correct_branch(pkg, buildopts)
     else:
         # verify package dirs
         for pkg in package_dirs:

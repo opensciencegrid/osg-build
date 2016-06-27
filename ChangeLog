@@ -1,4 +1,6 @@
+* Mon Jun 27 2016 Carl Edquist <edquist@cs.wisc.edu> - 1.6.4
 - Rename koji-hub.batlab.org to koji.chtc.wisc.edu (SOFTWARE-2175)
+- Do not enforce vcs branch checks for scratch builds (SOFTWARE-1876)
 
 * Tue Apr 12 2016 Matyas Selmeci <matyas@cs.wisc.edu> - 1.6.3
 - osg-koji setup: add CILogon-OSG CA cert to osg-ca-certs.crt (SOFTWARE-2273)

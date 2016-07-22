@@ -390,3 +390,32 @@ def print_table(columns_by_header):
 def is_url(location):
     return re.match(r'[-a-z+]+://', location)
 
+
+# Functions for manipulating a directory stack in the style of bash
+# pushd/popd.
+__dir_stack = []
+
+def pushd(new_dir):
+    """Change the current working directory to `new_dir`, and push the
+    old one onto the directory stack `__dir_stack`.
+    """
+    global __dir_stack
+
+    old_dir = os.getcwd()
+    os.chdir(new_dir)
+    __dir_stack.append(old_dir)
+
+
+def popd():
+    """Change to the topmost directory in the directory stack
+    `__dir_stack` and pop the stack.  Note: the stack will be
+    popped even if the chdir fails.
+
+    Raise `IndexError` if the stack is empty.
+    """
+    global __dir_stack
+
+    try:
+        os.chdir(__dir_stack.pop())
+    except IndexError:
+        raise IndexError("Directory stack empty")

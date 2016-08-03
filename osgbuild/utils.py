@@ -36,6 +36,15 @@ class CalledProcessError(Exception):
                     repr(self.output)))
 
 
+# pipes.quote was deprecated in Python 2.7, but its replacement, shlex.quote
+# was not added until Python 3.3
+try:
+    shell_quote = shlex.quote
+except AttributeError:
+    import pipes
+    shell_quote = pipes.quote
+
+
 def checked_call(*args, **kwargs):
     """A wrapper around subprocess.call() that raises CalledProcessError on
     a nonzero return code. Similar to subprocess.check_call() in 2.7+, but
@@ -221,7 +230,7 @@ def super_unpack(*compressed_files):
     for cf in compressed_files:
         for (ext, cmd) in handlers:
             if cf.endswith(ext):
-                subprocess.call(cmd % re.escape(cf), shell=True)
+                subprocess.call(cmd % shell_quote(cf), shell=True)
                 break
 
 
@@ -419,3 +428,5 @@ def popd():
         os.chdir(__dir_stack.pop())
     except IndexError:
         raise IndexError("Directory stack empty")
+
+

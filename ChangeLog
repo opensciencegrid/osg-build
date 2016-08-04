@@ -1,3 +1,6 @@
+* Thu Aug 04 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.7.0
+- Add three-way diff functionality (--diff3 or -3) to osg-import-srpm
+
 * Mon Jun 27 2016 Carl Edquist <edquist@cs.wisc.edu> - 1.6.4
 - Rename koji-hub.batlab.org to koji.chtc.wisc.edu (SOFTWARE-2175)
 - Do not enforce vcs branch checks for scratch builds (SOFTWARE-1876)

@@ -142,7 +142,7 @@ class TestRpmbuild(XTestCase):
         try:
             self.assertRegexpMatches(
                 out,
-                r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
+                r'(?ms) >> The following RPM[(]s[)] have been created:\n'
                 r'[^\n]+'
                 r'yum-remove-osg-1[.]0-0[.]2[.]osg[.]el\d[.]noarch[.]rpm',
                 "rpm created message not found")
@@ -298,10 +298,6 @@ class TestMock(XTestCase):
         errprintf("%s not in mock group", username)
         return False
 
-
-    def test_mock_auto_cfg(self):
-        if self.check_for_mock_group():
-            checked_osg_build(["mock", self.pkg_dir])
 
     def test_mock_koji_cfg(self):
         if self.check_for_mock_group():

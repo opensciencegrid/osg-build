@@ -142,7 +142,7 @@ class TestRpmbuild(XTestCase):
         try:
             self.assertRegexpMatches(
                 out,
-                r'(?ms)INFO:osg-build:The following RPM[(]s[)] have been created:\n'
+                r'(?ms) >> The following RPM[(]s[)] have been created:\n'
                 r'[^\n]+'
                 r'yum-remove-osg-1[.]0-0[.]2[.]osg[.]el\d[.]noarch[.]rpm',
                 "rpm created message not found")

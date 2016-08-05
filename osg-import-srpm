@@ -140,7 +140,7 @@ def make_source_file(url, cached_filename, upstream_dir, provider=None):
 """ % locals()
 
     if os.path.exists(source_filename):
-        logging.info("Source file exists. Saving as %s.old", source_filename)
+        logging.info("%s already exists. Backing it up as %s.old", source_filename, source_filename)
         shutil.move(source_filename, source_filename + ".old")
         utils.unslurp(source_filename, source_contents)
     else:

@@ -575,7 +575,7 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
 
         if dver not in enabled_dvers:
             enabled_dvers.add(dver)
-            print "Implicitly enabled building for el%s due to %r argument %r" % (dver, opt_str, value)
+            log.debug("Implicitly enabled building for el%s due to %r argument %r" % (dver, opt_str, value))
 
         if opt_name == 'ktt':
             targetopts_by_dver[dver]['koji_tag'] = value

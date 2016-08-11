@@ -20,6 +20,7 @@ DEFAULT_LOG_LEVEL = logging.INFO
 EXTRA_ACTION_DIFF_SPEC = 'diff_spec'
 EXTRA_ACTION_EXTRACT_SPEC = 'extract_spec'
 EXTRA_ACTION_DIFF3_SPEC = 'diff3_spec'
+EXTRA_ACTION_UPDATE = 'update'
 
 PROVIDER_PATTERNS = [
     (r'emisoft\.web\.cern\.ch'         , 'emi')    ,
@@ -100,7 +101,8 @@ def make_svn_tree(srpm, url, extra_action=None, provider=None):
         diff_spec(abs_srpm, osg_dir, want_diff3=False)
     elif extra_action == EXTRA_ACTION_EXTRACT_SPEC:
         extract_spec(abs_srpm, osg_dir)
-    elif extra_action == EXTRA_ACTION_DIFF3_SPEC:
+    # HACK - this test is ugly
+    elif extra_action == EXTRA_ACTION_DIFF3_SPEC or (extra_action == EXTRA_ACTION_UPDATE and os.path.isdir(osg_dir)):
         if os.path.isdir(osg_dir):
             extract_orig_spec(osg_dir)
         diff_spec(abs_srpm, osg_dir, want_diff3=True)
@@ -425,6 +427,11 @@ downloading and putting the SRPM into the upstream cache.
             "-u", "--upstream", default=DEFAULT_UPSTREAM_ROOT,
             help="The base directory to put the upstream sources under. "
             "Default: %default")
+        parser.add_option(
+            "-U", "--update", action="store_const", dest='extra_action', const=EXTRA_ACTION_UPDATE,
+            help="If there is an osg/ directory, do a 3-way diff like --diff3-spec.  Otherwise just update"
+            " the .source file in the 'upstream' directory."
+        )
 
         options, pos_args = parser.parse_args(argv[1:])
 

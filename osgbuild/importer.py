@@ -89,30 +89,36 @@ def make_svn_tree(srpm, url, extra_action=None, provider=None):
     name, version = srpm_nvr(srpm)[0:2]
     abs_srpm = os.path.abspath(srpm)
 
-    # HACK - if we're already in the package directory
-    if os.path.basename(os.getcwd()) == name:
-        os.chdir("..")
+    package_dir = os.path.abspath(os.getcwd())
+    if os.path.basename(package_dir) != name:
+        package_dir = os.path.join(package_dir, name)
 
-    if not os.path.exists(name):
-        utils.checked_call(["svn", "mkdir", name])
+    if not os.path.exists(package_dir):
+        utils.checked_call(["svn", "mkdir", package_dir])
 
-    osg_dir = os.path.join(name, "osg")
+    osg_dir = os.path.join(package_dir, "osg")
     if extra_action == EXTRA_ACTION_DIFF_SPEC:
         diff_spec(abs_srpm, osg_dir, want_diff3=False)
     elif extra_action == EXTRA_ACTION_EXTRACT_SPEC:
         extract_spec(abs_srpm, osg_dir)
-    # HACK - this test is ugly
-    elif extra_action == EXTRA_ACTION_DIFF3_SPEC or (extra_action == EXTRA_ACTION_UPDATE and os.path.isdir(osg_dir)):
+    elif extra_action == EXTRA_ACTION_DIFF3_SPEC:
         if os.path.isdir(osg_dir):
             extract_orig_spec(osg_dir)
         diff_spec(abs_srpm, osg_dir, want_diff3=True)
+    elif extra_action == EXTRA_ACTION_UPDATE:
+        if os.path.isdir(osg_dir):
+            logging.info("osg dir found -- doing 3-way diff")
+            extract_orig_spec(osg_dir)
+            diff_spec(abs_srpm, osg_dir, want_diff3=True)
+        else:
+            logging.info("osg dir not found -- updating .source file only")
 
-    upstream_dir = os.path.join(name, "upstream")
+    upstream_dir = os.path.join(package_dir, "upstream")
 
     if not os.path.exists(upstream_dir):
         utils.checked_call(["svn", "mkdir", upstream_dir])
 
-    cached_filename = os.path.join(name, version, srpm)
+    cached_filename = os.path.join(name, version, os.path.basename(srpm))
 
     make_source_file(url, cached_filename, upstream_dir, provider)
 
@@ -371,7 +377,7 @@ def extract_orig_spec(osg_dir):
 
 
 def move_to_cache(srpm, upstream_root):
-    """Move the srpm to the upstream cache."""
+    """Move the srpm to the upstream cache. Return the path to the file in the cache."""
     name, version = srpm_nvr(srpm)[0:2]
     base_srpm = os.path.basename(srpm)
     upstream_dir = os.path.join(upstream_root, name, version)
@@ -380,6 +386,8 @@ def move_to_cache(srpm, upstream_root):
     if os.path.exists(dest_file):
         os.unlink(dest_file)
     shutil.move(srpm, dest_file)
+
+    return dest_file
 
 
 def main(argv=None):
@@ -455,9 +463,8 @@ downloading and putting the SRPM into the upstream cache.
         if not re.match(r'(http|https|ftp):', upstream_url):
             raise UsageError("upstream-url is not a valid url")
 
-        srpm = download_srpm(upstream_url, options.output)
+        srpm = move_to_cache(download_srpm(upstream_url, options.output), options.upstream)
         make_svn_tree(srpm, upstream_url, options.extra_action, options.provider)
-        move_to_cache(srpm, options.upstream)
 
     except UsageError, e:
         parser.print_help()

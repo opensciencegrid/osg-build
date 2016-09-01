@@ -1,6 +1,7 @@
-Unreleased
+* Thu Sep 01 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.7.1
 - Don't print "Implicitly building for el..." message unless in verbose mode
 - Add update action (--update or -U) to osg-import-srpm
+- Some internal cleanup
 
 * Fri Aug 05 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.7.0
 - Add three-way diff functionality (--diff3 or -3) to osg-import-srpm

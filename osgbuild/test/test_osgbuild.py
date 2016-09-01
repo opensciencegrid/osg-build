@@ -434,27 +434,28 @@ class TestMisc(XTestCase):
         buildopts_el = dict()
         build_el = dict()
         defines_el = dict()
-        for dver in ['5', '6']:
+        for dver in ['el5', 'el6']:
+            rhel = dver[2:]
             buildopts_el[dver] = DEFAULT_BUILDOPTS_COMMON.copy()
             buildopts_el[dver]['redhat_release'] = dver
             buildopts_el[dver].update(DEFAULT_BUILDOPTS_BY_DVER[dver])
             build_el[dver] = srpm.SRPMBuild(".", buildopts_el[dver], None, None)
             defines_el[dver] = build_el[dver].get_rpmbuild_defines(True)
-            self.assertTrue("--define=rhel %s" % dver in defines_el[dver],
-                            "%%rhel not set correctly for el%s build" % dver)
+            self.assertTrue("--define=rhel %s" % rhel in defines_el[dver],
+                            "%%rhel not set correctly for %s build" % dver)
 
-        self.assertTrue('--define=el5 1' in defines_el['5'],
+        self.assertTrue('--define=el5 1' in defines_el['el5'],
                         "%el5 not set for el5 build")
-        self.assertTrue('--define=el6 0' in defines_el['5'],
+        self.assertTrue('--define=el6 0' in defines_el['el5'],
                         "%el6 not unset for el5 build")
 
-        self.assertTrue('--define=el6 1' in defines_el['6'],
+        self.assertTrue('--define=el6 1' in defines_el['el6'],
                         "%el6 not set for el6 build")
-        self.assertTrue('--define=el5 0' in defines_el['6'],
+        self.assertTrue('--define=el5 0' in defines_el['el6'],
                         "%el5 not unset for el6 build")
 
         self.assertTrue('--define=_source_filedigest_algorithm 1' in
-                        defines_el['5'],
+                        defines_el['el5'],
                         "filedigest algorithm not set for el5 build")
 
 

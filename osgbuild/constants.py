@@ -105,6 +105,9 @@ DEFAULT_BUILDOPTS_BY_DVER = {
         'repo': 'osg',
     }
 }
+# If the dver on the current machine can't be detected for some reason, or
+# isn't EL, use this.
+FALLBACK_DVER = 'el7'
 
 REPO_HINTS_STATIC = {
     'osg': {'target': 'osg-%(dver)s', 'tag': 'osg-%(dver)s'},

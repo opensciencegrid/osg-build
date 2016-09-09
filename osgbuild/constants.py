@@ -70,7 +70,7 @@ DEFAULT_BUILDOPTS_COMMON = {
     'kojilogin': None,
     'koji_wrapper': True,
     'mock_clean': True,
-    'mock_config': 'AUTO',
+    'mock_config': None,
     'mock_config_from_koji': None,
     'no_wait': False,
     'redhat_releases': None,

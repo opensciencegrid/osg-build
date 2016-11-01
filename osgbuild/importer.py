@@ -26,7 +26,8 @@ PROVIDER_PATTERNS = [
     (r'emisoft\.web\.cern\.ch'         , 'emi')    ,
     (r'fedoraproject\.org/pub/epel/'   , 'epel')   ,
     (r'fedoraproject\.org/pub/fedora/' , 'fedora') ,
-    (r'globus\.org'                    , 'globus') ]
+    (r'globus\.org'                    , 'globus') ,
+    (r'koji\.fedoraproject\.org/'      , 'fedora') ]
 
 
 

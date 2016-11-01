@@ -17,27 +17,6 @@ from osgbuild import utils
 
 
 
-def make_mock_config_from_template(arch, cfg_path, dist, rhel):
-    """Autogenerate a mock config for arch 'arch'."""
-    if re.match(r'i[3-6]86', arch):
-        basearch = 'i386'
-    else:
-        basearch = arch
-
-    cfg_abspath = os.path.abspath(cfg_path)
-    cfg_name = re.sub(r'\.cfg$', '', os.path.basename(cfg_abspath))
-
-    template = string.Template(utils.slurp(utils.find_file('mock-auto.cfg.in', DATA_FILE_SEARCH_PATH)))
-
-    utils.unslurp(cfg_abspath, template.safe_substitute(NAME=cfg_name,
-                                                        ARCH=arch,
-                                                        BASEARCH=basearch,
-                                                        DIST=dist,
-                                                        RHEL=rhel))
-
-    return cfg_abspath
-
-
 def make_mock_config_from_koji(koji_obj, arch, cfg_path, tag, dist):
     """Request a mock config from the koji hub"""
     cfg_abspath = os.path.abspath(cfg_path)
@@ -60,15 +39,12 @@ class Mock(object):
         if cfg_path:
             cfg_abspath = os.path.abspath(cfg_path)
             cfg_abspath_no_ext = re.sub(r'\.cfg$', '', cfg_abspath)
-            self.cfg_name = os.path.basename(cfg_abspath_no_ext)
 
             if not os.path.isfile(cfg_abspath):
                 raise MockError("Couldn't find mock config file at " + cfg_abspath)
 
             # The cfg file passed to mock is always relative to /etc/mock
             self.mock_cmd += ['-r', "../../" + cfg_abspath_no_ext]
-        else:
-            self.cfg_name = None
 
         self.target_arch = buildopts['target_arch']
 
@@ -105,40 +81,31 @@ You might need to log out and log in for the changes to take effect""")
             arch = machine_arch
 
         if mock_config:
-            if mock_config == "AUTO":
-                cfg_dir = tempfile.mkdtemp(prefix="osg-build-mock-")
-                atexit.register(shutil.rmtree, cfg_dir)
-                cfg_path = make_mock_config_from_template(
-                    arch,
-                    os.path.join(cfg_dir,"mock-auto-%s.%d.cfg" % (arch, os.getuid())),
-                    distro_tag,
-                    self.buildopts['redhat_release'])
+            # mock is very particular with its config file
+            # names. The path we pass it is interpreted to be
+            # relative to '/etc/mock', and mock will append '.cfg'
+            # to the end of the config file name.  So the argument
+            # to --mock-config can be interpreted in the usual way
+            # (as a file name with either an absolute path or path
+            # relative to the cwd), or it can be interpreted in
+            # the way mock does it. Figure out which the user
+            # meant (by seeing which interpretation exists) and
+            # translate it to what mock wants.
+            if not mock_config.endswith(".cfg"):
+                given_cfg_path = mock_config + ".cfg"
             else:
-                # mock is very particular with its config file
-                # names. The path we pass it is interpreted to be
-                # relative to '/etc/mock', and mock will append '.cfg'
-                # to the end of the config file name.  So the argument
-                # to --mock-config can be interpreted in the usual way
-                # (as a file name with either an absolute path or path
-                # relative to the cwd), or it can be interpreted in
-                # the way mock does it. Figure out which the user
-                # meant (by seeing which interpretation exists) and
-                # translate it to what mock wants.
-                if not mock_config.endswith(".cfg"):
-                    given_cfg_path = mock_config + ".cfg"
-                else:
-                    given_cfg_path = mock_config
+                given_cfg_path = mock_config
 
-                if given_cfg_path.startswith('/'):
-                    # Absolute path
-                    cfg_path = given_cfg_path
-                else:
-                    # Relative path. Can be relative to cwd or
-                    # /etc/mock. Prefer cwd.
-                    given_cfg_dir, given_cfg_file = os.path.split(given_cfg_path)
-                    cfg_dir1 = os.path.abspath(given_cfg_dir)
-                    cfg_dir2 = os.path.abspath(os.path.join('/etc/mock', given_cfg_dir))
-                    cfg_path = utils.find_file(given_cfg_file, [cfg_dir1, cfg_dir2])
+            if given_cfg_path.startswith('/'):
+                # Absolute path
+                cfg_path = given_cfg_path
+            else:
+                # Relative path. Can be relative to cwd or
+                # /etc/mock. Prefer cwd.
+                given_cfg_dir, given_cfg_file = os.path.split(given_cfg_path)
+                cfg_dir1 = os.path.abspath(given_cfg_dir)
+                cfg_dir2 = os.path.abspath(os.path.join('/etc/mock', given_cfg_dir))
+                cfg_path = utils.find_file(given_cfg_file, [cfg_dir1, cfg_dir2])
 
         elif mock_config_from_koji:
             cfg_dir = tempfile.mkdtemp(prefix="osg-build-mock-")

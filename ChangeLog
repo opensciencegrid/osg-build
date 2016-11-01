@@ -1,3 +1,4 @@
+- Remove --mock-config=AUTO (autogenerating a mock config from a template)
 - Fix KeyError on non-RHEL-like systems
 
 * Thu Sep 01 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.7.1

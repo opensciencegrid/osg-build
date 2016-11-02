@@ -196,7 +196,12 @@ def setup_koji_config_file():
     """Create the koji config file (if needed)."""
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
     if (not os.path.exists(new_koji_config_path) or
-            ask_yn("Koji configuration file '" + new_koji_config_path + "' already exists. Recreate it?")):
+            ask_yn("""\
+Koji configuration file '%s' already exists.
+Overwrite it with a new config file? Unless you have made changes to the file,
+you should say 'yes'.
+""" % new_koji_config_path)):
+        safe_make_backup(new_koji_config_path)
         shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH), new_koji_config_path)
 
 

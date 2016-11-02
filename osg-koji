@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import glob
 import os
 import shutil
 import sys
@@ -17,11 +16,11 @@ from osgbuild.utils import (
     ask_yn,
     backtick,
     find_file,
-    checked_call,
     safe_make_backup,
     safe_makedirs,
+    shell_quote,
     slurp,
-    unslurp, shell_quote)
+    unslurp)
 
 
 

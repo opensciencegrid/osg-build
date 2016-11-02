@@ -256,7 +256,12 @@ def setup_koji_client_cert(user_cert, user_key):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
     if (os.path.exists(new_client_cert_path) and
-            not ask_yn("Client cert file '" + new_client_cert_path + "' already exists. Recreate it?")):
+            not ask_yn("""\
+Client cert file '%s' already exists.
+Recreate it? Say 'y' if you have trouble logging in via the command-line
+tools, if you got a new certificate, or want to change between using a
+cert/key pair and using a grid proxy.
+""" % new_client_cert_path)):
 
         print "Not writing client cert file %r" % new_client_cert_path
         return
@@ -266,11 +271,18 @@ def setup_koji_client_cert(user_cert, user_key):
             not os.path.samefile(KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR)) and
             os.path.isfile(OLD_CLIENT_CERT_FILE)):
 
-        if ask_yn("Copy client cert from '" + OLD_CLIENT_CERT_FILE + "' ?"):
+        if ask_yn("""\
+You already have a client cert at '%s'.
+Reuse that file?
+""" % OLD_CLIENT_CERT_FILE):
             copy_old_client_cert(new_client_cert_path)
             return
 
-    if ask_yn("Set up symlink to grid proxy?"):
+    if ask_yn("""\
+Set up symlink to grid proxy? If you do this, you can use grid-proxy-init or
+voms-proxy-init to create a proxy and not have to type your password in as
+often.
+"""):
         create_client_symlink_to_proxy(new_client_cert_path)
         print "Proxy symlink created. If using voms-proxy-init, be sure to request an RFC-style proxy (pass -rfc)"
         return

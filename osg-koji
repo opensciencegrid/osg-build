@@ -201,16 +201,12 @@ def setup_koji_config_file():
 
 
 def setup_koji_server_cert():
-    """Create the koji server cert file (if needed)."""
+    """Create the koji server cert file."""
     new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, SERVER_CERT_FILE)
-    if (not os.path.exists(new_server_cert_path) or
-            ask_yn("Server cert file '" + new_server_cert_path + "' already exists. Recreate it?")):
-        working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
-        safe_make_backup(new_server_cert_path)
-        shutil.copy(create_ca_bundle(working_dir), new_server_cert_path)
-        shutil.rmtree(working_dir, ignore_errors=True)
-    else:
-        print "Not writing server cert file %r" % new_server_cert_path
+    working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
+    safe_make_backup(new_server_cert_path)
+    shutil.copy(create_ca_bundle(working_dir), new_server_cert_path)
+    shutil.rmtree(working_dir, ignore_errors=True)
 
 
 def with_safe_umask(function_to_wrap):

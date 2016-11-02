@@ -21,7 +21,7 @@ from osgbuild.utils import (
     safe_make_backup,
     safe_makedirs,
     slurp,
-    unslurp)
+    unslurp, shell_quote)
 
 
 
@@ -199,7 +199,7 @@ def setup_koji_config_file():
             ask_yn("""\
 Koji configuration file '%s' already exists.
 Overwrite it with a new config file? Unless you have made changes to the file,
-you should say 'yes'.
+you should say 'y'.
 """ % new_koji_config_path)):
         safe_make_backup(new_koji_config_path)
         shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH), new_koji_config_path)
@@ -237,9 +237,10 @@ def copy_old_client_cert(new_client_cert_path):
 def create_client_cert_from_cert_and_key(new_client_cert_path, user_cert, user_key):
     safe_make_backup(new_client_cert_path)
     # Concatenate the cert and key; make sure there is a newline between them
-    os.system("(cat %r; echo; cat %r) > %r" % (user_cert, user_key, new_client_cert_path))
+    os.system("(cat %s; echo; cat %s) > %s" % (shell_quote(user_cert), shell_quote(user_key),
+                                               shell_quote(new_client_cert_path)))
     # Convert DOS line endings; use sed because dos2unix might not be installed
-    os.system("sed -i -e 's/\015$//g' %r" % new_client_cert_path)
+    os.system("sed -i -e 's/\015$//g' %s" % shell_quote(new_client_cert_path))
 
 @with_safe_umask
 def create_client_symlink_to_proxy(new_client_cert_path):

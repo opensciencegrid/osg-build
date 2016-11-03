@@ -307,6 +307,7 @@ If you wish to use grid proxy authentication, make a symlink from
 %(new_client_cert_path)r to your proxy. If using voms-proxy-init, be sure to
 request an RFC-style proxy (pass -rfc).
 """ % locals())
+    sys.exit(1)
 
 
 def run_setup(user_cert, user_key):
@@ -351,6 +352,15 @@ def main(argv=None):
             if argv[1] == "setup":
                 options = setup_parse_args(argv[2:])
                 run_setup(options.user_cert, options.user_key)
+                print """\
+Setup is done. You may verify that you can log in via the command-line
+tools by running:
+
+    %s list-permissions --mine
+
+(Run grid-proxy-init first, if necessary).
+""" % (PROGRAM_NAME)
+
             elif argv[1] == "help":
                 os.system("koji " + ' '.join(argv[1:]))
                 print EXTRA_HELP

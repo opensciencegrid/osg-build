@@ -254,7 +254,7 @@ def create_client_symlink_to_proxy(new_client_cert_path):
 def setup_koji_client_cert(user_cert, user_key):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
-    if (os.path.exists(new_client_cert_path) and
+    if (os.path.lexists(new_client_cert_path) and
             not ask_yn("""\
 Client cert file '%s' already exists.
 Recreate it? Say 'y' if you have trouble logging in via the command-line

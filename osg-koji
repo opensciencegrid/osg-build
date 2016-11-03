@@ -256,10 +256,10 @@ def setup_koji_client_cert(user_cert, user_key):
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
     if (os.path.lexists(new_client_cert_path) and
             not ask_yn("""
-Client cert file '%s' already exists.
-Recreate it? Say yes if you have trouble logging in via the command-line
-tools, if you got a new certificate, or want to change between using a
-cert/key pair and using a grid proxy.
+Client certificate file '%s' already exists. Do you want to recreate it now?
+Enter yes if you have trouble logging in via the command-line tools, if you
+got a new certificate, or want to use a grid certificate/key pair instead of
+a grid proxy or vice versa.
 """ % new_client_cert_path)):
 
         print "Not writing client cert file %r" % new_client_cert_path
@@ -271,16 +271,16 @@ cert/key pair and using a grid proxy.
             os.path.isfile(OLD_CLIENT_CERT_FILE)):
 
         if ask_yn("""
-You already have a client cert at '%s'.
+You already have a client certificate at '%s'.
 Reuse that file?
 """ % OLD_CLIENT_CERT_FILE):
             copy_old_client_cert(new_client_cert_path)
             return
 
     if ask_yn("""
-Set up symlink to grid proxy? If you do this, you can use grid-proxy-init or
-voms-proxy-init to create a proxy and not have to type your password in as
-often.
+Symlink to expected grid proxy location? Doing so means you can use a grid
+proxy (from grid-proxy-init or voms-proxy-init) for authentication and
+thereby not need to type your password in as often.
 """):
         create_client_symlink_to_proxy(new_client_cert_path)
         print "Proxy symlink created. If using voms-proxy-init, be sure to request an RFC-style proxy (pass -rfc)"
@@ -358,7 +358,7 @@ tools by running:
 
     %s list-permissions --mine
 
-(Run grid-proxy-init first, if necessary).
+If you authenticate with a proxy, be sure to have a valid one first.
 """ % (PROGRAM_NAME)
 
             elif argv[1] == "help":

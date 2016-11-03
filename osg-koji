@@ -195,10 +195,10 @@ def setup_koji_config_file():
     """Create the koji config file (if needed)."""
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
     if (not os.path.exists(new_koji_config_path) or
-            ask_yn("""\
+            ask_yn("""
 Koji configuration file '%s' already exists.
 Overwrite it with a new config file? Unless you have made changes to the file,
-you should say 'y'.
+you should say yes.
 """ % new_koji_config_path)):
         safe_make_backup(new_koji_config_path)
         shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH), new_koji_config_path)
@@ -255,9 +255,9 @@ def setup_koji_client_cert(user_cert, user_key):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
     if (os.path.lexists(new_client_cert_path) and
-            not ask_yn("""\
+            not ask_yn("""
 Client cert file '%s' already exists.
-Recreate it? Say 'y' if you have trouble logging in via the command-line
+Recreate it? Say yes if you have trouble logging in via the command-line
 tools, if you got a new certificate, or want to change between using a
 cert/key pair and using a grid proxy.
 """ % new_client_cert_path)):
@@ -270,14 +270,14 @@ cert/key pair and using a grid proxy.
             not os.path.samefile(KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR)) and
             os.path.isfile(OLD_CLIENT_CERT_FILE)):
 
-        if ask_yn("""\
+        if ask_yn("""
 You already have a client cert at '%s'.
 Reuse that file?
 """ % OLD_CLIENT_CERT_FILE):
             copy_old_client_cert(new_client_cert_path)
             return
 
-    if ask_yn("""\
+    if ask_yn("""
 Set up symlink to grid proxy? If you do this, you can use grid-proxy-init or
 voms-proxy-init to create a proxy and not have to type your password in as
 often.
@@ -352,7 +352,7 @@ def main(argv=None):
             if argv[1] == "setup":
                 options = setup_parse_args(argv[2:])
                 run_setup(options.user_cert, options.user_key)
-                print """\
+                print """
 Setup is done. You may verify that you can log in via the command-line
 tools by running:
 

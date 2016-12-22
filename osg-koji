@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import glob
 import os
 import shutil
 import sys
@@ -17,9 +16,9 @@ from osgbuild.utils import (
     ask_yn,
     backtick,
     find_file,
-    checked_call,
     safe_make_backup,
     safe_makedirs,
+    shell_quote,
     slurp,
     unslurp)
 
@@ -196,21 +195,22 @@ def setup_koji_config_file():
     """Create the koji config file (if needed)."""
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
     if (not os.path.exists(new_koji_config_path) or
-            ask_yn("Koji configuration file '" + new_koji_config_path + "' already exists. Recreate it?")):
+            ask_yn("""
+Koji configuration file '%s' already exists.
+Overwrite it with a new config file? Unless you have made changes to the file,
+you should say yes.
+""" % new_koji_config_path)):
+        safe_make_backup(new_koji_config_path)
         shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH), new_koji_config_path)
 
 
 def setup_koji_server_cert():
-    """Create the koji server cert file (if needed)."""
+    """Create the koji server cert file."""
     new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, SERVER_CERT_FILE)
-    if (not os.path.exists(new_server_cert_path) or
-            ask_yn("Server cert file '" + new_server_cert_path + "' already exists. Recreate it?")):
-        working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
-        safe_make_backup(new_server_cert_path)
-        shutil.copy(create_ca_bundle(working_dir), new_server_cert_path)
-        shutil.rmtree(working_dir, ignore_errors=True)
-    else:
-        print "Not writing server cert file %r" % new_server_cert_path
+    working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
+    safe_make_backup(new_server_cert_path)
+    shutil.copy(create_ca_bundle(working_dir), new_server_cert_path)
+    shutil.rmtree(working_dir, ignore_errors=True)
 
 
 def with_safe_umask(function_to_wrap):
@@ -236,9 +236,10 @@ def copy_old_client_cert(new_client_cert_path):
 def create_client_cert_from_cert_and_key(new_client_cert_path, user_cert, user_key):
     safe_make_backup(new_client_cert_path)
     # Concatenate the cert and key; make sure there is a newline between them
-    os.system("(cat %r; echo; cat %r) > %r" % (user_cert, user_key, new_client_cert_path))
+    os.system("(cat %s; echo; cat %s) > %s" % (shell_quote(user_cert), shell_quote(user_key),
+                                               shell_quote(new_client_cert_path)))
     # Convert DOS line endings; use sed because dos2unix might not be installed
-    os.system("sed -i -e 's/\015$//g' %r" % new_client_cert_path)
+    os.system("sed -i -e 's/\015$//g' %s" % shell_quote(new_client_cert_path))
 
 @with_safe_umask
 def create_client_symlink_to_proxy(new_client_cert_path):
@@ -253,8 +254,13 @@ def create_client_symlink_to_proxy(new_client_cert_path):
 def setup_koji_client_cert(user_cert, user_key):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
-    if (os.path.exists(new_client_cert_path) and
-            not ask_yn("Client cert file '" + new_client_cert_path + "' already exists. Recreate it?")):
+    if (os.path.lexists(new_client_cert_path) and
+            not ask_yn("""
+Client certificate file '%s' already exists. Do you want to recreate it now?
+Enter yes if you have trouble logging in via the command-line tools, if you
+got a new certificate, or want to use a grid certificate/key pair instead of
+a grid proxy or vice versa.
+""" % new_client_cert_path)):
 
         print "Not writing client cert file %r" % new_client_cert_path
         return
@@ -264,11 +270,18 @@ def setup_koji_client_cert(user_cert, user_key):
             not os.path.samefile(KOJI_USER_CONFIG_DIR, OSG_KOJI_USER_CONFIG_DIR)) and
             os.path.isfile(OLD_CLIENT_CERT_FILE)):
 
-        if ask_yn("Copy client cert from '" + OLD_CLIENT_CERT_FILE + "' ?"):
+        if ask_yn("""
+You already have a client certificate at '%s'.
+Reuse that file?
+""" % OLD_CLIENT_CERT_FILE):
             copy_old_client_cert(new_client_cert_path)
             return
 
-    if ask_yn("Set up symlink to grid proxy?"):
+    if ask_yn("""
+Symlink to expected grid proxy location? Doing so means you can use a grid
+proxy (from grid-proxy-init or voms-proxy-init) for authentication and
+thereby not need to type your password in as often.
+"""):
         create_client_symlink_to_proxy(new_client_cert_path)
         print "Proxy symlink created. If using voms-proxy-init, be sure to request an RFC-style proxy (pass -rfc)"
         return
@@ -294,6 +307,7 @@ If you wish to use grid proxy authentication, make a symlink from
 %(new_client_cert_path)r to your proxy. If using voms-proxy-init, be sure to
 request an RFC-style proxy (pass -rfc).
 """ % locals())
+    sys.exit(1)
 
 
 def run_setup(user_cert, user_key):
@@ -338,6 +352,15 @@ def main(argv=None):
             if argv[1] == "setup":
                 options = setup_parse_args(argv[2:])
                 run_setup(options.user_cert, options.user_key)
+                print """
+Setup is done. You may verify that you can log in via the command-line
+tools by running:
+
+    %s list-permissions --mine
+
+If you authenticate with a proxy, be sure to have a valid one first.
+""" % (PROGRAM_NAME)
+
             elif argv[1] == "help":
                 os.system("koji " + ' '.join(argv[1:]))
                 print EXTRA_HELP

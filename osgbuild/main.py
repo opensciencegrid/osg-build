@@ -157,8 +157,8 @@ def main(argv):
                     log.warning("--getfiles is only implemented on the KojiLib backend")
                 else:
                     for destdir, tids in task_ids_by_results_dir.iteritems():
-                        kojiinter.KojiInter.backend.download_results(tids, destdir)
-                        log.info("Results and logs downloaded to %s", destdir)
+                        if kojiinter.KojiInter.backend.download_results(tids, destdir):
+                            log.info("Results and logs downloaded to %s", destdir)
             try:
                 return int(ret)
             except (TypeError, ValueError):

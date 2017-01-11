@@ -8,6 +8,7 @@ import re
 import os
 import time
 import urllib2
+from urllib2 import HTTPError
 
 from osgbuild.constants import *
 from osgbuild import clientcert
@@ -90,7 +91,12 @@ def download_koji_file(task_id, filename, destdir):
     """
     url = KOJI_HUB + "/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
     log.debug('Retrieving ' + url)
-    handle = urllib2.urlopen(url)
+    try:
+        handle = urllib2.urlopen(url)
+    except HTTPError as err:
+        log.error('Error retrieving ' + url)
+        log.error(str(err))
+        raise
     utils.safe_makedirs(destdir)
     full_filename = os.path.join(destdir, filename)
     desthandle = open(full_filename, 'w')
@@ -626,9 +632,11 @@ class KojiLibInter(object):
                             if not filename.endswith('src.rpm'):
                                 destsubdir = re.sub(r'-build', '', tag_name) + "-" + arch
                                 download_koji_file(task_id, filename, os.path.join(destdir, destsubdir))
-                    except (TypeError, AttributeError):
+                    except (TypeError, AttributeError, HTTPError):
                         # TODO More useful error message
                         log.warning("Unable to download files for task %d", task_id)
+                        return False
+        return True
 
 
 # end of class KojiLibInter

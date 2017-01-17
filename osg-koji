@@ -9,6 +9,7 @@ import urllib2
 from optparse import OptionParser
 
 from osgbuild.constants import (
+    CSL_KOJI_DIR,
     DATA_FILE_SEARCH_PATH,
     KOJI_USER_CONFIG_DIR,     # old koji config dir
     OSG_KOJI_USER_CONFIG_DIR) # new koji config dir (created by this script)
@@ -43,8 +44,6 @@ CILOGON_OSG_CA_CERT = {
     '098hash': "d690e530",
     '1xhash': "70d35895"}
 CILOGON_OSG_CA_CERT_URL = "https://cilogon.org/cilogon-osg.pem"
-
-CSL_KOJI_PATH = "/p/vdt/workspace/koji-1.6.0"
 
 DIGICERT_GRID_BASEURL = "http://www.digicert-grid.com"
 GRID_CERTS_DIR = "/etc/grid-security/certificates"
@@ -340,12 +339,12 @@ def main(argv=None):
         argv = sys.argv
 
     # Kind of a hack
-    if os.path.exists(CSL_KOJI_PATH):
-        os.environ['PATH'] = (os.path.join(CSL_KOJI_PATH, "cli") + os.pathsep + os.environ['PATH'])
+    if os.path.exists(CSL_KOJI_DIR):
+        os.environ['PATH'] = (os.path.join(CSL_KOJI_DIR, "cli") + os.pathsep + os.environ['PATH'])
         if os.environ.has_key('PYTHONPATH'):
-            os.environ['PYTHONPATH'] = (CSL_KOJI_PATH + os.pathsep + os.environ['PYTHONPATH'])
+            os.environ['PYTHONPATH'] = (CSL_KOJI_DIR + os.pathsep + os.environ['PYTHONPATH'])
         else:
-            os.environ['PYTHONPATH'] = CSL_KOJI_PATH
+            os.environ['PYTHONPATH'] = CSL_KOJI_DIR
 
     try:
         if len(argv) > 1:

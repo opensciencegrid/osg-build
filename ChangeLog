@@ -1,5 +1,6 @@
 - Remove --mock-config=AUTO (autogenerating a mock config from a template)
 - Fix KeyError on non-RHEL-like systems
+- Improve explanatory text in osg-koji setup (SOFTWARE-2455)
 
 * Thu Sep 01 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.7.1
 - Don't print "Implicitly building for el..." message unless in verbose mode

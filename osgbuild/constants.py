@@ -47,7 +47,7 @@ GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?internal$'                   : 'internal',
     r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned'}
 
-CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.6.0"
+CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.11.0"
 
 OSG_REMOTE = 'https://github.com/opensciencegrid/Software-Redhat.git'
 HCC_REMOTE = 'https://github.com/unlhcc/hcc-packaging.git'

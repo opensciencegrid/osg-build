@@ -1,5 +1,8 @@
-- Remove --mock-config=AUTO (autogenerating a mock config from a template)
-- Fix KeyError on non-RHEL-like systems
+* Wed Feb 01 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.0
+- Use koji 1.11 on CSL systems and update template config to koji 1.7+ version
+  (adds dependency on koji >= 1.7) (SOFTWARE-2566)
+- Remove broken --mock-config=AUTO (autogenerating a mock config from a template)
+- Fix KeyError on non-RHEL-like systems (e.g. Fedora)
 - Improve explanatory text in osg-koji setup (SOFTWARE-2455)
 
 * Thu Sep 01 2016 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.7.1

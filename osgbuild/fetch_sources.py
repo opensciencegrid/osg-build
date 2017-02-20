@@ -46,7 +46,7 @@ def process_json_url(line, destdir):
     tag = json_contents.get("tag")
     if not tag:
         raise Error("No package tag specified: %s" % line)
-    dest_file = str("%s-%s.tar" % (name, tag))
+    dest_file = str("%s-%s.tar.gz" % (name, tag))
     full_dest_file = os.path.join(destdir, dest_file)
     prefix = str("%s-%s" % (name, tag))
     git_hash = json_contents.get("hash")
@@ -67,17 +67,14 @@ def process_json_url(line, destdir):
         sha1 = output.split()[0]
         if sha1 != git_hash:
             raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
-        rc = subprocess.call(["git", "archive", "--prefix=%s/" % prefix, str(git_hash), "--output=%s" % os.path.join(destdir, dest_file)])
+        rc = subprocess.call(["git", "archive", "--format=tgz", "--prefix=%s/" % prefix, str(git_hash), "--output=%s" % os.path.join(destdir, dest_file)])
         if rc:
             raise Error("Failed to create an archive of hash %s" % git_hash)
-        rc = subprocess.call(["gzip", full_dest_file])
-        if rc:
-            raise Error("Failed to compress archive at %s" % full_dest_file)
     finally:
         os.chdir(orig_dir)
         shutil.rmtree(checkout_dir)
 
-    return full_dest_file + ".gz"
+    return full_dest_file
 
 def process_dot_source(cache_prefix, sfilename, destdir):
     """Read a .source file, fetch any files mentioned in it from the

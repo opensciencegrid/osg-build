@@ -418,6 +418,7 @@ class KojiLibInter(object):
             self.user = user or get_cn()
         else:
             self.user = user or "osgbuild"
+        self.use_old_ssl = True
         self.weburl = os.path.join(KOJI_WEB, "koji")
         self.dry_run = dry_run
 
@@ -436,6 +437,12 @@ class KojiLibInter(object):
             cfg = ConfigParser.ConfigParser()
             cfg.read(config_file)
             items = dict(cfg.items('koji'))
+
+            # special case: use_old_ssl is a boolean so get ConfigParser to parse it
+            try:
+                self.use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
+            except ConfigParser.NoOptionError:
+                pass
         except ConfigParser.Error, err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl']:
@@ -445,7 +452,7 @@ class KojiLibInter(object):
 
     def init_koji_session(self, login=True):
         log.info("Initializing koji session to %s", self.server)
-        self.kojisession = kojilib.ClientSession(self.server, {'user': self.user})
+        self.kojisession = kojilib.ClientSession(self.server, {'user': self.user, 'use_old_ssl': self.use_old_ssl})
         if login and not self.dry_run:
             self.login_to_koji()
 

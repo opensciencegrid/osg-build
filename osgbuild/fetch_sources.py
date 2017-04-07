@@ -9,7 +9,6 @@ import logging
 import glob
 import re
 import os
-import json
 import tempfile
 import subprocess
 import shutil
@@ -22,20 +21,24 @@ from osgbuild import utils
 log = logging.getLogger('osgbuild')
 log.propagate = False
 
-def process_json_url(line, destdir):
+def process_meta_url(line, destdir):
     """
     Process a JSON-serialized URL spec.  Should be of the format:
-     {"type": "git", "url": "https://github.com/opensciencegrid/cvmfs-config-osg.git", "name": "cvmfs-config-osg", "tag": "0.1", "hash": "e2b54cd1b94c9e3eaee079490c9d85f193c52249"}
+     type=git url=https://github.com/opensciencegrid/cvmfs-config-osg.git name=cvmfs-config-osg tag=0.1 hash=e2b54cd1b94c9e3eaee079490c9d85f193c52249
     'name' can be derived from the URL if the last component in the URL is of the form 'NAME.git'
     """
-    json_contents = json.loads(line)
-    tag_type = json_contents.get("type", "")
+    contents = {}
+    for entry in line.split():
+        info = entry.split("=", 1)
+        if len(info) > 1:
+            contents[info[0].strip()] = info[1].strip()
+    tag_type = contents.get("type", "")
     if tag_type != "git":
         raise Error("Only 'git'-type URLs are understood in JSON: %s" % line)
-    git_url = json_contents.get('url')
+    git_url = contents.get('url')
     if not git_url:
         raise Error("No git URL provided in JSON: %s" % line)
-    name = json_contents.get("name")
+    name = contents.get("name")
     if not name:
         basename = os.path.split(git_url)[-1]
         if basename[-4:] == '.git':
@@ -43,13 +46,13 @@ def process_json_url(line, destdir):
         else:
             raise Error("No package name specified in JSON: %s" % line)
     print "Checking out git repo for %s." % name
-    tag = json_contents.get("tag")
+    tag = contents.get("tag")
     if not tag:
         raise Error("No package tag specified: %s" % line)
     dest_file = str("%s-%s.tar.gz" % (name, tag))
     full_dest_file = os.path.join(destdir, dest_file)
     prefix = str("%s-%s" % (name, tag))
-    git_hash = json_contents.get("hash")
+    git_hash = contents.get("hash")
     if not git_hash:
         raise Error("git hash not provided.")
     checkout_dir = tempfile.mkdtemp(prefix=dest_file, dir=destdir)
@@ -92,8 +95,8 @@ def process_dot_source(cache_prefix, sfilename, destdir):
             if line == '':
                 continue
             basename = os.path.basename(line)
-            if line.startswith('{'):
-                filename = process_json_url(line, destdir)
+            if line.split() > 1:
+                filename = process_meta_url(line, destdir)
                 downloaded.append(filename)
                 continue
             elif line.startswith('/'):

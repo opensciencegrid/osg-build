@@ -26,13 +26,21 @@ import tempfile
 import ConfigParser
 
 from osgbuild.constants import *
-from osgbuild.error import UsageError, KojiError, SVNError, GitError
-from osgbuild import kojiinter
-from osgbuild import mock
+from osgbuild.error import UsageError, KojiError, SVNError, GitError, Error
 from osgbuild import srpm
 from osgbuild import svn
 from osgbuild import git
 from osgbuild import utils
+
+try:
+    from osgbuild import kojiinter
+except ImportError:
+    kojiinter = None
+
+try:
+    from osgbuild import mock
+except ImportError:
+    mock = None
 
 __version__ = '@VERSION@'
 
@@ -53,15 +61,14 @@ def main(argv):
     """Main function."""
 
     buildopts, package_dirs, task = init(argv)
-    koji_obj = None
-    mock_obj = None
     vcs = None
 
     if task in ['koji', 'mock']:
         for dver in buildopts['enabled_dvers']:
             targetopts = buildopts['targetopts_by_dver'][dver]
-            targetopts['koji_target'] = targetopts['koji_target'] or target_for_repo_hint(targetopts['repo'], dver)
-            targetopts['koji_tag'] = targetopts['koji_tag'] or tag_for_repo_hint(targetopts['repo'], dver)
+            if kojiinter:
+                targetopts['koji_target'] = targetopts['koji_target'] or target_for_repo_hint(targetopts['repo'], dver)
+                targetopts['koji_tag'] = targetopts['koji_tag'] or tag_for_repo_hint(targetopts['repo'], dver)
     # checks
     if task == 'koji' and buildopts['vcs']:
         # verify working dirs
@@ -114,9 +121,12 @@ def main(argv):
             mock_obj = None
             koji_obj = None
             if task == 'koji':
+                assert kojiinter  # shouldn't get here without osg-build-koji
                 koji_obj = kojiinter.KojiInter(dver_buildopts)
             if task == 'mock':
+                assert mock  # shouldn't get here without osg-build-mock
                 if dver_buildopts['mock_config_from_koji']:
+                    assert kojiinter  # shouldn't get here without osg-build-koji
                     # HACK: We don't want to log in to koji just to get a mock config
                     dver_buildopts_ = dver_buildopts.copy()
                     dver_buildopts_['dry_run'] = True
@@ -142,7 +152,7 @@ def main(argv):
     # end of main loop
     # HACK
     task_ids = filter(None, task_ids)
-    if kojiinter.KojiInter.backend and task_ids:
+    if kojiinter and kojiinter.KojiInter.backend and task_ids:
         print "Koji task ids are:", task_ids
         for tid in task_ids:
             print KOJI_WEB + "/koji/taskinfo?taskID=" + str(tid)
@@ -185,7 +195,16 @@ def init(argv):
         set_loglevel(options.loglevel)
 
     task = get_task(args)
+    # Check for required modules
+    if task == 'mock' and not mock:
+        raise Error('Mock plugin not found.\nInstall osg-build-mock to make the mock task available.')
+    elif task == 'koji' and not kojiinter:
+        raise Error('Koji plugin not found.\nInstall osg-build-koji to make the koji task available.')
+
     buildopts = get_buildopts(options, task)
+    if buildopts['mock_config_from_koji'] and not kojiinter:
+        raise Error('Koji plugin not found.\nInstall osg-build-koji to make getting a Mock config from Koji available.')
+
     set_loglevel(buildopts.get('loglevel', 'INFO'))
 
     package_dirs = args[1:]
@@ -268,19 +287,31 @@ def parse_cmdline_args(argv):
     args:       a list containing the positional arguments left over
 
     """
-    parser = OptionParser("""
+    header = """
    %prog TASK PACKAGE1 <PACKAGE2..n> [options]
 
 Valid tasks are:
-koji         Build using koji
-lint         Discover potential package problems using rpmlint
-mock         Build using mock(1) on the local machine
+lint         Discover potential package problems using rpmlint(1)
 prebuild     Preprocess the package, create SRPM to be submitted, and stop
-prepare      Use rpmbuild -bp to unpack and patch the package
+prepare      Use 'rpmbuild -bp' to unpack and patch the package
 quilt        Preprocess the package and run 'quilt setup' on the spec file to
              unpack the source files and prepare a quilt(1) series file.
 rpmbuild     Build using rpmbuild(8) on the local machine
-""")
+"""
+    header_post = ""
+    if kojiinter:
+        header += "koji         Build using the Koji build system\n"
+    else:
+        header_post += "Install osg-build-koji to make the koji task available\n"
+    if mock:
+        header += "mock         Build using mock(1) on the local machine\n"
+    else:
+        header_post += "Install osg-build-mock to make the mock task available\n"
+
+    if header_post:
+        header += "\n" + header_post
+
+    parser = OptionParser(header)
     parser.add_option(
         "-a", "--autoclean", action="store_true",
         help="Clean out the following directories before each build: "
@@ -350,6 +381,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     prebuild_group.add_option(
         "--full-extract", action="store_true",
         help="Fully extract all source files.")
+    parser.add_option_group(prebuild_group)
 
     rpmbuild_mock_group = OptionGroup(parser, 
                                       "rpmbuild and mock task options")
@@ -357,122 +389,125 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "--distro-tag",
         help="The distribution tag to append to the end of the release. "
         "(Default: osg.el5, osg.el6 or osg.el7, depending on --redhat-release)")
+    parser.add_option_group(rpmbuild_mock_group)
 
-    mock_group = OptionGroup(parser,
-                             "mock task options")
-    mock_group.add_option(
-        "--mock-clean", action="store_true", dest="mock_clean",
-        help="Clean the mock buildroot after building (default)")
-    mock_group.add_option(
-        "--no-mock-clean", action="store_false", dest="mock_clean",
-        help="Do not clean the mock buildroot after building")
-    mock_group.add_option(
-        "-m", "--mock-config",
-        help="The location of a mock config file to build using. "
-        "Either this or --mock-config-from-koji must be specified.")
-    mock_group.add_option(
-        "--mock-config-from-koji",
-        help="Use a mock config based on a koji buildroot (build tag, "
-        "such as osg-3.2-el5-build). Either this or --mock-config must be "
-        "specified.")
+    if mock:
+        mock_group = OptionGroup(parser,
+                                 "mock task options")
+        mock_group.add_option(
+            "--mock-clean", action="store_true", dest="mock_clean",
+            help="Clean the mock buildroot after building (default)")
+        mock_group.add_option(
+            "--no-mock-clean", action="store_false", dest="mock_clean",
+            help="Do not clean the mock buildroot after building")
+        mock_group.add_option(
+            "-m", "--mock-config",
+            help="The location of a mock config file to build using. "
+            "Either this or --mock-config-from-koji must be specified.")
+        mock_group.add_option(
+            "--mock-config-from-koji",
+            help="Use a mock config based on a koji buildroot (build tag, "
+            "such as osg-3.2-el5-build). Either this or --mock-config must be "
+            "specified. This option requires the osg-build-koji plugin.")
+        parser.add_option_group(mock_group)
 
-    koji_group = OptionGroup(parser,
-                             "koji task options")
-    koji_group.add_option(
-        "--background", action="store_true",
-        help="Run build at a lower priority")
-    koji_group.add_option(
-        "--dry-run", action="store_true",
-        help="Do not invoke koji, only show what would be done.")
-    koji_group.add_option(
-        "--getfiles", "--get-files", action="store_true", dest="getfiles",
-        help="Download finished products and logfiles")
-    koji_group.add_option(
-        "--koji-backend", dest="koji_backend",
-        help="The back end to use for invoking koji. Valid values are: "
-        "'shell', 'kojilib'. If not specified, will try to use kojilib and use "
-        "shell as a fallback.")
-    koji_group.add_option(
-        "-k", "--kojilogin", "--koji-login", dest="kojilogin",
-        help="The login you use for koji (most likely your CN, e.g."
-        "'Matyas Selmeci 564109')")
-    koji_group.add_option(
-        "--koji-target",
-        action="callback",
-        callback=parser_targetopts_callback,
-        type="string",
-        help="The koji target to use for building. "
-        "It is recommended to use the --repo option instead of this when the "
-        "desired repo is available.")
-    koji_group.add_option(
-        "--koji-tag",
-        action="callback",
-        callback=parser_targetopts_callback,
-        type="string",
-        help="The koji tag to add packages to. The special value TARGET "
-        "uses the destination tag defined in the koji target. "
-        "It is recommended to use the --repo option instead of this when the "
-        "desired repo is available.")
-    koji_group.add_option(
-        "--koji-target-and-tag", "--ktt",
-        action="callback",
-        callback=parser_targetopts_callback,
-        type="string",
-        dest="ktt",
-        metavar='ARG',
-        help="Specifies both the koji tag to add packages to and the target "
-        "to use for building. '--ktt ARG' is equivalent to '--koji-target ARG "
-        " --koji-tag ARG'. "
-        "It is recommended to use the --repo option instead of this when the "
-        "desired repo is available.")
-    koji_group.add_option(
-        "--koji-wrapper", action="store_true", dest="koji_wrapper",
-        help="Use the 'osg-koji' koji wrapper if using the 'shell' backend. "
-        "(Default)")
-    koji_group.add_option(
-        "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
-        help="Do not use the 'osg-koji' koji wrapper if using the 'shell' "
-        "backend, even if found.")
-    koji_group.add_option(
-        "--no-wait", "--nowait", action="store_true", dest="no_wait",
-        help="Do not wait for the build to finish")
-    koji_group.add_option(
-        "--wait", action="store_false", dest="no_wait",
-        help="Wait for the build to finish")
-    koji_group.add_option(
-        "--regen-repos", action="store_true",
-        help="Perform a regen-repo on the build and destination repos after "
-        "each koji build. Allows doing builds that depend on each other. "
-        "Use sparingly, as this slows down builds and uses more disk space on "
-        "koji-hub.")
-    koji_group.add_option(
-        "--scratch", action="store_true",
-        help="Perform a scratch build")
-    koji_group.add_option(
-        "--no-scratch", "--noscratch", action="store_false", dest="scratch",
-        help="Do not perform a scratch build")
-    koji_group.add_option(
-        "--vcs", "--svn", action="store_true", dest="vcs",
-        help="Build package directly from SVN/git "
-        "(default for non-scratch builds)")
-    koji_group.add_option(
-        "--no-vcs", "--novcs", "--no-svn", "--nosvn", action="store_false", dest="vcs",
-        help="Do not build package directly from SVN/git "
-        "(default for scratch builds)")
-    koji_group.add_option(
-        "--upcoming", action="callback",
-        callback=parser_targetopts_callback,
-        type=None,
-        help="Target build for the 'upcoming' osg repos.")
-    koji_group.add_option(
-        "--repo", action="callback",
-        callback=parser_targetopts_callback,
-        type="string", dest="repo",
-        help="Specify a set of repos to build to (osg-3.1 (or just 3.1), "
-        + ", ".join(REPO_HINTS_STATIC.keys())
-        + ")")
-    for grp in [prebuild_group, rpmbuild_mock_group, mock_group, koji_group]:
-        parser.add_option_group(grp)
+    if kojiinter:
+        koji_group = OptionGroup(parser,
+                                 "koji task options")
+        koji_group.add_option(
+            "--background", action="store_true",
+            help="Run build at a lower priority")
+        koji_group.add_option(
+            "--dry-run", action="store_true",
+            help="Do not invoke koji, only show what would be done.")
+        koji_group.add_option(
+            "--getfiles", "--get-files", action="store_true", dest="getfiles",
+            help="Download finished products and logfiles")
+        koji_group.add_option(
+            "--koji-backend", dest="koji_backend",
+            help="The back end to use for invoking koji. Valid values are: "
+            "'shell', 'kojilib'. If not specified, will try to use kojilib and use "
+            "shell as a fallback.")
+        koji_group.add_option(
+            "-k", "--kojilogin", "--koji-login", dest="kojilogin",
+            help="The login you use for koji (most likely your CN, e.g."
+            "'Matyas Selmeci 564109')")
+        koji_group.add_option(
+            "--koji-target",
+            action="callback",
+            callback=parser_targetopts_callback,
+            type="string",
+            help="The koji target to use for building. "
+            "It is recommended to use the --repo option instead of this when the "
+            "desired repo is available.")
+        koji_group.add_option(
+            "--koji-tag",
+            action="callback",
+            callback=parser_targetopts_callback,
+            type="string",
+            help="The koji tag to add packages to. The special value TARGET "
+            "uses the destination tag defined in the koji target. "
+            "It is recommended to use the --repo option instead of this when the "
+            "desired repo is available.")
+        koji_group.add_option(
+            "--koji-target-and-tag", "--ktt",
+            action="callback",
+            callback=parser_targetopts_callback,
+            type="string",
+            dest="ktt",
+            metavar='ARG',
+            help="Specifies both the koji tag to add packages to and the target "
+            "to use for building. '--ktt ARG' is equivalent to '--koji-target ARG "
+            " --koji-tag ARG'. "
+            "It is recommended to use the --repo option instead of this when the "
+            "desired repo is available.")
+        koji_group.add_option(
+            "--koji-wrapper", action="store_true", dest="koji_wrapper",
+            help="Use the 'osg-koji' koji wrapper if using the 'shell' backend. "
+            "(Default)")
+        koji_group.add_option(
+            "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
+            help="Do not use the 'osg-koji' koji wrapper if using the 'shell' "
+            "backend, even if found.")
+        koji_group.add_option(
+            "--no-wait", "--nowait", action="store_true", dest="no_wait",
+            help="Do not wait for the build to finish")
+        koji_group.add_option(
+            "--wait", action="store_false", dest="no_wait",
+            help="Wait for the build to finish")
+        koji_group.add_option(
+            "--regen-repos", action="store_true",
+            help="Perform a regen-repo on the build and destination repos after "
+            "each koji build. Allows doing builds that depend on each other. "
+            "Use sparingly, as this slows down builds and uses more disk space on "
+            "koji-hub.")
+        koji_group.add_option(
+            "--scratch", action="store_true",
+            help="Perform a scratch build")
+        koji_group.add_option(
+            "--no-scratch", "--noscratch", action="store_false", dest="scratch",
+            help="Do not perform a scratch build")
+        koji_group.add_option(
+            "--vcs", "--svn", action="store_true", dest="vcs",
+            help="Build package directly from SVN/git "
+            "(default for non-scratch builds)")
+        koji_group.add_option(
+            "--no-vcs", "--novcs", "--no-svn", "--nosvn", action="store_false", dest="vcs",
+            help="Do not build package directly from SVN/git "
+            "(default for scratch builds)")
+        koji_group.add_option(
+            "--upcoming", action="callback",
+            callback=parser_targetopts_callback,
+            type=None,
+            help="Target build for the 'upcoming' osg repos.")
+        koji_group.add_option(
+            "--repo", action="callback",
+            callback=parser_targetopts_callback,
+            type="string", dest="repo",
+            help="Specify a set of repos to build to (osg-3.1 (or just 3.1), "
+            + ", ".join(REPO_HINTS_STATIC.keys())
+            + ")")
+        parser.add_option_group(koji_group)
 
     options, args = parser.parse_args(argv[1:])
 
@@ -554,14 +589,17 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
             else:
                 raise OptionValueError("Invalid redhat release value: %r" % value)
     elif opt_name == 'koji_tag' and value == 'TARGET': # HACK
+        assert kojiinter  # shouldn't get here without kojiinter
         for dver in targetopts_by_dver:
             targetopts_by_dver[dver]['koji_tag'] = 'TARGET'
     elif opt_str == '--upcoming':
+        assert kojiinter  # shouldn't get here without kojiinter
         for dver in DVERS:
             targetopts_by_dver[dver]['repo'] = 'upcoming'
             targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint('upcoming', dver)
             targetopts_by_dver[dver]['koji_tag'] = tag_for_repo_hint('upcoming', dver)
     elif opt_str == '--repo':
+        assert kojiinter  # shouldn't get here without kojiinter
         for dver in DVERS:
             targetopts_by_dver[dver]['repo'] = value
             targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint(value, dver)
@@ -688,14 +726,14 @@ def get_buildopts(options, task):
 
     # Hack: make --mock-config on command line override
     # --mock-config-from-koji from config file
-    if options.mock_config is not None:
+    if getattr(options, 'mock_config', None) is not None:
         buildopts['mock_config_from_koji'] = None
 
     # If set, --mock-config-from-koji overrides --mock-config
-    if buildopts['mock_config_from_koji']:
+    if buildopts.get('mock_config_from_koji', None):
         buildopts['mock_config'] = None
 
-    if buildopts['vcs'] is None and task == 'koji':
+    if kojiinter and buildopts['vcs'] is None and task == 'koji':
         if buildopts['scratch']:
             buildopts['vcs'] = False
         else:

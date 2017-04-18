@@ -23,7 +23,7 @@ log.propagate = False
 
 def process_meta_url(line, destdir):
     """
-    Process a JSON-serialized URL spec.  Should be of the format:
+    Process a serialized URL spec.  Should be of the format:
      type=git url=https://github.com/opensciencegrid/cvmfs-config-osg.git name=cvmfs-config-osg tag=0.1 hash=e2b54cd1b94c9e3eaee079490c9d85f193c52249
     'name' can be derived from the URL if the last component in the URL is of the form 'NAME.git'
     """
@@ -34,29 +34,32 @@ def process_meta_url(line, destdir):
             contents[info[0].strip()] = info[1].strip()
     tag_type = contents.get("type", "")
     if tag_type != "git":
-        raise Error("Only 'git'-type URLs are understood in JSON: %s" % line)
+        raise Error("Only 'git'-type URLs are understood: %s" % line)
     git_url = contents.get('url')
     if not git_url:
-        raise Error("No git URL provided in JSON: %s" % line)
+        raise Error("No git URL provided: %s" % line)
     name = contents.get("name")
     if not name:
         basename = os.path.split(git_url)[-1]
         if basename[-4:] == '.git':
             name = basename[:-4]
         else:
-            raise Error("No package name specified in JSON: %s" % line)
+            raise Error("No package name specified: %s" % line)
     print "Checking out git repo for %s." % name
     tag = contents.get("tag")
     if not tag:
         raise Error("No package tag specified: %s" % line)
-    dest_file = str("%s-%s.tar.gz" % (name, tag))
+    tag_version = tag
+    if re.match("v[0-9]+", tag_version):
+            tag_version = tag_version[1:]
+    dest_file = "%s-%s.tar.gz" % (name, tag_version)
     full_dest_file = os.path.join(destdir, dest_file)
-    prefix = str("%s-%s" % (name, tag))
+    prefix = "%s-%s" % (name, tag_version)
     git_hash = contents.get("hash")
     if not git_hash:
         raise Error("git hash not provided.")
     checkout_dir = tempfile.mkdtemp(prefix=dest_file, dir=destdir)
-    rc = subprocess.call(["git", "clone", str(git_url), checkout_dir])
+    rc = subprocess.call(["git", "clone", git_url, checkout_dir])
     if rc:
         shutil.rmtree(checkout_dir)
         raise Error("`git clone %s %s` failed with exit code %d" % (git_url, checkout_dir, rc))
@@ -64,13 +67,13 @@ def process_meta_url(line, destdir):
     try:
         os.chdir(checkout_dir)
         try:
-            output = subprocess.check_output(["git", "show-ref", str(tag)])
+            output = subprocess.check_output(["git", "show-ref", tag])
         except subprocess.CalledProcessError:
             raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
         sha1 = output.split()[0]
         if sha1 != git_hash:
             raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
-        rc = subprocess.call(["git", "archive", "--format=tgz", "--prefix=%s/" % prefix, str(git_hash), "--output=%s" % os.path.join(destdir, dest_file)])
+        rc = subprocess.call(["git", "archive", "--format=tgz", "--prefix=%s/" % prefix, git_hash, "--output=%s" % os.path.join(destdir, dest_file)])
         if rc:
             raise Error("Failed to create an archive of hash %s" % git_hash)
     finally:

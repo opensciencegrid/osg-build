@@ -314,8 +314,8 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     parser = OptionParser(header)
     parser.add_option(
         "-a", "--autoclean", action="store_true",
-        help="(default) Clean out the following directories before each build: "
-        "'%s', '%s', '%s', '%s'" % (
+        help="Clean out the following directories before each build: "
+        "'%s', '%s', '%s', '%s' (default)" % (
             WD_RESULTS, WD_PREBUILD, WD_UNPACKED, WD_UNPACKED_TARBALL))
     parser.add_option(
         "--no-autoclean", action="store_false", dest="autoclean",
@@ -397,7 +397,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
                                  "mock task options")
         mock_group.add_option(
             "--mock-clean", action="store_true", dest="mock_clean",
-            help="(default) Clean the mock buildroot after building")
+            help="Clean the mock buildroot after building (default)")
         mock_group.add_option(
             "--no-mock-clean", action="store_false", dest="mock_clean",
             help="Do not clean the mock buildroot after building")
@@ -465,7 +465,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "desired repo is available")
         koji_group.add_option(
             "--koji-wrapper", action="store_true", dest="koji_wrapper",
-            help="(default) Use the 'osg-koji' koji wrapper if using the 'shell' backend")
+            help="Use the 'osg-koji' koji wrapper if using the 'shell' backend (default)")
         koji_group.add_option(
             "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
             help="Do not use the 'osg-koji' koji wrapper if using the 'shell' "
@@ -475,7 +475,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="Do not wait for the build to finish")
         koji_group.add_option(
             "--wait", action="store_false", dest="no_wait",
-            help="(default) Wait for the build to finish")
+            help="Wait for the build to finish (default)")
         koji_group.add_option(
             "--regen-repos", action="store_true",
             help="Perform a regen-repo on the build and destination repos after "
@@ -487,7 +487,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="Perform a scratch build")
         koji_group.add_option(
             "--no-scratch", "--noscratch", action="store_false", dest="scratch",
-            help="(default) Do not perform a scratch build")
+            help="Do not perform a scratch build (default)")
         koji_group.add_option(
             "--vcs", "--svn", action="store_true", dest="vcs",
             help="Build package directly from SVN/Git "

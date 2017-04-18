@@ -98,7 +98,7 @@ def process_dot_source(cache_prefix, sfilename, destdir):
             if line == '':
                 continue
             basename = os.path.basename(line)
-            if line.split() > 1:
+            if len(line.split()) > 1:
                 filename = process_meta_url(line, destdir)
                 downloaded.append(filename)
                 continue

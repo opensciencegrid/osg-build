@@ -315,7 +315,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     parser.add_option(
         "-a", "--autoclean", action="store_true",
         help="Clean out the following directories before each build: "
-        "'%s', '%s', '%s', '%s'" % (
+        "'%s', '%s', '%s', '%s' (default)" % (
             WD_RESULTS, WD_PREBUILD, WD_UNPACKED, WD_UNPACKED_TARBALL))
     parser.add_option(
         "--no-autoclean", action="store_false", dest="autoclean",
@@ -325,10 +325,10 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         help="The prefix for the software cache to take source files from. "
         "The following special caches exist: "
         "AFS (%s), VDT (%s), and AUTO (AFS if avaliable, VDT if not). "
-        "The default cache is AUTO." % (AFS_CACHE_PREFIX, WEB_CACHE_PREFIX))
+        "Default: AUTO" % (AFS_CACHE_PREFIX, WEB_CACHE_PREFIX))
     parser.add_option(
         "-C", "--config-file",
-        help="The file to get configuration for this script.")
+        help="The file to get configuration for this script. Default: ~/.osg-build.ini")
     parser.add_option(
         "--el5", action="callback", callback=parser_targetopts_callback,
         type=None,
@@ -347,7 +347,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     parser.add_option(
         "--loglevel",
         help="The level of logging the script should do. "
-        "Valid values are: DEBUG,INFO,WARNING,ERROR,CRITICAL")
+        "Valid values are: DEBUG,INFO,WARNING,ERROR,CRITICAL. Default: INFO")
     parser.add_option(
         "-q", "--quiet", action="store_const", const="warning", dest="loglevel",
         help="Display less information. Equivalent to --loglevel=warning")
@@ -357,13 +357,14 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         dest="redhat_release",
         type="string",
         help="The version of the distribution to build the package for. "
-        "Valid values are: 5 (for RHEL 5), 6 (for RHEL 6), 7 (for RHEL 7). "
-        "If not specified, will build for all releases (koji task) or the "
-        "platform you are running this on (other tasks)")
+        "Valid values are: 5/6/7 (for EL 5/6/7 respectively). "
+        "Default: build for all releases (koji task) current platform "
+        "(other tasks)")
     parser.add_option(
         "-t", "--target-arch",
-        help="The target architecture to build for."
-        " Ignored in non-scratch koji builds")
+        help="The target architecture to build for. Ignored in non-scratch "
+        "Koji builds. Default: all architectures (koji task) or current "
+        "architecture (other tasks)")
     parser.add_option(
         "-v", "--verbose", action="store_const", const="debug", dest="loglevel",
         help="Display more information. Equivalent to --loglevel=debug")
@@ -374,13 +375,13 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "-w", "--working-directory",
         help="The base directory to use for temporary files made by the "
         "script. If it is 'TEMP', a randomly-named directory under /tmp "
-        "is used.")
+        "is used. Default: package directory")
 
     prebuild_group = OptionGroup(parser,
                                  "prebuild task options")
     prebuild_group.add_option(
         "--full-extract", action="store_true",
-        help="Fully extract all source files.")
+        help="Fully extract all source files")
     parser.add_option_group(prebuild_group)
 
     rpmbuild_mock_group = OptionGroup(parser, 
@@ -388,7 +389,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     rpmbuild_mock_group.add_option(
         "--distro-tag",
         help="The distribution tag to append to the end of the release. "
-        "(Default: osg.el5, osg.el6 or osg.el7, depending on --redhat-release)")
+        "Default: osg.el5, osg.el6, or osg.el7 for EL 5/6/7 respectively")
     parser.add_option_group(rpmbuild_mock_group)
 
     if mock:
@@ -403,12 +404,12 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         mock_group.add_option(
             "-m", "--mock-config",
             help="The location of a mock config file to build using. "
-            "Either this or --mock-config-from-koji must be specified.")
+            "Either this or --mock-config-from-koji must be specified")
         mock_group.add_option(
             "--mock-config-from-koji",
             help="Use a mock config based on a koji buildroot (build tag, "
             "such as osg-3.2-el5-build). Either this or --mock-config must be "
-            "specified. This option requires the osg-build-koji plugin.")
+            "specified. This option requires the osg-build-koji plugin")
         parser.add_option_group(mock_group)
 
     if kojiinter:
@@ -419,19 +420,18 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="Run build at a lower priority")
         koji_group.add_option(
             "--dry-run", action="store_true",
-            help="Do not invoke koji, only show what would be done.")
+            help="Do not invoke koji, only show what would be done")
         koji_group.add_option(
             "--getfiles", "--get-files", action="store_true", dest="getfiles",
             help="Download finished products and logfiles")
         koji_group.add_option(
             "--koji-backend", dest="koji_backend",
             help="The back end to use for invoking koji. Valid values are: "
-            "'shell', 'kojilib'. If not specified, will try to use kojilib and use "
-            "shell as a fallback.")
+            "'shell', 'kojilib'. Default: use kojilib if possible")
         koji_group.add_option(
             "-k", "--kojilogin", "--koji-login", dest="kojilogin",
             help="The login you use for koji (most likely your CN, e.g."
-            "'Matyas Selmeci 564109')")
+            "'Matyas Selmeci 564109'). Default: what's in ~/.osg-koji/client.crt")
         koji_group.add_option(
             "--koji-target",
             action="callback",
@@ -439,7 +439,8 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             type="string",
             help="The koji target to use for building. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available.")
+            "desired repo is available. Default: osg-el6 or osg-el7 for EL 6/7 "
+            "respectively")
         koji_group.add_option(
             "--koji-tag",
             action="callback",
@@ -448,7 +449,8 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="The koji tag to add packages to. The special value TARGET "
             "uses the destination tag defined in the koji target. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available.")
+            "desired repo is available. Default: osg-el6 or osg-el7 for EL 6/7 "
+            "respectively")
         koji_group.add_option(
             "--koji-target-and-tag", "--ktt",
             action="callback",
@@ -460,46 +462,45 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "to use for building. '--ktt ARG' is equivalent to '--koji-target ARG "
             " --koji-tag ARG'. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available.")
+            "desired repo is available")
         koji_group.add_option(
             "--koji-wrapper", action="store_true", dest="koji_wrapper",
-            help="Use the 'osg-koji' koji wrapper if using the 'shell' backend. "
-            "(Default)")
+            help="Use the 'osg-koji' koji wrapper if using the 'shell' backend (default)")
         koji_group.add_option(
             "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
             help="Do not use the 'osg-koji' koji wrapper if using the 'shell' "
-            "backend, even if found.")
+            "backend, even if found")
         koji_group.add_option(
             "--no-wait", "--nowait", action="store_true", dest="no_wait",
             help="Do not wait for the build to finish")
         koji_group.add_option(
             "--wait", action="store_false", dest="no_wait",
-            help="Wait for the build to finish")
+            help="Wait for the build to finish (default)")
         koji_group.add_option(
             "--regen-repos", action="store_true",
             help="Perform a regen-repo on the build and destination repos after "
             "each koji build. Allows doing builds that depend on each other. "
             "Use sparingly, as this slows down builds and uses more disk space on "
-            "koji-hub.")
+            "the Koji server")
         koji_group.add_option(
             "--scratch", action="store_true",
             help="Perform a scratch build")
         koji_group.add_option(
             "--no-scratch", "--noscratch", action="store_false", dest="scratch",
-            help="Do not perform a scratch build")
+            help="Do not perform a scratch build (default)")
         koji_group.add_option(
             "--vcs", "--svn", action="store_true", dest="vcs",
-            help="Build package directly from SVN/git "
+            help="Build package directly from SVN/Git "
             "(default for non-scratch builds)")
         koji_group.add_option(
             "--no-vcs", "--novcs", "--no-svn", "--nosvn", action="store_false", dest="vcs",
-            help="Do not build package directly from SVN/git "
+            help="Do not build package directly from SVN/Git "
             "(default for scratch builds)")
         koji_group.add_option(
             "--upcoming", action="callback",
             callback=parser_targetopts_callback,
             type=None,
-            help="Target build for the 'upcoming' osg repos.")
+            help="Target build for the 'upcoming' osg repos")
         koji_group.add_option(
             "--repo", action="callback",
             callback=parser_targetopts_callback,

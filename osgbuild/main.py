@@ -76,12 +76,12 @@ def main(argv):
             git_ok = False
             try:
                 git_ok = git.is_git(pkg) and git.verify_working_dir(pkg)
-            except GitError, err:
+            except GitError as err:
                 log.info(str(err))
             svn_ok = False
             try:
                 svn_ok = svn.is_svn(pkg) and svn.verify_working_dir(pkg)
-            except SVNError, err:
+            except SVNError as err:
                 log.info(str(err))
 
             vcs = (git_ok and git) or (svn_ok and svn)
@@ -228,7 +228,7 @@ def valid_koji_targets():
         try:
             koji_obj = kojiinter.KojiShellInter(dry_run=True, koji_wrapper=True)
             __koji_targets_cache = koji_obj.get_targets()
-        except KojiError, err:
+        except KojiError as err:
             log.warning(str(err))
     return __koji_targets_cache
 
@@ -766,7 +766,7 @@ def read_config_file(given_cfg_file=None):
             cfg.read(cfg_file)
             log.debug("Read default config from %s", cfg_file)
             return cfg.items('options')
-        except ConfigParser.Error, err:
+        except ConfigParser.Error as err:
             log.warning("Error reading configuration from %s: %s", cfg_file, str(err))
     else:
         return {}

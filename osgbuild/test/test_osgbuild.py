@@ -63,7 +63,7 @@ def svn_export(path, rev, destpath):
         checked_backtick(
             ["svn", "export", opj(SVN_ROOT, path) + "@" + rev, "-r", rev, destpath],
             err2out=True)
-    except CalledProcessError, err:
+    except CalledProcessError as err:
         errprintf("Error in svn export:\n%s", err.output)
         raise
 
@@ -382,7 +382,7 @@ class TestKoji(XTestCase):
     def test_verify_correct_branch(self):
         try:
             _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(SVN_ROOT, 'native/redhat/trunk/koji')])
-        except CalledProcessError, err:
+        except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(
                 regex_in_list(r".*Forbidden to build from .+ branch into .+ target", out_list),
@@ -469,7 +469,7 @@ if __name__ == '__main__':
     try:
         errprintf("testing %s", osg_build_path)
         unittest.main()
-    except CalledProcessError, e:
+    except CalledProcessError as e:
         errprintf("output: %s", e.output)
         raise
 

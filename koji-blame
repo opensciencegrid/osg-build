@@ -105,7 +105,7 @@ def main(argv):
 if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv))
-    except Error, err:
+    except Error as err:
         sys.stderr.write(str(err))
         sys.exit(1)
 

@@ -79,7 +79,7 @@ def backtick(*args, **kwargs):
     """
     try:
         output = checked_backtick(*args, **kwargs)
-    except CalledProcessError, e:
+    except CalledProcessError as e:
         output = e.output
 
     return output
@@ -93,7 +93,7 @@ def sbacktick(*args, **kwargs):
     returncode = 0
     try:
         output = checked_backtick(*args, **kwargs)
-    except CalledProcessError, e:
+    except CalledProcessError as e:
         output = e.output
         returncode = e.returncode
 
@@ -275,7 +275,7 @@ def safe_make_backup(filename, move=True):
             os.rename(filename, newname)
         else:
             shutil.copy(filename, newname)
-    except EnvironmentError, err:
+    except EnvironmentError as err:
         if err.errno == errno.ENOENT: # no file to back up
             pass
         elif "are the same file" in str(err): # file already backed up

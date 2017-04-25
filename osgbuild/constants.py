@@ -121,7 +121,9 @@ DEFAULT_DVERS_BY_REPO = {
     'osg-3.2': ['el5', 'el6'],
     '3.3': ['el6', 'el7'],
     'osg-3.3': ['el6', 'el7'],
-    'internal': ['el5', 'el6', 'el7'],
+    '3.4': ['el6', 'el7'],
+    'osg-3.4': ['el6', 'el7'],
+    'internal': ['el6', 'el7'],
 }
 DVERS = DEFAULT_BUILDOPTS_BY_DVER.keys()
 

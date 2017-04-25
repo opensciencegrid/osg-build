@@ -15,10 +15,7 @@ from osgbuild import utils
 from osgbuild.utils import printf, print_table
 from optparse import OptionParser
 
-try:
-    from collections import namedtuple
-except ImportError:
-    from osgbuild.namedtuple import namedtuple
+from collections import namedtuple
 
 DEFAULT_ROUTE = 'testing'
 INIFILE = 'promoter.ini'

@@ -467,19 +467,19 @@ downloading and putting the SRPM into the upstream cache.
         srpm = move_to_cache(download_srpm(upstream_url, options.output), options.upstream)
         make_svn_tree(srpm, upstream_url, options.extra_action, options.provider)
 
-    except UsageError, e:
+    except UsageError as e:
         parser.print_help()
         print >>sys.stderr, str(e)
         return 2
-    except SystemExit, e:
+    except SystemExit as e:
         return e.code
     except KeyboardInterrupt:
         print >>sys.stderr, "Interrupted"
         return 3
-    except Error, e:
+    except Error as e:
         logging.critical(str(e))
         logging.debug(e.traceback)
-    except Exception, e:
+    except Exception as e:
         logging.critical("Unhandled exception: %s", str(e))
         logging.critical(traceback.format_exc())
         return 1

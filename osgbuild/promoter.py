@@ -15,10 +15,7 @@ from osgbuild import utils
 from osgbuild.utils import printf, print_table
 from optparse import OptionParser
 
-try:
-    from collections import namedtuple
-except ImportError:
-    from osgbuild.namedtuple import namedtuple
+from collections import namedtuple
 
 DEFAULT_ROUTE = 'testing'
 INIFILE = 'promoter.ini'
@@ -209,7 +206,7 @@ def load_routes(inifile):
             to_tag_hint = config.get(sec, 'to')
             repotag = config.get(sec, 'repotag')
             dvers = _parse_list_str(config.get(sec, 'dvers'))
-        except ConfigParser.NoOptionError, err:
+        except ConfigParser.NoOptionError as err:
             raise error.Error("Malformed config file: %s" % str(err))
         extra_dvers = []
         if config.has_option(sec, 'extra_dvers'):

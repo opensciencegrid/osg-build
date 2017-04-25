@@ -79,7 +79,7 @@ def backtick(*args, **kwargs):
     """
     try:
         output = checked_backtick(*args, **kwargs)
-    except CalledProcessError, e:
+    except CalledProcessError as e:
         output = e.output
 
     return output
@@ -93,7 +93,7 @@ def sbacktick(*args, **kwargs):
     returncode = 0
     try:
         output = checked_backtick(*args, **kwargs)
-    except CalledProcessError, e:
+    except CalledProcessError as e:
         output = e.output
         returncode = e.returncode
 
@@ -146,21 +146,15 @@ def checked_backtick(*args, **kwargs):
 
 def slurp(filename):
     """Return the contents of a file as a single string."""
-    fh = open(filename, 'r')
-    try:
+    with open(filename, 'r') as fh:
         contents = fh.read()
-    finally:
-        fh.close()
     return contents
 
 
 def unslurp(filename, contents):
     """Write a string to a file."""
-    fh = open(filename, 'w')
-    try:
+    with open(filename, 'w') as fh:
         fh.write(contents)
-    finally:
-        fh.close()
 
 def atomic_unslurp(filename, contents, mode=0644):
     """Write contents to a file, making sure a half-written file is never
@@ -275,7 +269,7 @@ def safe_make_backup(filename, move=True):
             os.rename(filename, newname)
         else:
             shutil.copy(filename, newname)
-    except EnvironmentError, err:
+    except EnvironmentError as err:
         if err.errno == errno.ENOENT: # no file to back up
             pass
         elif "are the same file" in str(err): # file already backed up
@@ -355,32 +349,6 @@ def get_screen_columns():
     except TypeError:
         return 80
 
-try:
-    from itertools import izip_longest # pylint: disable=E0611
-except ImportError:
-    class ZipExhausted(Exception):
-        pass
-
-    def izip_longest(*args, **kwds):
-        """izip_longest from the python 2.6 documentation
-        (since it's not in 2.4)
-        """
-        # izip_longest('ABCD', 'xy', fillvalue='-') --> Ax By C- D-
-        fillvalue = kwds.get('fillvalue')
-        counter = [len(args) - 1]
-        def sentinel():
-            if not counter[0]:
-                raise ZipExhausted
-            counter[0] -= 1
-            yield fillvalue
-        fillers = itertools.repeat(fillvalue)
-        iterators = [itertools.chain(it, sentinel(), fillers) for it in args]
-        try:
-            while iterators:
-                yield tuple(map(lambda x:x.next(), iterators)) # disable deprecated-lambda check: pylint:disable=W0110
-                # ^ the 'next' builtin is not in 2.4
-        except ZipExhausted:
-            pass
 
 
 def print_table(columns_by_header):
@@ -390,7 +358,7 @@ def print_table(columns_by_header):
     columns = []
     for entry in sorted(columns_by_header):
         columns.append([entry, '---'] + sorted(columns_by_header[entry]))
-    for columns_in_row in izip_longest(fillvalue='', *columns):
+    for columns_in_row in itertools.izip_longest(fillvalue='', *columns):
         for col in columns_in_row:
             printf("%-*s", field_width - 1, col, end=' ')
         printf("")

@@ -117,7 +117,7 @@ def checked_download(dest, url, descr=None):
         realdesthandle = open(realdest, 'w')
         realdesthandle.write(urlhandle.read())
         realdesthandle.close()
-    except Exception, e:
+    except Exception as e:
         if descr:
             raise Error("Error downloading %s (from %s to %s): %s" % (descr, url, realdest, str(e)))
         else:
@@ -228,7 +228,7 @@ def copy_old_client_cert(new_client_cert_path):
     safe_make_backup(new_client_cert_path)
     try:
         shutil.copy(OLD_CLIENT_CERT_FILE, new_client_cert_path)
-    except EnvironmentError, err:
+    except EnvironmentError as err:
         raise Error("Unable to copy client cert: %s" % str(err))
 
 @with_safe_umask
@@ -246,7 +246,7 @@ def create_client_symlink_to_proxy(new_client_cert_path):
     proxy_filename = '/tmp/x509up_u%d' % os.getuid()
     try:
         os.symlink(proxy_filename, new_client_cert_path)
-    except EnvironmentError, err:
+    except EnvironmentError as err:
         raise Error("Unable to create symlink: %s" % str(err))
 
 
@@ -376,15 +376,15 @@ If you authenticate with a proxy, be sure to have a valid one first.
         else:
             os.system("koji")
             print EXTRA_HELP
-    except SystemExit, e:
+    except SystemExit as e:
         return e.code
     except KeyboardInterrupt:
         print >> sys.stderr, "Interrupted"
         return 3
-    except Error, e:
+    except Error as e:
         print >> sys.stderr, str(e)
         return 1
-    except Exception, e:
+    except Exception as e:
         print >> sys.stderr, "Unhandled exception: " + str(e)
         raise
 

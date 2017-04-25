@@ -47,7 +47,7 @@ class ClientCert(object):
         try:
             startdate = self._parse_date(startdate_match.group(1))
             enddate = self._parse_date(enddate_match.group(1))
-        except (ValueError, AttributeError), err:
+        except (ValueError, AttributeError) as err:
             raise ClientCertError(
                 self.filename,
                 "cannot determine valid dates from openssl output"

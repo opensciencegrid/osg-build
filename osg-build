@@ -13,7 +13,7 @@ log = main.log
 
 try:
     sys.exit(main.main(sys.argv))
-except UsageError, err:
+except UsageError as err:
     print >> sys.stderr, str(err)
     print >> sys.stderr, """\
 Type %(prog)s --help for usage info.
@@ -46,7 +46,7 @@ Also see the documentation at:
     https://twiki.grid.iu.edu/bin/view/SoftwareTeam/OSGBuildTools
 """ % {'prog': os.path.basename(sys.argv[0])}
     sys.exit(2)
-except SystemExit, err:
+except SystemExit as err:
     raise
 except KeyboardInterrupt:
     print >> sys.stderr, ""
@@ -54,14 +54,14 @@ except KeyboardInterrupt:
     print >> sys.stderr, "Interrupted"
     print >> sys.stderr, "-" * 79
     sys.exit(3)
-except Error, err:
+except Error as err:
     print >> sys.stderr, "-" * 79
     print >> sys.stderr, str(err)
     print >> sys.stderr, "-" * 79
     log.debug("Full traceback follows:")
     log.debug(traceback.format_exc())
     sys.exit(4)
-except Exception, err:
+except Exception as err:
     print >> sys.stderr, "-" * 79
     print >> sys.stderr, "An unhandled exception of type %s occurred:" % type_of_error(err)
     print >> sys.stderr, str(err)

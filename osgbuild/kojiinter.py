@@ -99,11 +99,8 @@ def download_koji_file(task_id, filename, destdir):
         raise
     utils.safe_makedirs(destdir)
     full_filename = os.path.join(destdir, filename)
-    desthandle = open(full_filename, 'w')
-    try:
+    with open(full_filename, 'w') as desthandle:
         desthandle.write(handle.read())
-    finally:
-        desthandle.close()
 
 
 
@@ -389,9 +386,9 @@ def koji_error_wrap(description):
         def wrapped_function(*args, **kwargs):
             try:
                 return function_to_wrap(*args, **kwargs)
-            except kojilib.ServerOffline, err:
+            except kojilib.ServerOffline as err:
                 raise KojiError("Server outage detected while %s: %s" % (description, str(err)))
-            except kojilib.GenericError, err:
+            except kojilib.GenericError as err:
                 raise KojiError("Error of type %s while %s: %s" % (type_of_error(err), description, str(err)))
         return wrapped_function
     return koji_error_wrap_helper
@@ -443,7 +440,7 @@ class KojiLibInter(object):
                 self.use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
             except ConfigParser.NoOptionError:
                 pass
-        except ConfigParser.Error, err:
+        except ConfigParser.Error as err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl']:
             if items.get(var):
@@ -461,7 +458,7 @@ class KojiLibInter(object):
         log.info("Logging in to koji as %s", self.user)
         try:
             self.kojisession.ssl_login(self.cert, self.ca, self.serverca)
-        except Exception, err:
+        except Exception as err:
             raise KojiError("Couldn't do ssl_login: " + str(err))
         if not self.kojisession.logged_in:
             raise KojiError("Couldn't log in to koji for unknown reason")
@@ -594,7 +591,7 @@ class KojiLibInter(object):
         while True:
             try:
                 return kojicli.watch_tasks(self.kojisession, tasks)
-            except kojilib.ServerOffline, err:
+            except kojilib.ServerOffline as err:
                 # these have a large chance of being bogus
                 log.info("Got error from server: %s", err)
                 tries += 1

@@ -125,7 +125,7 @@ def is_uncommitted(package_dir):
     command = ["git", "--work-tree", top_dir, "--git-dir", os.path.join(top_dir, ".git"), "show-ref"]
     out, err = utils.sbacktick(command, err2out=True)
     if err:
-        raise GitError("Exit code %d getting git references for directory %s.  Output:\n%s", (err, package_dir, out))
+        raise GitError("Exit code %d getting git references for directory %s.  Output:\n%s" % (err, package_dir, out))
     branch_hash = ''
     origin_hash = ''
     for line in out.splitlines():
@@ -161,7 +161,7 @@ def is_outdated(package_dir):
     command = ["git", "--work-tree", top_dir, "--git-dir", os.path.join(top_dir, ".git"), "show-ref"]
     out, err = utils.sbacktick(command, err2out=True)
     if err:
-        raise GitError("Exit code %d getting git references for directory %s.  Output:\n%s", (err, package_dir, out))
+        raise GitError("Exit code %d getting git references for directory %s.  Output:\n%s" % (err, package_dir, out))
     for line in out.splitlines():
         info = line.strip().split()
         if len(info) != 2:

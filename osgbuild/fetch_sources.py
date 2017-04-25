@@ -89,8 +89,7 @@ def process_dot_source(cache_prefix, sfilename, destdir):
     """
     utils.safe_makedirs(destdir)
     downloaded = []
-    try:
-        sfile = open(sfilename, 'r')
+    with open(sfilename, 'r') as sfile:
         for lineno, line in enumerate(sfile):
             line = line.strip()
             if line.startswith('#'):
@@ -121,13 +120,11 @@ def process_dot_source(cache_prefix, sfilename, destdir):
                 raise Error("Unable to download %s\n%s" % (uri, str(err)))
             filename = os.path.join(destdir, basename)
             try:
-                desthandle = open(filename, 'w')
-                desthandle.write(handle.read())
+                with open(filename, 'w') as desthandle:
+                    desthandle.write(handle.read())
             except EnvironmentError as err:
                 raise Error("Unable to save downloaded file to %s\n%s" % (filename, str(err)))
             downloaded.append(filename)
-    finally:
-        sfile.close()
 
     return downloaded
 # end of process_dot_source()

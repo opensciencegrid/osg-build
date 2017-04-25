@@ -146,21 +146,15 @@ def checked_backtick(*args, **kwargs):
 
 def slurp(filename):
     """Return the contents of a file as a single string."""
-    fh = open(filename, 'r')
-    try:
+    with open(filename, 'r') as fh:
         contents = fh.read()
-    finally:
-        fh.close()
     return contents
 
 
 def unslurp(filename, contents):
     """Write a string to a file."""
-    fh = open(filename, 'w')
-    try:
+    with open(filename, 'w') as fh:
         fh.write(contents)
-    finally:
-        fh.close()
 
 def atomic_unslurp(filename, contents, mode=0644):
     """Write contents to a file, making sure a half-written file is never

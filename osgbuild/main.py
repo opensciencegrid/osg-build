@@ -67,8 +67,8 @@ def main(argv):
         for dver in buildopts['enabled_dvers']:
             targetopts = buildopts['targetopts_by_dver'][dver]
             if kojiinter:
-                targetopts['koji_target'] = targetopts['koji_target'] or target_for_repo_hint(targetopts['repo'], dver)
-                targetopts['koji_tag'] = targetopts['koji_tag'] or tag_for_repo_hint(targetopts['repo'], dver)
+                targetopts['koji_target'] = targetopts['koji_target'] or target_for_repo_hint(buildopts['repo'], dver)
+                targetopts['koji_tag'] = targetopts['koji_tag'] or tag_for_repo_hint(buildopts['repo'], dver)
     # checks
     if task == 'koji' and buildopts['vcs']:
         # verify working dirs
@@ -595,14 +595,14 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
             targetopts_by_dver[dver]['koji_tag'] = 'TARGET'
     elif opt_str == '--upcoming':
         assert kojiinter  # shouldn't get here without kojiinter
+        parser.values.repo = 'upcoming'
         for dver in DVERS:
-            targetopts_by_dver[dver]['repo'] = 'upcoming'
             targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint('upcoming', dver)
             targetopts_by_dver[dver]['koji_tag'] = tag_for_repo_hint('upcoming', dver)
     elif opt_str == '--repo':
         assert kojiinter  # shouldn't get here without kojiinter
+        parser.values.repo = value
         for dver in DVERS:
-            targetopts_by_dver[dver]['repo'] = value
             targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint(value, dver)
             targetopts_by_dver[dver]['koji_tag'] = tag_for_repo_hint(value, dver)
     else:
@@ -704,21 +704,14 @@ def get_buildopts(options, task):
         for dver in DVERS:
             buildopts['targetopts_by_dver'][dver] = DEFAULT_BUILDOPTS_BY_DVER[dver].copy()
 
-    for dver in DVERS:
-        if 'repo' in buildopts['targetopts_by_dver'][dver]:
-            repo = buildopts['targetopts_by_dver'][dver]['repo']
-            break
-    else:
-        repo = buildopts['repo']
-
     # Which distro versions are we building for? If not specified on the
     # command line, either build for all (koji) or the dver of the local machine
     # (others)
     enabled_dvers = getattr(options, 'enabled_dvers', None)
     if not enabled_dvers:
         if task == 'koji':
-            if repo in DEFAULT_DVERS_BY_REPO:
-                buildopts['enabled_dvers'] = set(DEFAULT_DVERS_BY_REPO[repo])
+            if buildopts['repo'] in DEFAULT_DVERS_BY_REPO:
+                buildopts['enabled_dvers'] = set(DEFAULT_DVERS_BY_REPO[buildopts['repo']])
             else:
                 buildopts['enabled_dvers'] = set(DEFAULT_DVERS)
         else:

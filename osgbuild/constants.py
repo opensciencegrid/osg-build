@@ -73,7 +73,6 @@ DEFAULT_BUILDOPTS_COMMON = {
     'mock_config': None,
     'mock_config_from_koji': None,
     'no_wait': False,
-    'redhat_releases': None,
     'regen_repos': False,
     'repo': 'osg',
     'scratch': False,
@@ -88,21 +87,18 @@ DEFAULT_BUILDOPTS_BY_DVER = {
         'koji_tag': None,
         'koji_target': None,
         'redhat_release': '5',
-        'repo': 'osg',
     },
     'el6': {
         'distro_tag': 'osg.el6',
         'koji_tag': None,
         'koji_target': None,
         'redhat_release': '6',
-        'repo': 'osg',
     },
     'el7': {
         'distro_tag': 'osg.el7',
         'koji_tag': None,
         'koji_target': None,
         'redhat_release': '7',
-        'repo': 'osg',
     }
 }
 # If the dver on the current machine can't be detected for some reason, or

@@ -73,7 +73,6 @@ DEFAULT_BUILDOPTS_COMMON = {
     'mock_config': None,
     'mock_config_from_koji': None,
     'no_wait': False,
-    'redhat_releases': None,
     'regen_repos': False,
     'repo': 'osg',
     'scratch': False,

@@ -788,18 +788,6 @@ def print_version_and_exit():
     sys.exit(0)
 
 
-def all(iterable): # disable "redefined-builtin" check: pylint: disable=W0622
-    """Return True if all elements of the iterable are true (or if it's empty).
-    This is a builtin in Python 2.5+, but doesn't exist in 2.4.
-
-    """
-    for element in iterable:
-        if not element:
-            return False
-    return True
-
-
-
 def verify_release_in_targetopts_by_dver(targetopts_by_dver):
     """Verify that the values for distro_tag, koji_target and koji_tag are
     consistent. If consistent, return the dver; else, return None.

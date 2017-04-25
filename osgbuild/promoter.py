@@ -23,14 +23,6 @@ except ImportError:
 DEFAULT_ROUTE = 'testing'
 INIFILE = 'promoter.ini'
 
-DVERS_OFF_BY_DEFAULT = ['el7']
-DVERS_BY_OSGVER = {
-    '3.1': ['el5', 'el6'],
-    '3.2': ['el5', 'el6'],
-    '3.3': ['el6', 'el7'],
-}
-
-
 # logging. Can't use root logger because its loglevel can't be changed once set
 log = logging.getLogger('osgpromote')
 log.setLevel(logging.INFO)

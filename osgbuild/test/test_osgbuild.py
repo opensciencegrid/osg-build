@@ -246,21 +246,21 @@ class TestFetch(XTestCase):
     """Tests for fetch-sources"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "mash"),
-                                    "{2011-12-08}")
+        common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
+        svn_export('native/redhat/branches/matyas/osg-build', '{2017-04-26}', 'osg-build')
+
         utils.unslurp("fetch-sources", """\
 #!%(python)s
 import sys
 sys.path.insert(0, "%(pkgdatadir)s")
 from osgbuild import fetch_sources
-fetch_sources.fetch('.')
+fetch_sources.fetch(sys.argv[1])
 """ % {'python': sys.executable, 'pkgdatadir': opj(sys.path[0], "../..")})
         os.chmod("fetch-sources", 0755)
 
-    def test_fetch(self):
-        os.chdir('mash')
-        checked_call("../fetch-sources")
-        contents = get_listing('.')
+    def test_cache_fetch(self):
+        checked_call(["./fetch-sources", "mash"])
+        contents = get_listing('mash')
 
         self.assertTrue(
             "mash.spec" in contents,
@@ -269,11 +269,22 @@ fetch_sources.fetch('.')
             "mash-0.5.22.tar.gz" in contents,
             "source tarball not found")
         head_out = checked_backtick(
-            ["head", "-n", "15", "mash.spec"])
+            ["head", "-n", "15", "mash/mash.spec"])
         self.assertRegexpMatches(
             head_out,
             r"Patch0:\s+multilib-python.patch",
             "Spec file not overridden")
+
+    def test_github_fetch(self):
+        checked_call(["./fetch-sources", "osg-build"])
+        contents = get_listing('osg-build')
+
+        self.assertTrue(
+            "osg-build.spec" in contents,
+            "spec file not found")
+        self.assertTrue(
+            "osg-build-1.8.90.tar.gz" in contents,
+            "source tarball not found")
 
 
 class TestMock(XTestCase):

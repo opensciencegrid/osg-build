@@ -10,7 +10,6 @@ import glob
 import re
 import os
 import tempfile
-import subprocess
 import shutil
 import urllib2
 
@@ -59,21 +58,20 @@ def process_meta_url(line, destdir):
     if not git_hash:
         raise Error("git hash not provided.")
     checkout_dir = tempfile.mkdtemp(prefix=dest_file, dir=destdir)
-    rc = subprocess.call(["git", "clone", git_url, checkout_dir])
+    rc = utils.unchecked_call(["git", "clone", git_url, checkout_dir])
     if rc:
         shutil.rmtree(checkout_dir)
         raise Error("`git clone %s %s` failed with exit code %d" % (git_url, checkout_dir, rc))
     orig_dir = os.getcwd()
     try:
         os.chdir(checkout_dir)
-        try:
-            output = subprocess.check_output(["git", "show-ref", tag])
-        except subprocess.CalledProcessError:
+        output, rc = utils.sbacktick(["git", "show-ref", tag])
+        if rc:
             raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
         sha1 = output.split()[0]
         if sha1 != git_hash:
             raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
-        rc = subprocess.call(["git", "archive", "--format=tgz", "--prefix=%s/" % prefix, git_hash, "--output=%s" % os.path.join(destdir, dest_file)])
+        rc = utils.unchecked_call(["git", "archive", "--format=tgz", "--prefix=%s/" % prefix, git_hash, "--output=%s" % os.path.join(destdir, dest_file)])
         if rc:
             raise Error("Failed to create an archive of hash %s" % git_hash)
     finally:

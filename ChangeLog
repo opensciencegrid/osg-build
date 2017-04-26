@@ -1,3 +1,6 @@
+* Tue Apr 25 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.91
+- Fix Python 2.6 compat in fetch_sources
+
 * Tue Apr 25 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.90
 - Make koji and mock optional modules that can be shipped as separate
   subpackages and will be loaded if necessary. (SOFTWARE-2671)

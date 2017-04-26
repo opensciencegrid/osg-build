@@ -55,7 +55,7 @@ def process_meta_url(line, destdir):
     # git-archive was not capable of directly creating .tar.gz files on git
     # 1.7.1 (SLF 6)
     dest_file = "%s-%s.tar" % (name, tag_version)
-    full_dest_file = os.path.join(destdir, dest_file)
+    full_dest_file = os.path.abspath(os.path.join(destdir, dest_file))
     prefix = "%s-%s" % (name, tag_version)
     git_hash = contents.get("hash")
     if not git_hash:
@@ -74,7 +74,7 @@ def process_meta_url(line, destdir):
         sha1 = output.split()[0]
         if sha1 != git_hash:
             raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
-        rc = utils.unchecked_call(["git", "archive", "--format=tar", "--prefix=%s/" % prefix, git_hash, "--output=%s" % os.path.join(destdir, dest_file)])
+        rc = utils.unchecked_call(["git", "archive", "--format=tar", "--prefix=%s/" % prefix, git_hash, "--output=%s" % full_dest_file])
         if rc:
             raise Error("Failed to create an archive of hash %s" % git_hash)
         # gzip -n will keep hashes of gzips of identical tarballs identical (by

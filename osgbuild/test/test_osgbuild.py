@@ -249,17 +249,8 @@ class TestFetch(XTestCase):
         common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
         svn_export('native/redhat/branches/matyas/osg-build', '{2017-04-26}', 'osg-build')
 
-        utils.unslurp("fetch-sources", """\
-#!%(python)s
-import sys
-sys.path.insert(0, "%(pkgdatadir)s")
-from osgbuild import fetch_sources
-fetch_sources.fetch(sys.argv[1])
-""" % {'python': sys.executable, 'pkgdatadir': opj(sys.path[0], "../..")})
-        os.chmod("fetch-sources", 0755)
-
     def test_cache_fetch(self):
-        checked_call(["./fetch-sources", "mash"])
+        checked_call(["python", "-m", "osgbuild.fetch_sources", "mash"])
         contents = get_listing('mash')
 
         self.assertTrue(
@@ -276,7 +267,7 @@ fetch_sources.fetch(sys.argv[1])
             "Spec file not overridden")
 
     def test_github_fetch(self):
-        checked_call(["./fetch-sources", "osg-build"])
+        checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
         contents = get_listing('osg-build')
 
         self.assertTrue(

@@ -1,10 +1,13 @@
-* Wed Apr 26 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.92
+* Thu Apr 27 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.9.0
+- Release 1.8.92 as 1.9.0 (SOFTWARE-2694)
+
+* Wed Apr 26 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.92 (prerelease)
 - Various fetch_sources fixes (SOFTWARE-2689)
 
-* Tue Apr 25 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.91
+* Tue Apr 25 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.91 (prerelease)
 - Fix Python 2.6 compat in fetch_sources (SOFTWARE-2689)
 
-* Tue Apr 25 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.90
+* Tue Apr 25 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.8.90 (prerelease)
 - Make koji and mock optional modules that can be shipped as separate
   subpackages and will be loaded if necessary. (SOFTWARE-2671)
 - Improve `osg-build --help` text to be more consistent and show default

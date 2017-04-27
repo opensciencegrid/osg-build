@@ -51,8 +51,11 @@ def process_meta_url(line, destdir):
     tag_version = tag
     if re.match("v[0-9]+", tag_version):
             tag_version = tag_version[1:]
-    dest_file = "%s-%s.tar.gz" % (name, tag_version)
-    full_dest_file = os.path.join(destdir, dest_file)
+    # we create the archive as a tar file and gzip it ourselves because
+    # git-archive was not capable of directly creating .tar.gz files on git
+    # 1.7.1 (SLF 6)
+    dest_file = "%s-%s.tar" % (name, tag_version)
+    full_dest_file = os.path.abspath(os.path.join(destdir, dest_file))
     prefix = "%s-%s" % (name, tag_version)
     git_hash = contents.get("hash")
     if not git_hash:
@@ -71,14 +74,19 @@ def process_meta_url(line, destdir):
         sha1 = output.split()[0]
         if sha1 != git_hash:
             raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
-        rc = utils.unchecked_call(["git", "archive", "--format=tgz", "--prefix=%s/" % prefix, git_hash, "--output=%s" % os.path.join(destdir, dest_file)])
+        rc = utils.unchecked_call(["git", "archive", "--format=tar", "--prefix=%s/" % prefix, git_hash, "--output=%s" % full_dest_file])
         if rc:
             raise Error("Failed to create an archive of hash %s" % git_hash)
+        # gzip -n will keep hashes of gzips of identical tarballs identical (by
+        # omitting timestamp information)
+        rc = utils.unchecked_call(["gzip", "-fn", full_dest_file])
+        if rc:
+            raise Error("Failed to compress archive at %s" % full_dest_file)
     finally:
         os.chdir(orig_dir)
         shutil.rmtree(checkout_dir)
 
-    return full_dest_file
+    return full_dest_file + ".gz"
 
 def process_dot_source(cache_prefix, sfilename, destdir):
     """Read a .source file, fetch any files mentioned in it from the
@@ -243,3 +251,9 @@ def fetch(package_dir,
 # end of fetch
 
 
+if __name__ == '__main__':
+    try:
+        package_dir = sys.argv[1]
+    except IndexError:
+        package_dir = "."
+    fetch(package_dir)

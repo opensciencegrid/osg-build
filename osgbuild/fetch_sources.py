@@ -79,7 +79,7 @@ def process_meta_url(line, destdir):
             raise Error("Failed to create an archive of hash %s" % git_hash)
         # gzip -n will keep hashes of gzips of identical tarballs identical (by
         # omitting timestamp information)
-        rc = utils.unchecked_call(["gzip", "-n", full_dest_file])
+        rc = utils.unchecked_call(["gzip", "-fn", full_dest_file])
         if rc:
             raise Error("Failed to compress archive at %s" % full_dest_file)
     finally:

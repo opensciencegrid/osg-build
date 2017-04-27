@@ -251,3 +251,9 @@ def fetch(package_dir,
 # end of fetch
 
 
+if __name__ == '__main__':
+    try:
+        package_dir = sys.argv[1]
+    except IndexError:
+        package_dir = "."
+    fetch(package_dir)

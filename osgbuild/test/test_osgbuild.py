@@ -36,7 +36,7 @@ if not osg_build_path:
     errprintf("osg-build script not found!")
     sys.exit(255)
 
-osg_build_command = [osg_build_path, "--config-file=/dev/null"]
+osg_build_command = [osg_build_path]
 
 def common_setUp(path, rev):
     '''Create a temporary directory, ensure it gets deleted on exit, cd to it,

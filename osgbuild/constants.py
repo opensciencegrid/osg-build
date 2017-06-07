@@ -10,8 +10,6 @@ WD_QUILT = '_quilt'
 AFS_CACHE_PATH = '/p/vdt/public/html/upstream'
 AFS_CACHE_PREFIX = 'file://' + AFS_CACHE_PATH
 WEB_CACHE_PREFIX = 'http://vdt.cs.wisc.edu/upstream'
-DEFAULT_CONFIG_FILE = os.path.expanduser("~/.osg-build.ini")
-ALT_DEFAULT_CONFIG_FILE = os.path.expanduser("~/.vdt-build.ini")
 
 KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.koji")
 OSG_KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")

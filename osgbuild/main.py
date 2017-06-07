@@ -23,7 +23,6 @@ import re
 import os
 import sys
 import tempfile
-import ConfigParser
 
 from osgbuild.constants import *
 from osgbuild.error import UsageError, KojiError, SVNError, GitError, Error
@@ -326,9 +325,6 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "The following special caches exist: "
         "AFS (%s), VDT (%s), and AUTO (AFS if avaliable, VDT if not). "
         "Default: AUTO" % (AFS_CACHE_PREFIX, WEB_CACHE_PREFIX))
-    parser.add_option(
-        "-C", "--config-file",
-        help="The file to get configuration for this script. Default: ~/.osg-build.ini")
     parser.add_option(
         "--el5", action="callback", callback=parser_targetopts_callback,
         type=None,
@@ -653,25 +649,22 @@ def get_task(args):
 
 
 def get_buildopts(options, task):
-    """Return a dict of the build options to use, based on the config file and
+    """Return a dict of the build options to use, based on the
     command-line arguments.
 
-    The format of the config file is simple: there's one section, [options],
-    and the canonical name of every command-line argument can be used as an
-    option.
-
-    This has two implications: first, you should be able to override any option
-    with a subsequent option. Second, I can't set a 'default' value for any of
-    the options in the OptionParser object, because I need to distinguish
-    between the option not having been specified, and the option explicitly
-    being the default.
-
     """
+    # The previous implementation also used a config file, which has two implications:
+    # first, you should be able to override any option
+    # with a subsequent option. Second, I can't set a 'default' value for any of
+    # the options in the OptionParser object, because I need to distinguish
+    # between the option not having been specified, and the option explicitly
+    # being the default.
+    #
+    # TODO Now that the config file has been removed, simplify the code because I
+    # no longer have to deal with the above.
+
 
     buildopts = DEFAULT_BUILDOPTS_COMMON.copy()
-
-    cfg_items = read_config_file(options.config_file)
-    buildopts.update(cfg_items)
 
     # Backward compatibility for 'svn' option:
     buildopts['vcs'] = buildopts.get('vcs') or buildopts.get('svn')
@@ -735,34 +728,6 @@ def get_buildopts(options, task):
 
     return buildopts
 # end of get_buildopts()
-
-
-def read_config_file(given_cfg_file=None):
-    """Return a dict of items read from a config file. If given_cfg_file
-    is None, uses one of the default config file locations.
-
-    """
-    cfg_file = None
-    if given_cfg_file:
-        cfg_file = given_cfg_file
-    else:
-        if os.path.exists(DEFAULT_CONFIG_FILE):
-            cfg_file = DEFAULT_CONFIG_FILE
-        else:
-            log.debug("Didn't find default config at %s", DEFAULT_CONFIG_FILE)
-            if os.path.exists(ALT_DEFAULT_CONFIG_FILE):
-                cfg_file = ALT_DEFAULT_CONFIG_FILE
-
-    if cfg_file and os.path.isfile(cfg_file):
-        try:
-            cfg = ConfigParser.ConfigParser()
-            cfg.read(cfg_file)
-            log.debug("Read default config from %s", cfg_file)
-            return cfg.items('options')
-        except ConfigParser.Error as err:
-            log.warning("Error reading configuration from %s: %s", cfg_file, str(err))
-    else:
-        return {}
 
 
 def print_version_and_exit():

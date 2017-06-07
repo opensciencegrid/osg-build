@@ -4,7 +4,6 @@ NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osgbuild
 TESTDIR = $(PYDIR)/test
 SVNDATADIR = data
-SVNDOCDIR = doc
 MAIN_SCRIPT = $(NAME)
 EXTRA_SCRIPTS = koji-tag-diff osg-import-srpm osg-koji osg-promote koji-blame
 MAIN_TEST_SYMLINK = osg-build-test
@@ -12,7 +11,6 @@ MAIN_TEST = $(TESTDIR)/test_osgbuild.py
 PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 PYTHON26_SITELIB = $(shell python26 -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 BINDIR = /usr/bin
-DOCDIR = /usr/share/doc/$(NAME)
 DATADIR = /usr/share/$(NAME)
 AFS_SOFTWARE_DIR = /p/vdt/public/html/upstream/$(NAME)
 
@@ -23,9 +21,6 @@ clean:
 	rm -f *.py[co] *~ $(PYDIR)/*.py[co] $(PYDIR)/*~ $(TESTDIR)/*.py[co] $(TESTDIR)/*~ tags
 
 install-common:
-	mkdir -p $(DESTDIR)/$(DOCDIR)
-	install -p -m 644 $(SVNDOCDIR)/* $(DESTDIR)/$(DOCDIR)
-
 	mkdir -p $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(EXTRA_SCRIPTS) $(DESTDIR)/$(BINDIR)
@@ -60,7 +55,7 @@ install-python26: install-common
 
 dist:
 	mkdir -p $(NAME_VERSION)
-	cp -rp $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(PYDIR) $(SVNDATADIR) $(SVNDOCDIR) Makefile pylintrc $(NAME_VERSION)/
+	cp -rp $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(PYDIR) $(SVNDATADIR) Makefile pylintrc $(NAME_VERSION)/
 	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(NAME_VERSION)/$(PYDIR)/main.py
 	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]' --exclude='*/*~'
 

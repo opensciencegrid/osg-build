@@ -1,3 +1,7 @@
+* Wed Jun 07 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.10.0
+- Drop vdt-build (SOFTWARE-2709)
+- Drop ~/.osg-build.ini (SOFTWARE-2708)
+
 * Thu Apr 27 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.9.0
 - Release 1.8.92 as 1.9.0 (SOFTWARE-2694)
 

@@ -423,12 +423,12 @@ class TestMisc(XTestCase):
 
     def test_cmdline_scratch_svn(self):
         buildopts = main.init(
-            ["osg-build", "-C", "/dev/null", "koji", "--scratch", "."])[0]
+            ["osg-build", "koji", "--scratch", "."])[0]
         self.assertFalse(buildopts['vcs'],
                          "vcs not false for scratch build")
 
         buildopts = main.init(
-            ["osg-build", "-C", "/dev/null", "koji", "."])[0]
+            ["osg-build", "koji", "."])[0]
         self.assertTrue(buildopts['vcs'],
                         "vcs not true for non-scratch build")
 

@@ -6,7 +6,6 @@ TESTDIR = $(PYDIR)/test
 SVNDATADIR = data
 SVNDOCDIR = doc
 MAIN_SCRIPT = $(NAME)
-MAIN_SCRIPT_SYMLINK = vdt-build
 EXTRA_SCRIPTS = koji-tag-diff osg-import-srpm osg-koji osg-promote koji-blame
 MAIN_TEST_SYMLINK = osg-build-test
 MAIN_TEST = $(TESTDIR)/test_osgbuild.py
@@ -30,7 +29,6 @@ install-common:
 	mkdir -p $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(EXTRA_SCRIPTS) $(DESTDIR)/$(BINDIR)
-	ln -snf $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)/$(MAIN_SCRIPT_SYMLINK)
 
 	mkdir -p $(DESTDIR)/$(DATADIR)
 	install -p -m 644 $(SVNDATADIR)/* $(DESTDIR)/$(DATADIR)

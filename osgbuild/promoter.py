@@ -745,4 +745,8 @@ def _get_route_dvers_pairs(routenames, valid_routes, extra_dvers, no_dvers, only
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    try:
+        sys.exit(main(sys.argv))
+    except error.Error, e:
+        print >>sys.stderr, e
+        sys.exit(1)

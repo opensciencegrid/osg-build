@@ -232,7 +232,6 @@ def create_ca_bundle(working_dir):
     # Write bundle
     bundle_filename = os.path.join(working_dir, "ca-bundle.crt")
     unslurp(bundle_filename, bundle_contents)
-    print("Wrote CA cert bundle " + bundle_filename)
 
     return bundle_filename
 
@@ -350,8 +349,7 @@ proxy (from grid-proxy-init or voms-proxy-init) for authentication and
 thereby not need to type your password in as often.
 """):
             create_client_symlink_to_proxy(new_client_cert_path)
-            print("Proxy symlink created. If using voms-proxy-init,"
-                  " be sure to request an RFC-style proxy (pass -rfc)")
+            print("Proxy symlink created.")
             return
 
         # if we get here, there's no old cert to copy
@@ -367,6 +365,7 @@ thereby not need to type your password in as often.
         sys.exit(1)
     elif proxy is True:
         create_client_symlink_to_proxy(new_client_cert_path)
+        print("Proxy symlink created.")
     elif proxy is False:
         if os.path.isfile(user_cert) and os.path.isfile(user_key):
             create_client_cert_from_cert_and_key(new_client_cert_path,

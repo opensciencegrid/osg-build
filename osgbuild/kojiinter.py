@@ -1,5 +1,5 @@
 """koji interface classes for osg-build"""
-# pylint: disable=W0614,C0103,W0142
+# pylint: disable=W0614,C0103
 
 
 import ConfigParser

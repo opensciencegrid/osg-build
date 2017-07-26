@@ -17,8 +17,7 @@ from osgbuild.constants import *
 from osgbuild.error import Error, GlobNotFoundError
 from osgbuild import utils
 
-log = logging.getLogger('osgbuild')
-log.propagate = False
+log = logging.getLogger(__name__)
 
 def process_meta_url(line, destdir):
     """

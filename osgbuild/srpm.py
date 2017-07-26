@@ -15,8 +15,7 @@ from osgbuild import utils
 from osgbuild.error import *
 
 
-log = logging.getLogger('osgbuild')
-log.propagate = False
+log = logging.getLogger(__name__)
 
 
 class SRPMBuild(object):

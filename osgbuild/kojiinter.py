@@ -15,8 +15,7 @@ from osgbuild import clientcert
 from osgbuild import utils
 from osgbuild.error import KojiError, type_of_error
 
-log = logging.getLogger('osgbuild')
-log.propagate = False
+log = logging.getLogger(__name__)
 
 HAVE_KOJILIB = None
 try:

@@ -161,11 +161,8 @@ def get_openssl_version():
     return _openssl_version
 
 
-def checked_download(dest, url, descr=None):
-    """Download a file from 'url' to 'dest'. 'descr' is an optional text
-    description of a file, for a more informative error message.
-
-    """
+def checked_download(dest, url):
+    """Download a file from 'url' to 'dest'"""
     if os.path.isdir(dest):
         realdest = os.path.join(dest, os.path.basename(url))
     else:
@@ -176,12 +173,8 @@ def checked_download(dest, url, descr=None):
         realdesthandle.write(urlhandle.read())
         realdesthandle.close()
     except Exception as err:  # pylint: disable=broad-except
-        if descr:
-            raise Error("Error downloading %s (from %s to %s): %s" % (
-                descr, url, realdest, err))
-        else:
-            raise Error("Error downloading from %s to %s: %s" % (
-                url, realdest, err))
+        raise Error("Error downloading from %s to %s: %s" % (
+                    url, realdest, err))
     return realdest
 
 
@@ -207,7 +200,7 @@ def validate_cert(cert_path, cert):
                     (cert_path, expected_hash, real_hash))
 
 
-def create_ca_bundle(working_dir="."):
+def create_ca_bundle(working_dir):
     """Create the ca-bundle.crt file in working_dir"""
     if os.path.isdir(GRID_CERTS_DIR):
         # Use local grid certificates
@@ -244,7 +237,7 @@ def create_ca_bundle(working_dir="."):
     return bundle_filename
 
 
-def setup_koji_config_file(write_client_conf=None):
+def setup_koji_config_file(write_client_conf):
     """Create the koji config file (if needed)."""
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
                                         KOJI_CONFIG_FILE)
@@ -321,7 +314,7 @@ def create_client_symlink_to_proxy(new_client_cert_path):
         raise Error("Unable to create symlink: %s" % str(err))
 
 
-def setup_koji_client_cert(user_cert, user_key, proxy=None):
+def setup_koji_client_cert(user_cert, user_key, proxy):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
 

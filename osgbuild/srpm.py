@@ -197,10 +197,12 @@ class SRPMBuild(object):
         utils.safe_makedirs(self.quilt_dir)
         spec_filename = self.prebuild_external_sources(destdir=self.quilt_dir)
 
+        oldcwd = os.getcwd()
         os.chdir(self.quilt_dir)
         ret = utils.unchecked_call(["quilt", "-v", "setup", spec_filename])
         if ret != 0:
             raise Error("Error running 'quilt setup' on the spec file.")
+        os.chdir(oldcwd)
 
         log.info("quilt files ready in %s", self.quilt_dir)
 

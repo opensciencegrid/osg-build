@@ -144,12 +144,11 @@ def full_extract(unpacked_dir, archives_downloaded, destdir):
             if os.path.isfile(fname):
                 archives_in_srpm.append(os.path.abspath(fname))
     utils.safe_makedirs(destdir)
-    old_dir = os.getcwd()
-    os.chdir(destdir)
+    utils.pushd(destdir)
     for fname in archives_downloaded + archives_in_srpm:
         log.info("Extracting " + fname)
         utils.super_unpack(fname)
-    os.chdir(old_dir)
+    utils.popd()
     log.info('Extracted files to ' + destdir)
 
 
@@ -157,12 +156,11 @@ def extract_srpms(srpms_downloaded, destdir):
     """Extract SRPMs to destdir"""
     abs_srpms_downloaded = [os.path.abspath(x) for x in srpms_downloaded]
     utils.safe_makedirs(destdir)
-    old_dir = os.getcwd()
-    os.chdir(destdir)
+    utils.pushd(destdir)
     for srpm in abs_srpms_downloaded:
         log.info("Unpacking SRPM " + srpm)
         utils.super_unpack(srpm)
-    os.chdir(old_dir)
+    utils.popd()
 
 
 def copy_with_filter(files_list, destdir):

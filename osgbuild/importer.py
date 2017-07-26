@@ -23,6 +23,7 @@ EXTRA_ACTION_DIFF3_SPEC = 'diff3_spec'
 EXTRA_ACTION_UPDATE = 'update'
 
 PROVIDER_PATTERNS = [
+    (r'centos\.org'                    , 'centos') ,
     (r'emisoft\.web\.cern\.ch'         , 'emi')    ,
     (r'fedoraproject\.org/pub/epel/'   , 'epel')   ,
     (r'fedoraproject\.org/pub/fedora/' , 'fedora') ,

@@ -1,10 +1,11 @@
+from __future__ import absolute_import
 import re
 import os
 import time
 
 from datetime import datetime
-from osgbuild.error import ClientCertError
-from osgbuild import utils
+from .error import ClientCertError
+from . import utils
 
 class ClientCert(object):
     __slots__ = ['filename', 'first_commonname', 'startdate', 'enddate']

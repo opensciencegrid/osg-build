@@ -1,4 +1,6 @@
 """utilities for osg-build"""
+from __future__ import absolute_import
+from __future__ import print_function
 import errno
 import itertools
 import logging
@@ -10,6 +12,12 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime
+
+# python 3:
+try:
+    input_ = raw_input
+except NameError:
+    input_ = input
 
 
 log = logging.getLogger(__name__)
@@ -159,7 +167,7 @@ def unslurp(filename, contents):
     with open(filename, 'w') as fh:
         fh.write(contents)
 
-def atomic_unslurp(filename, contents, mode=0644):
+def atomic_unslurp(filename, contents, mode=0o644):
     """Write contents to a file, making sure a half-written file is never
     left behind in case of error.
 
@@ -231,7 +239,7 @@ def super_unpack(*compressed_files):
                 break
 
 
-def safe_makedirs(directory, mode=0777):
+def safe_makedirs(directory, mode=0o777):
     """Create a directory and all its parent directories, unless it already
     exists.
 
@@ -246,8 +254,8 @@ def ask(question, choices):
     user_choice = ""
     match = False
     while not match:
-        print question
-        user_choice = raw_input("[" + "/".join(choices) + "] ? ").strip().lower()
+        print(question)
+        user_choice = input_("[" + "/".join(choices) + "] ? ").strip().lower()
         for choice in choices_lc:
             if user_choice.startswith(choice):
                 match = True

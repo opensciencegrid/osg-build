@@ -2,7 +2,12 @@
 # pylint: disable=W0614,C0103
 
 
-import ConfigParser
+from __future__ import absolute_import
+from __future__ import print_function
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 import logging
 import re
 import os
@@ -10,10 +15,10 @@ import time
 import urllib2
 from urllib2 import HTTPError
 
-from osgbuild.constants import *
-from osgbuild import clientcert
-from osgbuild import utils
-from osgbuild.error import KojiError, type_of_error
+from .constants import *
+from . import clientcert
+from . import utils
+from .error import KojiError, type_of_error
 
 log = logging.getLogger(__name__)
 
@@ -172,7 +177,7 @@ class KojiInter(object):
 
     def build_git(self, remote, rev, path):
         """Submit a GIT build"""
-        print remote
+        print(remote)
         return KojiInter.backend.build("git+" + remote + "?" + path + "#" + rev,
                                        self.target,
                                        self.scratch,
@@ -220,7 +225,7 @@ class KojiShellInter(object):
             if not self.dry_run:
                 utils.checked_call(cmd)
             else:
-                print " ".join(cmd)
+                print(" ".join(cmd))
 
     def get_build_and_dest_tags(self, target):
         """Return the build and destination tags for the current target."""
@@ -263,7 +268,7 @@ class KojiShellInter(object):
         if not self.dry_run:
             err = utils.unchecked_call(self.koji_cmd + build_subcmd)
         else:
-            print " ".join(self.koji_cmd + build_subcmd)
+            print(" ".join(self.koji_cmd + build_subcmd))
             err = 0
 
         if err:
@@ -277,7 +282,7 @@ class KojiShellInter(object):
             if not self.dry_run:
                 err2 = utils.unchecked_call(self.koji_cmd + regen_repo_subcmd)
             else:
-                print " ".join(self.koji_cmd + regen_repo_subcmd)
+                print(" ".join(self.koji_cmd + regen_repo_subcmd))
                 err2 = 0
             if err2:
                 raise KojiError("koji regen-repo failed with exit code " + str(err2))
@@ -321,7 +326,7 @@ class KojiShellInter(object):
             search_subcmd.append("--exact")
         search_subcmd.append(terms)
 
-        out, err = utils.sbacktick(self.koji_cmd + search_subcmd)       
+        out, err = utils.sbacktick(self.koji_cmd + search_subcmd)
         if err:
             raise KojiError("koji search failed with exit code " + str(err))
         return out.split("\n")
@@ -430,16 +435,16 @@ class KojiLibInter(object):
         if not config_file or not os.path.isfile(config_file):
             raise KojiError("Can't find koji config file.")
         try:
-            cfg = ConfigParser.ConfigParser()
+            cfg = configparser.ConfigParser()
             cfg.read(config_file)
             items = dict(cfg.items('koji'))
 
             # special case: use_old_ssl is a boolean so get ConfigParser to parse it
             try:
                 self.use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
-            except ConfigParser.NoOptionError:
+            except configparser.NoOptionError:
                 pass
-        except ConfigParser.Error as err:
+        except configparser.Error as err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl']:
             if items.get(var):
@@ -625,7 +630,7 @@ class KojiLibInter(object):
             # el5-osg-build and the arch is noarch, files will be in 'el5-osg-noarch'.
             task_info = session.getTaskInfo(task_id, request=True)
             if task_info.get('method', "") == 'buildArch':
-                if task_info.has_key('request'):
+                if 'request' in task_info:
                     tag_id, arch = task_info['request'][1:3]
                     tag_info = session.getTag(tag_id)
                     try:

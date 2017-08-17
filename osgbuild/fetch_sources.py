@@ -4,6 +4,8 @@ the osg/ dir in the package.
 """
 
 # pylint: disable=W0614
+from __future__ import absolute_import
+from __future__ import print_function
 import fnmatch
 import logging
 import glob
@@ -13,9 +15,9 @@ import tempfile
 import shutil
 import urllib2
 
-from osgbuild.constants import *
-from osgbuild.error import Error, GlobNotFoundError
-from osgbuild import utils
+from .constants import *
+from .error import Error, GlobNotFoundError
+from . import utils
 
 log = logging.getLogger(__name__)
 

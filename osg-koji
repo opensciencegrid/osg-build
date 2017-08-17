@@ -242,7 +242,7 @@ def setup_koji_config_file(write_client_conf):
                                         KOJI_CONFIG_FILE)
     if write_client_conf is False:
         return
-    elif not os.path.exists(new_koji_config_path):
+    elif os.path.exists(new_koji_config_path):
         if (write_client_conf or
                 ask_yn("""\
 Koji configuration file '%s' already exists.
@@ -253,6 +253,9 @@ you should say yes.
             safe_make_backup(new_koji_config_path)
             shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH),
                         new_koji_config_path)
+    else:
+        shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH),
+                    new_koji_config_path)
 
 
 def setup_koji_server_cert():

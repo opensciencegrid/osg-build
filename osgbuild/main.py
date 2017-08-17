@@ -323,21 +323,13 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         "The following special caches exist: "
         "AFS (%s), VDT (%s), and AUTO (AFS if avaliable, VDT if not). "
         "Default: AUTO" % (AFS_CACHE_PREFIX, WEB_CACHE_PREFIX))
-    parser.add_option(
-        "--el5", action="callback", callback=parser_targetopts_callback,
-        type=None,
-        dest="redhat_release",
-        help="Build for RHEL 5-compatible. Equivalent to --redhat-release=5")
-    parser.add_option(
-        "--el6", action="callback", callback=parser_targetopts_callback,
-        type=None,
-        dest="redhat_release",
-        help="Build for RHEL 6-compatible. Equivalent to --redhat-release=6")
-    parser.add_option(
-        "--el7", action="callback", callback=parser_targetopts_callback,
-        type=None,
-        dest="redhat_release",
-        help="Build for RHEL 7-compatible. Equivalent to --redhat-release=7")
+    for dver in DVERS:
+        rhel = int(dver[2:])
+        parser.add_option(
+            "--"+dver, action="callback", callback=parser_targetopts_callback,
+            type=None,
+            dest="redhat_release",
+            help="Build for RHEL %d-compatible. Equivalent to --redhat-release=%d" % (rhel,rhel))
     parser.add_option(
         "--loglevel",
         help="The level of logging the script should do. "
@@ -568,17 +560,13 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
         parser.values.enabled_dvers = set()
     enabled_dvers = parser.values.enabled_dvers
 
-    dver = None
     if value is None:
         value = ''
     if opt_name == 'redhat_release':
-        if opt_str == '--el5':
-            enabled_dvers.add('el5')
-        elif opt_str == '--el6':
-            enabled_dvers.add('el6')
-        elif opt_str == '--el7':
-            enabled_dvers.add('el7')
-        elif opt_str == '--redhat-release':
+        for dver in DVERS:
+            if opt_str == '--'+dver:
+                enabled_dvers.add(dver)
+        if opt_str == '--redhat-release':
             if 'el' + value in DVERS:
                 enabled_dvers.add('el' + value)
             else:

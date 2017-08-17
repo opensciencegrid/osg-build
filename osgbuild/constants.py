@@ -79,38 +79,20 @@ DEFAULT_BUILDOPTS_COMMON = {
     'working_directory': '.',
 }
 
-DEFAULT_BUILDOPTS_BY_DVER = {
-    'el5': {
-        'distro_tag': 'osg.el5',
-        'koji_tag': None,
-        'koji_target': None,
-        'redhat_release': '5',
-    },
-    'el6': {
-        'distro_tag': 'osg.el6',
-        'koji_tag': None,
-        'koji_target': None,
-        'redhat_release': '6',
-    },
-    'el7': {
-        'distro_tag': 'osg.el7',
-        'koji_tag': None,
-        'koji_target': None,
-        'redhat_release': '7',
-    }
-}
+DVERS = ['el5', 'el6', 'el7']
+
+DEFAULT_BUILDOPTS_BY_DVER = {}
+for dver in DVERS:
+    DEFAULT_BUILDOPTS_BY_DVER[dver] = dict(
+        distro_tag='osg.'+dver,
+        koji_tag=None,
+        koji_target=None,
+        redhat_release=dver[2:]
+    )
+
 # If the dver on the current machine can't be detected for some reason, or
 # isn't EL, use this.
 FALLBACK_DVER = 'el7'
-
-REPO_HINTS_STATIC = {
-    'osg': {'target': 'osg-%(dver)s', 'tag': 'osg-%(dver)s'},
-    'upcoming': {'target': 'osg-upcoming-%(dver)s', 'tag': 'osg-%(dver)s'},
-    'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
-    'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},
-    'condor': {'target': 'condor-%(dver)s', 'tag': 'condor-%(dver)s'},
-}
-
 DEFAULT_DVERS = ['el6', 'el7']
 DEFAULT_DVERS_BY_REPO = {
     '3.2': ['el5', 'el6'],
@@ -121,7 +103,20 @@ DEFAULT_DVERS_BY_REPO = {
     'osg-3.4': ['el6', 'el7'],
     'internal': ['el6', 'el7'],
 }
-DVERS = DEFAULT_BUILDOPTS_BY_DVER.keys()
+assert FALLBACK_DVER in DVERS
+for d in DEFAULT_DVERS:
+    assert d in DVERS
+for ds in DEFAULT_DVERS_BY_REPO.values():
+    for d in ds:
+        assert d in DVERS
+
+REPO_HINTS_STATIC = {
+    'osg': {'target': 'osg-%(dver)s', 'tag': 'osg-%(dver)s'},
+    'upcoming': {'target': 'osg-upcoming-%(dver)s', 'tag': 'osg-%(dver)s'},
+    'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
+    'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},
+    'condor': {'target': 'condor-%(dver)s', 'tag': 'condor-%(dver)s'},
+}
 
 BUGREPORT_EMAIL = "osg-software@opensciencegrid.org"
 

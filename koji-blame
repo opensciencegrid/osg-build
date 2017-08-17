@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import re
 import sys
 import datetime
@@ -93,7 +94,7 @@ def format_history_item(history_item, mode):
 
 def main(argv):
     if len(argv) < 2 or argv[1] in ('-h', '--help'):
-        print "Usage: koji-blame <PACKAGE or TAG or BUILD>"
+        print("Usage: koji-blame <PACKAGE or TAG or BUILD>")
         return 2
 
     if not utils.which('osg-koji'):

@@ -12,6 +12,9 @@ import tempfile
 from datetime import datetime
 
 
+log = logging.getLogger(__name__)
+
+
 class CalledProcessError(Exception):
     """Returned by checked_call and checked_backtick if the subprocess exits
     nonzero.
@@ -26,7 +29,7 @@ class CalledProcessError(Exception):
         self.output = output
 
     def __str__(self):
-        logging.debug(self.output)
+        log.debug(self.output)
         return ("Error in called process(%s): subprocess returned %s.\nOutput: %s" %
                 (str(self.process), str(self.returncode), str(self.output)))
 
@@ -65,10 +68,10 @@ def unchecked_call(*args, **kwargs):
         cmd = args[0]
     elif type(args[0]) == type([]) or type(args[0]) == type(()):
         cmd = "'" + "' '".join(args[0]) + "'"
-    logging.debug("Running " + cmd)
+    log.debug("Running " + cmd)
 
     err = subprocess.call(*args, **kwargs)
-    logging.debug("Subprocess returned " + str(err))
+    log.debug("Subprocess returned " + str(err))
     return err
 
 

@@ -43,15 +43,13 @@ except ImportError:
 
 __version__ = '@VERSION@'
 
-# logging. Can't use root logger because its loglevel can't be changed once set
-log = logging.getLogger('osgbuild')
+log = logging.getLogger('')
 log.setLevel(logging.INFO)
 log_consolehandler = logging.StreamHandler()
 log_consolehandler.setLevel(logging.INFO)
 log_formatter = logging.Formatter(" >> %(message)s")
 log_consolehandler.setFormatter(log_formatter)
 log.addHandler(log_consolehandler)
-log.propagate = False
 
 #-------------------------------------------------------------------------------
 # Main function

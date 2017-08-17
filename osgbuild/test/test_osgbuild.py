@@ -85,7 +85,7 @@ class XTestCase(unittest.TestCase):
     # Code from unittest in Python 2.7 (c) Python Software Foundation
     def assertRegexpMatches(self, text, regexp, msg=None):
         """Fail if 'text' does not match 'regexp'"""
-        if isinstance(regexp, basestring):
+        if isinstance(regexp, str):
             regexp = re.compile(regexp)
         if not regexp.search(text):
             msg = msg or "Regexp didn't match"
@@ -95,7 +95,7 @@ class XTestCase(unittest.TestCase):
     # Code from unittest in Python 2.7 (c) Python Software Foundation
     def assertNotRegexpMatches(self, text, regexp, msg=None):
         """Fail if 'text' matches 'regex'"""
-        if isinstance(regexp, basestring):
+        if isinstance(regexp, str):
             regexp = re.compile(regexp)
         match = regexp.search(text)
         if match:

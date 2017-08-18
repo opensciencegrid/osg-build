@@ -13,14 +13,25 @@ import sys
 import tempfile
 from datetime import datetime
 
-# python 3:
 try:
-    input_ = raw_input
-except NameError:
-    input_ = input
+    import six
+    from six.moves import input
+except ImportError:
+    from . import six
+    from .six.moves import input
 
 
 log = logging.getLogger(__name__)
+
+
+def to_str(strlike):
+    if six.PY3:
+        if isinstance(strlike, bytes):
+            return strlike.decode('utf-8', 'replace')
+        else:
+            return strlike
+    else:
+        return strlike.encode('utf-8', 'replace')
 
 
 class CalledProcessError(Exception):
@@ -144,7 +155,7 @@ def checked_backtick(*args, **kwargs):
 
     proc = subprocess.Popen(cmd, *args[1:], **sp_kwargs)
 
-    output = proc.communicate()[0]
+    output = to_str(proc.communicate()[0])
     if not nostrip:
         output = output.strip()
     err = proc.returncode
@@ -255,7 +266,7 @@ def ask(question, choices):
     match = False
     while not match:
         print(question)
-        user_choice = input_("[" + "/".join(choices) + "] ? ").strip().lower()
+        user_choice = input("[" + "/".join(choices) + "] ? ").strip().lower()
         for choice in choices_lc:
             if user_choice.startswith(choice):
                 match = True
@@ -314,7 +325,7 @@ def printf(fstring, *args, **kwargs):
     """
     file_ = kwargs.pop('file', sys.stdout)
     end = kwargs.pop('end', "\n")
-    ffstring = fstring + end
+    ffstring = to_str(fstring) + to_str(end)
     if len(args) == 0 and len(kwargs) > 0:
         file_.write(ffstring % kwargs)
     elif len(args) == 1 and type(args[0]) == dict:
@@ -376,7 +387,7 @@ def print_table(columns_by_header):
 
 
 def is_url(location):
-    return re.match(r'[-a-z+]+://', location)
+    return re.match(r'[-a-z+]+://', to_str(location))
 
 
 # Functions for manipulating a directory stack in the style of bash

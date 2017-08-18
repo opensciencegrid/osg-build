@@ -13,7 +13,11 @@ import re
 import os
 import tempfile
 import shutil
-import urllib2
+try:
+    from six.moves import urllib
+except ImportError:
+    from .six.moves import urllib
+
 
 from .constants import *
 from .error import Error, GlobNotFoundError
@@ -130,12 +134,12 @@ def process_dot_source(cache_prefix, sfilename, destdir):
 
             log.info('Retrieving ' + uri)
             try:
-                handle = urllib2.urlopen(uri)
-            except urllib2.URLError as err:
+                handle = urllib.request.urlopen(uri)
+            except urllib.error.URLError as err:
                 raise Error("Unable to download %s\n%s" % (uri, str(err)))
             filename = os.path.join(destdir, basename)
             try:
-                with open(filename, 'w') as desthandle:
+                with open(filename, 'wb') as desthandle:
                     desthandle.write(handle.read())
             except EnvironmentError as err:
                 raise Error("Unable to save downloaded file to %s\n%s" % (filename, str(err)))

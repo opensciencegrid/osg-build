@@ -27,11 +27,11 @@ log = logging.getLogger(__name__)
 def to_str(strlike):
     if six.PY3:
         if isinstance(strlike, bytes):
-            return strlike.decode('utf-8', 'replace')
+            return strlike.decode('utf-8', 'ignore')
         else:
             return strlike
     else:
-        return strlike.encode('utf-8', 'replace')
+        return strlike.encode('utf-8', 'ignore')
 
 
 class CalledProcessError(Exception):

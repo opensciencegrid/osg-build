@@ -31,7 +31,10 @@ def to_str(strlike):
         else:
             return strlike
     else:
-        return strlike.encode('utf-8', 'ignore')
+        if isinstance(strlike, unicode):
+            return strlike.encode('utf-8', 'ignore')
+        else:
+            return strlike
 
 
 class CalledProcessError(Exception):

@@ -1,3 +1,7 @@
+* Tue Oct 03 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.10.2
+- Fix logging (SOFTWARE-2745)
+- Fix quilt subcommand to work with multiple packages (SOFTWARE-2739)
+
 * Thu Jun 29 2017 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.10.1
 - Change goc-* promotion routes to use osg 3.4
 - Change default promotion routes to use osg 3.4

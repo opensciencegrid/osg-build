@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -183,7 +184,17 @@ def validate_cert(cert_path, cert):
     as in 'cert'. Raise an Error if not.
 
     """
-    expected_subject = "subject= " + cert.subject
+    if get_openssl_version() >= (1, 1, 0):
+        # turn something like
+        # subject= /C=US/O=DigiCert Inc/OU=www.digicert.com/CN=DigiCert Assured ID Root CA
+        # into
+        # subject=C = US, O = DigiCert Inc, OU = www.digicert.com, CN = DigiCert Assured ID Root CA
+        expected_subject = re.sub('=', ' = ', cert.subject[1:])
+        expected_subject = re.sub(r'(?<![\\])/', ', ', expected_subject)
+        expected_subject = 'subject=' + expected_subject
+    else:
+        expected_subject = "subject= " + cert.subject
+
     if get_openssl_version()[0] == 0:
         expected_hash = cert.o098hash
     else:

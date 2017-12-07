@@ -11,6 +11,7 @@ except ImportError:
 import logging
 import re
 import os
+import sys
 import time
 try:
     from six.moves import urllib
@@ -421,7 +422,10 @@ class KojiLibInter(object):
             self.user = user or get_cn()
         else:
             self.user = user or "osgbuild"
-        self.use_old_ssl = True
+        if sys.version_info[0] == 2:
+            self.use_old_ssl = True
+        else:
+            self.use_old_ssl = False
         self.weburl = os.path.join(KOJI_WEB, "koji")
         self.dry_run = dry_run
 
@@ -442,10 +446,17 @@ class KojiLibInter(object):
             items = dict(cfg.items('koji'))
 
             # special case: use_old_ssl is a boolean so get ConfigParser to parse it
+            use_old_ssl = None
             try:
-                self.use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
+                use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
             except configparser.NoOptionError:
                 pass
+
+            if sys.version_info[0] == 2:
+                self.use_old_ssl = use_old_ssl
+            else:
+                if use_old_ssl:
+                    log.warning("Ignoring use_old_ssl: only supported on Python 2")
         except configparser.Error as err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl']:

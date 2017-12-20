@@ -95,8 +95,6 @@ for dver in DVERS:
 FALLBACK_DVER = 'el7'
 DEFAULT_DVERS = ['el6', 'el7']
 DEFAULT_DVERS_BY_REPO = {
-    '3.2': ['el5', 'el6'],
-    'osg-3.2': ['el5', 'el6'],
     '3.3': ['el6', 'el7'],
     'osg-3.3': ['el6', 'el7'],
     '3.4': ['el6', 'el7'],

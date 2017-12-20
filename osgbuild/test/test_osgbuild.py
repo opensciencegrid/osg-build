@@ -303,7 +303,7 @@ class TestMock(XTestCase):
 
     def test_mock_koji_cfg(self):
         if self.check_for_mock_group():
-            checked_osg_build(["mock", self.pkg_dir, "--el6", "--mock-config-from-koji=osg-3.2-el6-build"])
+            checked_osg_build(["mock", self.pkg_dir, "--el7", "--mock-config-from-koji=osg-3.4-el7-build"])
 
 
 class TestKoji(XTestCase):
@@ -436,7 +436,7 @@ class TestMisc(XTestCase):
         buildopts_el = dict()
         build_el = dict()
         defines_el = dict()
-        for dver in ['el5', 'el6']:
+        for dver in ['el6', 'el7']:
             rhel = dver[2:]
             buildopts_el[dver] = DEFAULT_BUILDOPTS_COMMON.copy()
             buildopts_el[dver]['redhat_release'] = dver
@@ -446,19 +446,15 @@ class TestMisc(XTestCase):
             self.assertTrue("--define=rhel %s" % rhel in defines_el[dver],
                             "%%rhel not set correctly for %s build" % dver)
 
-        self.assertTrue('--define=el5 1' in defines_el['el5'],
-                        "%el5 not set for el5 build")
-        self.assertTrue('--define=el6 0' in defines_el['el5'],
-                        "%el6 not unset for el5 build")
+        self.assertTrue('--define=el6 0' in defines_el['el7'],
+                        "%el6 not unset for el7 build")
+        self.assertTrue('--define=el7 1' in defines_el['el7'],
+                        "%el7 not set for el7 build")
 
         self.assertTrue('--define=el6 1' in defines_el['el6'],
                         "%el6 not set for el6 build")
-        self.assertTrue('--define=el5 0' in defines_el['el6'],
-                        "%el5 not unset for el6 build")
-
-        self.assertTrue('--define=_source_filedigest_algorithm 1' in
-                        defines_el['el5'],
-                        "filedigest algorithm not set for el5 build")
+        self.assertTrue('--define=el7 0' in defines_el['el6'],
+                        "%el7 not unset for el6 build")
 
 
 short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc, TestKoji)

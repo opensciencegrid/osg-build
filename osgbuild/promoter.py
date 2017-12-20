@@ -549,18 +549,6 @@ def format_valid_routes(valid_routes):
     return formatted
 
 
-def _append_const(option, opt, value, parser, const):
-    """optparser callback to do the same as the 'append_const' action
-    on Python 2.4, which does not support append_const.
-
-    Use as follows in add_option:
-    action="callback", callback=_append_const, callback_args=(const,)
-    """
-    if not getattr(parser.values, option.dest, option.default):
-        setattr(parser.values, option.dest, [])
-    getattr(parser.values, option.dest).append(const)
-
-
 def parse_cmdline_args(all_dvers, valid_routes, argv):
     """Return a tuple of (options, positional args)"""
     helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
@@ -584,11 +572,9 @@ def parse_cmdline_args(all_dvers, valid_routes, argv):
     for dver in all_dvers:
         parser.add_option("--%s-only" % dver, action="store_const", dest="only_dver", const=dver, default=None,
                           help="Promote only %s builds" % dver)
-        parser.add_option("--no-%s" % dver, "--no%s" % dver, dest="no_dvers", action="callback", callback=_append_const,
-                          callback_args=(dver,), default=[],
+        parser.add_option("--no-%s" % dver, "--no%s" % dver, dest="no_dvers", action="append_const", default=[],
                           help="Do not promote %s builds, even if they are default for the route(s)" % dver)
-        parser.add_option("--%s" % dver, dest="extra_dvers", action="callback", callback=_append_const,
-                          callback_args=(dver,), default=[],
+        parser.add_option("--%s" % dver, dest="extra_dvers", action="append_const", default=[],
                           help="Promote %s builds if the route(s) support them" % dver)
 
     if len(argv) < 2:

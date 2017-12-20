@@ -343,7 +343,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         dest="redhat_release",
         type="string",
         help="The version of the distribution to build the package for. "
-        "Valid values are: 5/6/7 (for EL 5/6/7 respectively). "
+        "Valid values are: 6 or 7 (for EL 6 or 7 respectively). "
         "Default: build for all releases (koji task) current platform "
         "(other tasks)")
     parser.add_option(
@@ -375,7 +375,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     rpmbuild_mock_group.add_option(
         "--distro-tag",
         help="The distribution tag to append to the end of the release. "
-        "Default: osg.el5, osg.el6, or osg.el7 for EL 5/6/7 respectively")
+        "Default: osg.el6, or osg.el7 for EL 6 or 7 respectively")
     parser.add_option_group(rpmbuild_mock_group)
 
     if mock:
@@ -394,7 +394,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         mock_group.add_option(
             "--mock-config-from-koji",
             help="Use a mock config based on a koji buildroot (build tag, "
-            "such as osg-3.2-el5-build). Either this or --mock-config must be "
+            "such as osg-3.4-el7-build). Either this or --mock-config must be "
             "specified. This option requires the osg-build-koji plugin")
         parser.add_option_group(mock_group)
 
@@ -491,7 +491,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "--repo", action="callback",
             callback=parser_targetopts_callback,
             type="string", dest="repo",
-            help="Specify a set of repos to build to (osg-3.1 (or just 3.1), "
+            help="Specify a set of repos to build to (osg-3.4 (or just 3.4), "
             + ", ".join(REPO_HINTS_STATIC.keys())
             + ")")
         parser.add_option_group(koji_group)
@@ -530,13 +530,13 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
     targetopts_by_dver is a dict keyed by redhat release (aka 'distro
     version' or 'dver' for short) The values of targetopts_by_dver are dicts
     containing the options to use for building with that dver. For example,
-    targetopts_by_dver['5']['koji_tag'] is the koji tag to use when building
-    for EL 5.
+    targetopts_by_dver['7']['koji_tag'] is the koji tag to use when building
+    for EL 7.
 
-    enabled_dvers is the set of dvers to actually build for, which the --el5,
+    enabled_dvers is the set of dvers to actually build for, which the
     --el6, --el7 and --redhat-release arguments affect. dvers may also be
     implicitly turned on by other arguments, e.g. specifying
-    --koji-tag=el5-foobar will implicitly turn on el5 builds.
+    --koji-tag=el7-foobar will implicitly turn on el7 builds.
 
     Also handle --ktt (--koji-tag-and-target), which sets both koji_tag
     and koji_target, and --upcoming, and --repo, which sets the target for both dvers.
@@ -762,7 +762,7 @@ def verify_release_in_targetopts_by_dver(targetopts_by_dver):
 
 
 def get_local_machine_dver():
-    "Return the distro version (e.g. 'el5', 'el6', 'el7') of the local machine or None"
+    "Return the distro version (e.g. 'el6', 'el7') of the local machine or None"
     try:
         redhat_release_contents = utils.slurp('/etc/redhat-release')
     except EnvironmentError: # some error reading the file

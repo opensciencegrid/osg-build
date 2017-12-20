@@ -76,7 +76,7 @@ class SRPMBuild(object):
         working dir and the subdirectories specified in the WD_* constants.
 
         """
-        rhel = self.buildopts.get('redhat_release', '5')
+        rhel = self.buildopts.get('redhat_release', '7')
         defines = [
             "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm",
             "rhel " + rhel,
@@ -88,14 +88,6 @@ class SRPMBuild(object):
                 defines.append("%s 1" % dver)
             else:
                 defines.append("%s 0" % dver)
-        if rhel == '5':
-            defines += [
-                "_source_filedigest_algorithm 1",
-                "_binary_filedigest_algorithm 1",
-                "_binary_payload w9.gzdio",
-                "_source_payload w9.gzdio",
-                "_default_patch_fuzz 2",
-            ]
 
         if prebuild:
             defines += [

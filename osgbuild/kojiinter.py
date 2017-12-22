@@ -9,8 +9,10 @@ try:
 except ImportError:
     import ConfigParser as configparser
 import logging
+import random
 import re
 import os
+import string
 import sys
 import time
 try:
@@ -577,8 +579,18 @@ class KojiLibInter(object):
         return os.path.join(serverdir, os.path.basename(source))
 
 
+    # taken from cli/koji from Koji version 1.11
+    # Copyright (c) 2005-2014 Red Hat, Inc.
     def _unique_path(self, prefix="cli-build"):
-        return kojicli._unique_path(prefix)
+        """Create a unique path fragment by appending a path component
+        to prefix.  The path component will consist of a string of letter and numbers
+        that is unlikely to be a duplicate, but is not guaranteed to be unique."""
+        # Use time() in the dirname to provide a little more information when
+        # browsing the filesystem.
+        # For some reason repr(time.time()) includes 4 or 5
+        # more digits of precision than str(time.time())
+        return '%s/%r.%s' % (prefix, time.time(),
+                          ''.join([random.choice(string.ascii_letters) for i in range(8)]))
 
 
     def get_build_and_dest_tags(self, target):

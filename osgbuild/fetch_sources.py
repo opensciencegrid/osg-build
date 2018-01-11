@@ -43,7 +43,7 @@ def process_meta_url(line, destdir):
             name = basename[:-4]
         else:
             raise Error("No package name specified: %s" % line)
-    print "Checking out git repo for %s." % name
+    log.info("Checking out git repo for %s.", name)
     tag = contents.get("tag")
     if not tag:
         raise Error("No package tag specified: %s" % line)
@@ -81,11 +81,19 @@ def process_meta_url(line, destdir):
         rc = utils.unchecked_call(["gzip", "-fn", full_dest_file])
         if rc:
             raise Error("Failed to compress archive at %s" % full_dest_file)
+
+        files = [full_dest_file + ".gz"]
+
+        spec_file = os.path.join(checkout_dir, "rpm", name + ".spec")
+        if os.path.exists(spec_file):
+            log.info("Found spec file %s in repo", spec_file)
+            shutil.copy(spec_file, destdir)
+            files.append(spec_file)
     finally:
         os.chdir(orig_dir)
         shutil.rmtree(checkout_dir)
 
-    return full_dest_file + ".gz"
+    return files
 
 def process_dot_source(cache_prefix, sfilename, destdir):
     """Read a .source file, fetch any files mentioned in it from the
@@ -103,8 +111,8 @@ def process_dot_source(cache_prefix, sfilename, destdir):
                 continue
             basename = os.path.basename(line)
             if len(line.split()) > 1:
-                filename = process_meta_url(line, destdir)
-                downloaded.append(filename)
+                filenames = process_meta_url(line, destdir)
+                downloaded.extend(filenames)
                 continue
             elif line.startswith('/'):
                 uri = "file://" + line
@@ -210,8 +218,8 @@ def fetch(package_dir,
     downloaded = []
     for src in dot_sources:
         log.debug('Processing .source file %s', src)
-        for fname in process_dot_source(cache_prefix, src, destdir):
-            downloaded.append(os.path.abspath(fname))
+        for fnames in process_dot_source(cache_prefix, src, destdir):
+            downloaded.extend([os.path.abspath(x) for x in fnames])
 
     # Process downloaded SRPMs
     srpms = fnmatch.filter(downloaded, '*.src.rpm')

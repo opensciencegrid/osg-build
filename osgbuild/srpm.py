@@ -1,6 +1,8 @@
 """Tasks for an SRPM build."""
 
 # pylint: disable=W0614
+from __future__ import absolute_import
+from __future__ import print_function
 import glob
 import fnmatch
 import logging
@@ -9,10 +11,10 @@ import re
 import shutil
 
 # local
-from osgbuild.constants import *
-from osgbuild import fetch_sources
-from osgbuild import utils
-from osgbuild.error import *
+from .constants import *
+from . import fetch_sources
+from . import utils
+from .error import *
 
 
 log = logging.getLogger(__name__)
@@ -291,17 +293,17 @@ class SRPMBuild(object):
         lint_output, lint_returncode = utils.sbacktick(
             ["rpmlint", "-f", conf_file, srpm])
 
-        print lint_output
+        print(lint_output)
         if lint_returncode == 0:
-            print "rpmlint ok for " + self.package_name
+            print("rpmlint ok for " + self.package_name)
         elif lint_returncode < 64:
-            print "Error running rpmlint for " + self.package_name
+            print("Error running rpmlint for " + self.package_name)
         elif lint_returncode == 64:
-            print "rpmlint found problems with " + self.package_name
+            print("rpmlint found problems with " + self.package_name)
         elif lint_returncode == 66:
-            print "rpmlint found many problems with " + self.package_name
+            print("rpmlint found many problems with " + self.package_name)
         else:
-            print "unrecognized return code from rpmlint: " + str(lint_returncode)
+            print("unrecognized return code from rpmlint: " + str(lint_returncode))
 # end of SRPMBuild
 
 

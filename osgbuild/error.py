@@ -47,7 +47,7 @@ class FileNotFoundError(Error):
 class ProgramNotFoundError(Error):
     def __init__(self, program):
         msg = "Couldn't find required program '%s'." % program
-        if program.find("/") == -1:
+        if "/" not in program:
             Error.__init__(self, msg + " $PATH was:\n%s" % os.environ['PATH'])
         else:
             Error.__init__(self, msg)

@@ -1,12 +1,13 @@
 """Helper functions for a git build."""
+from __future__ import absolute_import
+from __future__ import print_function
 import re
 import os
 import errno
 
-from osgbuild.error import Error, GitError
-from osgbuild import utils
-
-import osgbuild.constants as constants
+from .error import Error, GitError
+from . import utils
+from . import constants
 
 def is_git(package_dir):
     """Determine whether a given directory is part of a git repo."""
@@ -111,9 +112,9 @@ def is_uncommitted(package_dir):
     if err:
         raise GitError("Exit code %d getting git status for directory %s. Output:\n%s" % (err, package_dir, out))
     if out:
-        print "The following uncommitted changes exist:"
-        print out
-        print "Please commit these first."
+        print("The following uncommitted changes exist:")
+        print(out)
+        print("Please commit these first.")
         return True
 
     remote = get_current_branch_remote(package_dir)
@@ -191,7 +192,7 @@ def is_outdated(package_dir):
     if remote_hash == branch_hash:
         return False
 
-    print "Remote hash (%s) does not match local hash (%s) for branch %s." % (remote_hash, branch_hash, branch)
+    print("Remote hash (%s) does not match local hash (%s) for branch %s." % (remote_hash, branch_hash, branch))
     return True
 
 

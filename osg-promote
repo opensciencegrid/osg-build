@@ -1,4 +1,5 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
+from __future__ import print_function
 import logging
 import sys
 from osgbuild import error
@@ -15,7 +16,7 @@ log.addHandler(log_consolehandler)
 if __name__ == "__main__":
     try:
         sys.exit(promoter.main(sys.argv))
-    except error.Error, e:
-        print >>sys.stderr, e
+    except error.Error as e:
+        print(e, file=sys.stderr)
         sys.exit(1)
 

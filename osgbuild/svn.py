@@ -1,11 +1,13 @@
 """Helper functions for an SVN build."""
+from __future__ import absolute_import
+from __future__ import print_function
 import re
 import os
 import errno
 
-from osgbuild.constants import SVN_ROOT, SVN_REDHAT_PATH, SVN_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
-from osgbuild.error import Error, SVNError, UsageError
-from osgbuild import utils
+from .constants import SVN_ROOT, SVN_REDHAT_PATH, SVN_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
+from .error import Error, SVNError, UsageError
+from . import utils
 
 
 def is_svn(package_dir):
@@ -44,8 +46,8 @@ def is_uncommitted(package_dir):
     if err:
         raise SVNError("Exit code %d getting SVN status. Output:\n%s" % (err, out))
     if out:
-        print "The following uncommitted changes exist:"
-        print out
+        print("The following uncommitted changes exist:")
+        print(out)
         return True
     else:
         return False
@@ -70,8 +72,8 @@ def is_outdated(package_dir):
         if outdated_flag == "*":
             outdated_files.append(line)
     if outdated_files:
-        print "The following outdated files exist:"
-        print "\n".join(outdated_files)
+        print("The following outdated files exist:")
+        print("\n".join(outdated_files))
         return True
     else:
         return False
@@ -160,9 +162,9 @@ def restricted_branch_matches_target(branch, target):
     are True.
 
     """
-    for (branch_pattern, branch_name) in SVN_RESTRICTED_BRANCHES.iteritems():
+    for (branch_pattern, branch_name) in SVN_RESTRICTED_BRANCHES.items():
         branch_match = re.search(branch_pattern, branch)
-        for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.iteritems():
+        for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
             target_match = re.search(target_pattern, target)
 
             if branch_match and target_match and branch_name == target_name:

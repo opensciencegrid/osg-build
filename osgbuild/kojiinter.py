@@ -2,18 +2,28 @@
 # pylint: disable=W0614,C0103
 
 
-import ConfigParser
+from __future__ import absolute_import
+from __future__ import print_function
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 import logging
+import random
 import re
 import os
+import string
+import sys
 import time
-import urllib2
-from urllib2 import HTTPError
+try:
+    from six.moves import urllib
+except ImportError:
+    from .six.moves import urllib
 
-from osgbuild.constants import *
-from osgbuild import clientcert
-from osgbuild import utils
-from osgbuild.error import KojiError, type_of_error
+from .constants import *
+from . import clientcert
+from . import utils
+from .error import KojiError, type_of_error
 
 log = logging.getLogger(__name__)
 
@@ -91,8 +101,8 @@ def download_koji_file(task_id, filename, destdir):
     url = KOJI_HUB + "/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
     log.debug('Retrieving ' + url)
     try:
-        handle = urllib2.urlopen(url)
-    except HTTPError as err:
+        handle = urllib.request.urlopen(url)
+    except urllib.error.HTTPError as err:
         log.error('Error retrieving ' + url)
         log.error(str(err))
         raise
@@ -172,7 +182,7 @@ class KojiInter(object):
 
     def build_git(self, remote, rev, path):
         """Submit a GIT build"""
-        print remote
+        print(remote)
         return KojiInter.backend.build("git+" + remote + "?" + path + "#" + rev,
                                        self.target,
                                        self.scratch,
@@ -220,7 +230,7 @@ class KojiShellInter(object):
             if not self.dry_run:
                 utils.checked_call(cmd)
             else:
-                print " ".join(cmd)
+                print(" ".join(cmd))
 
     def get_build_and_dest_tags(self, target):
         """Return the build and destination tags for the current target."""
@@ -263,7 +273,7 @@ class KojiShellInter(object):
         if not self.dry_run:
             err = utils.unchecked_call(self.koji_cmd + build_subcmd)
         else:
-            print " ".join(self.koji_cmd + build_subcmd)
+            print(" ".join(self.koji_cmd + build_subcmd))
             err = 0
 
         if err:
@@ -277,7 +287,7 @@ class KojiShellInter(object):
             if not self.dry_run:
                 err2 = utils.unchecked_call(self.koji_cmd + regen_repo_subcmd)
             else:
-                print " ".join(self.koji_cmd + regen_repo_subcmd)
+                print(" ".join(self.koji_cmd + regen_repo_subcmd))
                 err2 = 0
             if err2:
                 raise KojiError("koji regen-repo failed with exit code " + str(err2))
@@ -321,7 +331,7 @@ class KojiShellInter(object):
             search_subcmd.append("--exact")
         search_subcmd.append(terms)
 
-        out, err = utils.sbacktick(self.koji_cmd + search_subcmd)       
+        out, err = utils.sbacktick(self.koji_cmd + search_subcmd)
         if err:
             raise KojiError("koji search failed with exit code " + str(err))
         return out.split("\n")
@@ -414,7 +424,10 @@ class KojiLibInter(object):
             self.user = user or get_cn()
         else:
             self.user = user or "osgbuild"
-        self.use_old_ssl = True
+        if sys.version_info[0] == 2:
+            self.use_old_ssl = True
+        else:
+            self.use_old_ssl = False
         self.weburl = os.path.join(KOJI_WEB, "koji")
         self.dry_run = dry_run
 
@@ -430,16 +443,23 @@ class KojiLibInter(object):
         if not config_file or not os.path.isfile(config_file):
             raise KojiError("Can't find koji config file.")
         try:
-            cfg = ConfigParser.ConfigParser()
+            cfg = configparser.ConfigParser()
             cfg.read(config_file)
             items = dict(cfg.items('koji'))
 
             # special case: use_old_ssl is a boolean so get ConfigParser to parse it
+            use_old_ssl = None
             try:
-                self.use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
-            except ConfigParser.NoOptionError:
+                use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
+            except configparser.NoOptionError:
                 pass
-        except ConfigParser.Error as err:
+
+            if sys.version_info[0] == 2:
+                self.use_old_ssl = use_old_ssl
+            else:
+                if use_old_ssl:
+                    log.warning("Ignoring use_old_ssl: only supported on Python 2")
+        except configparser.Error as err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl']:
             if items.get(var):
@@ -559,8 +579,18 @@ class KojiLibInter(object):
         return os.path.join(serverdir, os.path.basename(source))
 
 
+    # taken from cli/koji from Koji version 1.11
+    # Copyright (c) 2005-2014 Red Hat, Inc.
     def _unique_path(self, prefix="cli-build"):
-        return kojicli._unique_path(prefix)
+        """Create a unique path fragment by appending a path component
+        to prefix.  The path component will consist of a string of letter and numbers
+        that is unlikely to be a duplicate, but is not guaranteed to be unique."""
+        # Use time() in the dirname to provide a little more information when
+        # browsing the filesystem.
+        # For some reason repr(time.time()) includes 4 or 5
+        # more digits of precision than str(time.time())
+        return '%s/%r.%s' % (prefix, time.time(),
+                          ''.join([random.choice(string.ascii_letters) for i in range(8)]))
 
 
     def get_build_and_dest_tags(self, target):
@@ -625,7 +655,7 @@ class KojiLibInter(object):
             # el5-osg-build and the arch is noarch, files will be in 'el5-osg-noarch'.
             task_info = session.getTaskInfo(task_id, request=True)
             if task_info.get('method', "") == 'buildArch':
-                if task_info.has_key('request'):
+                if 'request' in task_info:
                     tag_id, arch = task_info['request'][1:3]
                     tag_info = session.getTag(tag_id)
                     try:
@@ -635,7 +665,7 @@ class KojiLibInter(object):
                             if not filename.endswith('src.rpm'):
                                 destsubdir = re.sub(r'-build', '', tag_name) + "-" + arch
                                 download_koji_file(task_id, filename, os.path.join(destdir, destsubdir))
-                    except (TypeError, AttributeError, HTTPError):
+                    except (TypeError, AttributeError, urllib.error.HTTPError):
                         # TODO More useful error message
                         log.warning("Unable to download files for task %d", task_id)
                         return False

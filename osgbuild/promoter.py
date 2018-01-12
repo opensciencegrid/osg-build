@@ -1,17 +1,21 @@
 """A package promotion script for OSG"""
 
 
-
+from __future__ import absolute_import
+from __future__ import print_function
 import os
 import re
 import sys
-import ConfigParser
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 
-from osgbuild import constants
-from osgbuild import error
-from osgbuild import kojiinter
-from osgbuild import utils
-from osgbuild.utils import printf, print_table
+from . import constants
+from . import error
+from . import kojiinter
+from . import utils
+from .utils import printf, print_table
 from optparse import OptionParser
 
 from collections import namedtuple
@@ -150,7 +154,7 @@ def _parse_list_str(list_str):
     # split string on spaces or commas
     items = re.split(r'[ ,]', list_str)
     # remove empty strings from the list
-    filtered_items = filter(None, items)
+    filtered_items = [_f for _f in items if _f]
     return filtered_items
 
 
@@ -178,7 +182,7 @@ def load_routes(inifile):
     defined.
 
     """
-    config = ConfigParser.RawConfigParser()
+    config = configparser.RawConfigParser()
 
     config.read([os.path.join(x, INIFILE) for x in constants.DATA_FILE_SEARCH_PATH])
     if not config.sections():
@@ -195,7 +199,7 @@ def load_routes(inifile):
             to_tag_hint = config.get(sec, 'to')
             repotag = config.get(sec, 'repotag')
             dvers = _parse_list_str(config.get(sec, 'dvers'))
-        except ConfigParser.NoOptionError as err:
+        except configparser.NoOptionError as err:
             raise error.Error("Malformed config file: %s" % str(err))
         extra_dvers = []
         if config.has_option(sec, 'extra_dvers'):
@@ -374,7 +378,7 @@ class Promoter(object):
             promoted_builds = self.watch_builds(tasks)
 
             if regen:
-                print "--- Regenerating repos"
+                print("--- Regenerating repos")
                 self.kojihelper.regen_repos(tags_to_regen=self.tag_pkg_args.keys())
         return promoted_builds
 
@@ -470,14 +474,14 @@ class KojiHelper(kojiinter.KojiLibInter):
 
     def get_tagged_builds(self, tag):
         """Return a list of NVRs of all builds in a tag"""
-        if not KojiHelper.tagged_builds_cache.has_key(tag):
+        if tag not in KojiHelper.tagged_builds_cache:
             data = self.kojisession.listTagged(tag)
             KojiHelper.tagged_builds_cache[tag] = [x['nvr'] for x in data]
         return KojiHelper.tagged_builds_cache[tag]
 
     def get_tagged_packages(self, tag):
         """Return a list of names of all builds in a tag"""
-        if not KojiHelper.tagged_packages_cache.has_key(tag):
+        if tag not in KojiHelper.tagged_packages_cache:
             KojiHelper.tagged_packages_cache[tag] = [split_nvr(x)[0] for x in self.get_tagged_builds(tag)]
         return KojiHelper.tagged_packages_cache[tag]
 
@@ -656,10 +660,10 @@ def main(argv=None):
         promoter.add_promotion(pkgb, options.ignore_rejects)
 
     if promoter.rejects:
-        print "Rejected package or builds:\n" + "\n".join([str(x) for x in promoter.rejects])
-        print "Rejects will not be promoted! Rerun with --ignore-rejects to promote them anyway."
+        print("Rejected package or builds:\n" + "\n".join([str(x) for x in promoter.rejects]))
+        print("Rejects will not be promoted! Rerun with --ignore-rejects to promote them anyway.")
 
-    print "Promotion plan:"
+    print("Promotion plan:")
     if any(promoter.tag_pkg_args.values()):
         text_args = {}
         for tag, builds in promoter.tag_pkg_args.items():
@@ -722,6 +726,6 @@ def _get_route_dvers_pairs(routenames, valid_routes, extra_dvers, no_dvers, only
 if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv))
-    except error.Error, e:
-        print >>sys.stderr, e
+    except error.Error as e:
+        print(e, file=sys.stderr)
         sys.exit(1)

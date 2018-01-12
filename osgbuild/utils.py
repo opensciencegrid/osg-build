@@ -1,4 +1,6 @@
 """utilities for osg-build"""
+from __future__ import absolute_import
+from __future__ import print_function
 import errno
 import itertools
 import logging
@@ -11,8 +13,28 @@ import sys
 import tempfile
 from datetime import datetime
 
+try:
+    import six
+    from six.moves import input
+except ImportError:
+    from . import six
+    from .six.moves import input
+
 
 log = logging.getLogger(__name__)
+
+
+def to_str(strlike):
+    if six.PY3:
+        if isinstance(strlike, bytes):
+            return strlike.decode('utf-8', 'ignore')
+        else:
+            return strlike
+    else:
+        if isinstance(strlike, unicode):
+            return strlike.encode('utf-8', 'ignore')
+        else:
+            return strlike
 
 
 class CalledProcessError(Exception):
@@ -136,7 +158,7 @@ def checked_backtick(*args, **kwargs):
 
     proc = subprocess.Popen(cmd, *args[1:], **sp_kwargs)
 
-    output = proc.communicate()[0]
+    output = to_str(proc.communicate()[0])
     if not nostrip:
         output = output.strip()
     err = proc.returncode
@@ -159,7 +181,7 @@ def unslurp(filename, contents):
     with open(filename, 'w') as fh:
         fh.write(contents)
 
-def atomic_unslurp(filename, contents, mode=0644):
+def atomic_unslurp(filename, contents, mode=0o644):
     """Write contents to a file, making sure a half-written file is never
     left behind in case of error.
 
@@ -231,7 +253,7 @@ def super_unpack(*compressed_files):
                 break
 
 
-def safe_makedirs(directory, mode=0777):
+def safe_makedirs(directory, mode=0o777):
     """Create a directory and all its parent directories, unless it already
     exists.
 
@@ -246,8 +268,8 @@ def ask(question, choices):
     user_choice = ""
     match = False
     while not match:
-        print question
-        user_choice = raw_input("[" + "/".join(choices) + "] ? ").strip().lower()
+        print(question)
+        user_choice = input("[" + "/".join(choices) + "] ? ").strip().lower()
         for choice in choices_lc:
             if user_choice.startswith(choice):
                 match = True
@@ -306,7 +328,7 @@ def printf(fstring, *args, **kwargs):
     """
     file_ = kwargs.pop('file', sys.stdout)
     end = kwargs.pop('end', "\n")
-    ffstring = fstring + end
+    ffstring = to_str(fstring) + to_str(end)
     if len(args) == 0 and len(kwargs) > 0:
         file_.write(ffstring % kwargs)
     elif len(args) == 1 and type(args[0]) == dict:
@@ -368,7 +390,7 @@ def print_table(columns_by_header):
 
 
 def is_url(location):
-    return re.match(r'[-a-z+]+://', location)
+    return re.match(r'[-a-z+]+://', to_str(location))
 
 
 # Functions for manipulating a directory stack in the style of bash

@@ -6,7 +6,10 @@ import re
 import shutil
 import sys
 import tempfile
-import urllib2
+try:
+    from six.moves import urllib
+except ImportError:
+    from osgbuild.six.moves import urllib
 
 from collections import namedtuple
 from optparse import OptionParser
@@ -24,6 +27,7 @@ from osgbuild.utils import (
     safe_makedirs,
     shell_quote,
     slurp,
+    to_str,
     unslurp)
 
 
@@ -169,7 +173,7 @@ def checked_download(dest, url):
     else:
         realdest = dest
     try:
-        urlhandle = urllib2.urlopen(url)
+        urlhandle = urllib.request.urlopen(url)
         realdesthandle = open(realdest, 'w')
         realdesthandle.write(urlhandle.read())
         realdesthandle.close()

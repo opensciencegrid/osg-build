@@ -17,6 +17,8 @@ Wishlist:
 # TODO Shouldn't need koji access for 'rpmbuild', but currently does since it
 # gets the values for the --repo arg -- which is only used for koji builds.
 # Make it so.
+from __future__ import absolute_import
+from __future__ import print_function
 import logging
 from optparse import OptionGroup, OptionParser, OptionValueError
 import re
@@ -24,20 +26,20 @@ import os
 import sys
 import tempfile
 
-from osgbuild.constants import *
-from osgbuild.error import UsageError, KojiError, SVNError, GitError, Error
-from osgbuild import srpm
-from osgbuild import svn
-from osgbuild import git
-from osgbuild import utils
+from .constants import *
+from .error import UsageError, KojiError, SVNError, GitError, Error
+from . import srpm
+from . import svn
+from . import git
+from . import utils
 
 try:
-    from osgbuild import kojiinter
+    from . import kojiinter
 except ImportError:
     kojiinter = None
 
 try:
-    from osgbuild import mock
+    from . import mock
 except ImportError:
     mock = None
 
@@ -83,8 +85,8 @@ def main(argv):
 
             vcs = (git_ok and git) or (svn_ok and svn)
             if not vcs:
-                print "VCS build requested but no usable VCS found for " + pkg
-                print "Exiting"
+                print("VCS build requested but no usable VCS found for " + pkg)
+                print("Exiting")
                 return 1
 
             if not buildopts['scratch']:
@@ -148,11 +150,11 @@ def main(argv):
                     method()
     # end of main loop
     # HACK
-    task_ids = filter(None, task_ids)
+    task_ids = [_f for _f in task_ids if _f]
     if kojiinter and kojiinter.KojiInter.backend and task_ids:
-        print "Koji task ids are:", task_ids
+        print("Koji task ids are:", task_ids)
         for tid in task_ids:
-            print KOJI_WEB + "/koji/taskinfo?taskID=" + str(tid)
+            print(KOJI_WEB + "/koji/taskinfo?taskID=" + str(tid))
         if not buildopts['no_wait']:
             ret = kojiinter.KojiInter.backend.watch_tasks_with_retry(task_ids)
             # TODO This is not implemented for the KojiShellInter backend
@@ -163,7 +165,7 @@ def main(argv):
                 elif not isinstance(kojiinter.KojiInter.backend, kojiinter.KojiLibInter):
                     log.warning("--getfiles is only implemented on the KojiLib backend")
                 else:
-                    for destdir, tids in task_ids_by_results_dir.iteritems():
+                    for destdir, tids in task_ids_by_results_dir.items():
                         if kojiinter.KojiInter.backend.download_results(tids, destdir):
                             log.info("Results and logs downloaded to %s", destdir)
             try:
@@ -370,7 +372,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         help="Fully extract all source files")
     parser.add_option_group(prebuild_group)
 
-    rpmbuild_mock_group = OptionGroup(parser, 
+    rpmbuild_mock_group = OptionGroup(parser,
                                       "rpmbuild and mock task options")
     rpmbuild_mock_group.add_option(
         "--distro-tag",
@@ -722,13 +724,13 @@ def print_version_and_exit():
     if __version__ == '@' + 'VERSION' + '@':
         out, ret = utils.sbacktick("git -C %s describe --tags" % utils.shell_quote(os.path.dirname(os.path.realpath(sys.argv[0]))),
                                    err2out=False)
-        print "osg-build development version",
+        print("osg-build development version", end=' ')
         if not ret:
-            print " " + out
+            print(" " + out)
         else:
-            print
+            print()
     else:
-        print "osg-build " + __version__
+        print("osg-build " + __version__)
     sys.exit(0)
 
 

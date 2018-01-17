@@ -224,8 +224,8 @@ def fetch(package_dir,
     downloaded = []
     for src in dot_sources:
         log.debug('Processing .source file %s', src)
-        for fnames in process_dot_source(cache_prefix, src, destdir):
-            downloaded.extend([os.path.abspath(x) for x in fnames])
+        for fname in process_dot_source(cache_prefix, src, destdir):
+            downloaded.append(os.path.abspath(fname))
 
     # Process downloaded SRPMs
     srpms = fnmatch.filter(downloaded, '*.src.rpm')

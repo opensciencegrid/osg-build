@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.11.1
+Version:        1.11.2
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -124,6 +124,9 @@ rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 
 
 %changelog
+* Wed Jan 24 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.11.2-1
+- Work around old versions of git causing us to get the wrong version of the spec file
+
 * Tue Jan 23 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.11.1-1
 - Fix bug with git spec files where we take the spec file from master instead of the desired tag
 

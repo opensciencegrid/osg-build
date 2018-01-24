@@ -275,7 +275,7 @@ class TestFetch(XTestCase):
             "source tarball not found")
 
     def test_github_fetch_spec(self):
-        svn_export('native/redhat/branches/matyas/osg-build', '{2018-01-24}', 'osg-build2')
+        svn_export('native/redhat/trunk/osg-build', '{2018-01-24}', 'osg-build2')
         checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build2"])
         contents = get_listing('osg-build2')
 

@@ -59,8 +59,9 @@ def process_meta_url(line, destdir):
     # we create the archive as a tar file and gzip it ourselves because
     # git-archive was not capable of directly creating .tar.gz files on git
     # 1.7.1 (SLF 6)
+    destdir = os.path.abspath(destdir)
     dest_file = "%s-%s.tar" % (name, tag_version)
-    full_dest_file = os.path.abspath(os.path.join(destdir, dest_file))
+    full_dest_file = os.path.join(destdir, dest_file)
     prefix = "%s-%s" % (name, tag_version)
     git_hash = contents.get("hash")
     if not git_hash:
@@ -92,10 +93,13 @@ def process_meta_url(line, destdir):
         files = [full_dest_file + ".gz"]
 
         spec_file = os.path.join(checkout_dir, "rpm", name + ".spec")
+        log.info("Looking for spec file %s in repo", spec_file)
         if os.path.exists(spec_file):
-            log.info("Found spec file %s in repo", spec_file)
+            log.info("Found spec file")
             shutil.copy(spec_file, destdir)
             files.append(spec_file)
+        else:
+            log.info("Did not find spec file")
     finally:
         os.chdir(orig_dir)
         shutil.rmtree(checkout_dir)
@@ -268,4 +272,4 @@ if __name__ == '__main__':
         package_dir = sys.argv[1]
     except IndexError:
         package_dir = "."
-    fetch(package_dir)
+    fetch(os.path.abspath(package_dir))

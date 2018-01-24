@@ -245,11 +245,8 @@ class TestPrepare(XTestCase):
 class TestFetch(XTestCase):
     """Tests for fetch-sources"""
 
-    def setUp(self):
-        common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
-        svn_export('native/redhat/branches/matyas/osg-build', '{2017-04-26}', 'osg-build')
-
     def test_cache_fetch(self):
+        common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
         checked_call(["python", "-m", "osgbuild.fetch_sources", "mash"])
         contents = get_listing('mash')
 
@@ -267,6 +264,7 @@ class TestFetch(XTestCase):
             "Spec file not overridden")
 
     def test_github_fetch(self):
+        svn_export('native/redhat/branches/matyas/osg-build', '{2017-04-26}', 'osg-build')
         checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
         contents = get_listing('osg-build')
 
@@ -275,6 +273,18 @@ class TestFetch(XTestCase):
             "spec file not found")
         self.assertTrue(
             "osg-build-1.8.90.tar.gz" in contents,
+            "source tarball not found")
+
+    def test_github_fetch_spec(self):
+        svn_export('native/redhat/branches/matyas/osg-build', '{2018-01-24}', 'osg-build')
+        checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
+        contents = get_listing('osg-build')
+
+        self.assertTrue(
+            "osg-build.spec" in contents,
+            "spec file not found")
+        self.assertTrue(
+            "osg-build-1.11.1.tar.gz" in contents,
             "source tarball not found")
 
 

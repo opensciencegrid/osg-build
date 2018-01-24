@@ -38,31 +38,36 @@ if not osg_build_path:
 
 osg_build_command = [osg_build_path]
 
+
 def go_to_temp_dir():
     working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
     atexit.register(shutil.rmtree, working_dir)
     os.chdir(working_dir)
     return working_dir
 
+
 def common_setUp(path, rev):
-    '''Create a temporary directory, ensure it gets deleted on exit, cd to it,
+    """Create a temporary directory, ensure it gets deleted on exit, cd to it,
     and check out a specific revision of a path from our SVN.
 
-    '''
+    """
     working_dir = go_to_temp_dir()
     svn_export(path, rev, os.path.basename(path))
     return opj(working_dir, os.path.basename(path))
+
 
 def backtick_osg_build(cmd_args, *args, **kwargs):
     kwargs['clocale'] = True
     kwargs['err2out'] = True
     return checked_backtick(osg_build_command + cmd_args, *args, **kwargs)
 
+
 def checked_osg_build(cmd_args, *args, **kwargs):
     return checked_call(osg_build_command + cmd_args, *args, **kwargs)
 
+
 def svn_export(path, rev, destpath):
-    '''Run svn export on a revision rev of path into destpath'''
+    """Run svn export on a revision rev of path into destpath"""
     try:
         checked_backtick(
             ["svn", "export", opj(C.SVN_ROOT, path) + "@" + rev, "-r", rev, destpath],
@@ -71,12 +76,15 @@ def svn_export(path, rev, destpath):
         errprintf("Error in svn export:\n%s", err.output)
         raise
 
+
 def get_listing(directory):
     return checked_backtick(
             ["ls", directory]).split("\n")
 
+
 def regex_in_list(pattern, listing):
     return [x for x in listing if re.match(pattern, x)]
+
 
 class XTestCase(unittest.TestCase):
     """XTestCase (extended test case) adds some useful assertions to
@@ -89,22 +97,26 @@ class XTestCase(unittest.TestCase):
     # Code from unittest in Python 2.7 (c) Python Software Foundation
     def assertRegexpMatches(self, text, regexp, msg=None):
         """Fail if 'text' does not match 'regexp'"""
-        if isinstance(regexp, str):
-            regexp = re.compile(regexp)
-        if not regexp.search(text):
+        if isinstance(regexp, re._pattern_type):
+            re_pattern = regexp
+        else:
+            re_pattern = re.compile(regexp)
+        if not re_pattern.search(text):
             msg = msg or "Regexp didn't match"
-            msg = '%s: %r not found in %r' % (msg, regexp.pattern, text)
+            msg = '%s: %r not found in %r' % (msg, re_pattern.pattern, text)
             raise self.failureException(msg)
 
     # Code from unittest in Python 2.7 (c) Python Software Foundation
     def assertNotRegexpMatches(self, text, regexp, msg=None):
         """Fail if 'text' matches 'regex'"""
-        if isinstance(regexp, str):
-            regexp = re.compile(regexp)
-        match = regexp.search(text)
+        if isinstance(regexp, re._pattern_type):
+            re_pattern = regexp
+        else:
+            re_pattern = re.compile(regexp)
+        match = re_pattern.search(text)
         if match:
             msg = msg or "Regexp matched"
-            msg = '%s: %r matches %r in %r' % (msg, text[match.start():match.end()], regexp.pattern, text)
+            msg = '%s: %r matches %r in %r' % (msg, text[match.start():match.end()], re_pattern.pattern, text)
             raise self.failureException(msg)
 
 
@@ -327,7 +339,6 @@ class TestMock(XTestCase):
         errprintf("%s not in mock group", username)
         return False
 
-
     def test_mock_koji_cfg(self):
         if self.check_for_mock_group():
             checked_osg_build(["mock", self.pkg_dir, "--el7", "--mock-config-from-koji=osg-3.4-el7-build"])
@@ -418,9 +429,6 @@ class TestKoji(XTestCase):
                 "did not detect attempt to build for wrong branch (wrong error message)")
             return
         self.fail("did not detect attempt to build for wrong branch (no error message)")
-
-
-
 
 
 class TestKojiLong(XTestCase):

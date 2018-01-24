@@ -15,10 +15,9 @@ import unittest
 from unittest import makeSuite
 import sys
 
-from osgbuild.constants import *
+import osgbuild.constants as C
 from osgbuild import main
 from osgbuild import srpm
-from osgbuild import utils
 from osgbuild.utils import (
     checked_backtick,
     checked_call,
@@ -61,7 +60,7 @@ def svn_export(path, rev, destpath):
     '''Run svn export on a revision rev of path into destpath'''
     try:
         checked_backtick(
-            ["svn", "export", opj(SVN_ROOT, path) + "@" + rev, "-r", rev, destpath],
+            ["svn", "export", opj(C.SVN_ROOT, path) + "@" + rev, "-r", rev, destpath],
             err2out=True)
     except CalledProcessError as err:
         errprintf("Error in svn export:\n%s", err.output)
@@ -158,8 +157,8 @@ class TestPrebuild(XTestCase):
         pkg_dir = common_setUp(opj(TRUNK, "mash"),
                                "{2011-12-08}")
         checked_osg_build(["prebuild", pkg_dir])
-        upstream_contents = get_listing(opj(pkg_dir, WD_UNPACKED))
-        final_contents = get_listing(opj(pkg_dir, WD_PREBUILD))
+        upstream_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED))
+        final_contents = get_listing(opj(pkg_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             "mash.spec" in upstream_contents,
@@ -181,7 +180,7 @@ class TestPrebuild(XTestCase):
         pkg_osgonly_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
                                        "{2012-01-26}")
         checked_osg_build(["prebuild", pkg_osgonly_dir])
-        final_contents = get_listing(opj(pkg_osgonly_dir, WD_PREBUILD))
+        final_contents = get_listing(opj(pkg_osgonly_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
@@ -193,7 +192,7 @@ class TestPrebuild(XTestCase):
         pkg_passthrough_dir = common_setUp(opj(TRUNK, "globus-core"),
                                            "{2012-01-26}")
         checked_osg_build(["prebuild", pkg_passthrough_dir])
-        final_contents = get_listing(opj(pkg_passthrough_dir, WD_PREBUILD))
+        final_contents = get_listing(opj(pkg_passthrough_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
@@ -205,8 +204,8 @@ class TestPrebuild(XTestCase):
         pkg_dir = common_setUp(opj(TRUNK, "mash"),
                                "{2011-12-08}")
         out = backtick_osg_build(["prebuild", "--full-extract", pkg_dir])
-        ut_contents = get_listing(opj(pkg_dir, WD_UNPACKED_TARBALL))
-        tarball_contents = get_listing(opj(pkg_dir, WD_UNPACKED_TARBALL,
+        ut_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED_TARBALL))
+        tarball_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED_TARBALL,
                                            "mash-0.5.22"))
 
         self.assertNotRegexpMatches(
@@ -231,10 +230,10 @@ class TestPrepare(XTestCase):
 
     def test_prepare(self):
         checked_osg_build(["prepare", self.pkg_dir])
-        self.assertTrue(os.path.exists(opj(self.pkg_dir, WD_RESULTS, "BUILD",
+        self.assertTrue(os.path.exists(opj(self.pkg_dir, C.WD_RESULTS, "BUILD",
                         "globus_gatekeeper-8.1")), "SRPM unpacked")
         head_out = checked_backtick(
-            ["head", "-n", "10", opj(self.pkg_dir, WD_RESULTS, "BUILD",
+            ["head", "-n", "10", opj(self.pkg_dir, C.WD_RESULTS, "BUILD",
             "globus_gatekeeper-8.1", "init", "globus-gatekeeper-lsb.in")])
         self.assertRegexpMatches(
             head_out,
@@ -245,11 +244,8 @@ class TestPrepare(XTestCase):
 class TestFetch(XTestCase):
     """Tests for fetch-sources"""
 
-    def setUp(self):
-        common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
-        svn_export('native/redhat/branches/matyas/osg-build', '{2017-04-26}', 'osg-build')
-
     def test_cache_fetch(self):
+        common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
         checked_call(["python", "-m", "osgbuild.fetch_sources", "mash"])
         contents = get_listing('mash')
 
@@ -267,14 +263,27 @@ class TestFetch(XTestCase):
             "Spec file not overridden")
 
     def test_github_fetch(self):
-        checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
-        contents = get_listing('osg-build')
+        svn_export('native/redhat/branches/matyas/osg-build', '{2017-04-26}', 'osg-build1')
+        checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build1"])
+        contents = get_listing('osg-build1')
 
         self.assertTrue(
             "osg-build.spec" in contents,
             "spec file not found")
         self.assertTrue(
             "osg-build-1.8.90.tar.gz" in contents,
+            "source tarball not found")
+
+    def test_github_fetch_spec(self):
+        svn_export('native/redhat/trunk/osg-build', '{2018-01-24}', 'osg-build2')
+        checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build2"])
+        contents = get_listing('osg-build2')
+
+        self.assertTrue(
+            "osg-build.spec" in contents,
+            "spec file not found")
+        self.assertTrue(
+            "osg-build-1.11.1.tar.gz" in contents,
             "source tarball not found")
 
 
@@ -383,7 +392,7 @@ class TestKoji(XTestCase):
 
     def test_verify_correct_branch(self):
         try:
-            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(SVN_ROOT, 'native/redhat/trunk/koji')])
+            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(C.SVN_ROOT, 'native/redhat/trunk/koji')])
         except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(
@@ -438,9 +447,9 @@ class TestMisc(XTestCase):
         defines_el = dict()
         for dver in ['el6', 'el7']:
             rhel = dver[2:]
-            buildopts_el[dver] = DEFAULT_BUILDOPTS_COMMON.copy()
+            buildopts_el[dver] = C.DEFAULT_BUILDOPTS_COMMON.copy()
             buildopts_el[dver]['redhat_release'] = dver
-            buildopts_el[dver].update(DEFAULT_BUILDOPTS_BY_DVER[dver])
+            buildopts_el[dver].update(C.DEFAULT_BUILDOPTS_BY_DVER[dver])
             build_el[dver] = srpm.SRPMBuild(".", buildopts_el[dver], None, None)
             defines_el[dver] = build_el[dver].get_rpmbuild_defines(True)
             self.assertTrue("--define=rhel %s" % rhel in defines_el[dver],
@@ -470,4 +479,3 @@ if __name__ == '__main__':
     except CalledProcessError as e:
         errprintf("output: %s", e.output)
         raise
-

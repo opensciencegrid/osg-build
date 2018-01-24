@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.11.0
+Version:        1.11.1
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -124,8 +124,11 @@ rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 
 
 %changelog
+* Tue Jan 23 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.11.1-1
+- Fix bug with git spec files where we take the spec file from master instead of the desired tag
+
 * Tue Jan 23 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.11.0-1
-- New prerelease 1.11.0 (SOFTWARE-3107)
+- New release 1.11.0 (SOFTWARE-3107)
   Relnotes at https://github.com/opensciencegrid/osg-build/releases/tag/v1.11.0
 - Drop el5-isms (SOFTWARE-3050)
 - Drop koji-hub-testing.patch (no longer applies anyway)

@@ -66,7 +66,8 @@ def process_meta_url(line, destdir):
     if not git_hash:
         raise Error("git hash not provided.")
     checkout_dir = tempfile.mkdtemp(prefix=dest_file, dir=destdir)
-    rc = utils.unchecked_call(["git", "clone", git_url, checkout_dir])
+    # Check out the branch we're building; we're looking for the spec file in the working dir, not the archive.
+    rc = utils.unchecked_call(["git", "clone", "--branch", tag, git_url, checkout_dir])
     if rc:
         shutil.rmtree(checkout_dir)
         raise Error("`git clone %s %s` failed with exit code %d" % (git_url, checkout_dir, rc))

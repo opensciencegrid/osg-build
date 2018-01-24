@@ -67,8 +67,8 @@ def process_meta_url(line, destdir):
     if not git_hash:
         raise Error("git hash not provided.")
     checkout_dir = tempfile.mkdtemp(prefix=dest_file, dir=destdir)
-    # Check out the branch we're building; we're looking for the spec file in the working dir, not the archive.
-    rc = utils.unchecked_call(["git", "clone", "--branch", tag, git_url, checkout_dir])
+
+    rc = utils.unchecked_call(["git", "clone", git_url, checkout_dir])
     if rc:
         shutil.rmtree(checkout_dir)
         raise Error("`git clone %s %s` failed with exit code %d" % (git_url, checkout_dir, rc))
@@ -81,6 +81,13 @@ def process_meta_url(line, destdir):
         sha1 = output.split()[0]
         if sha1 != git_hash:
             raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
+        # Check out the branch/tag/ref we're building; we're looking for the
+        # spec file in the working dir, not the archive. Can't check it out
+        # directly in git clone (with "--branch") b/c on el6 git versions
+        # that doesn't work on non-branches (e.g. tags).
+        rc = utils.unchecked_call(["git", "checkout", git_hash])
+        if rc:
+            raise Error("Unable to check out %s for some reason." % git_hash)
         rc = utils.unchecked_call(["git", "archive", "--format=tar", "--prefix=%s/" % prefix, git_hash, "--output=%s" % full_dest_file])
         if rc:
             raise Error("Failed to create an archive of hash %s" % git_hash)

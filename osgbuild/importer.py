@@ -69,7 +69,7 @@ def download_srpm(url, output=None):
 
 def verifyRPM(srpm):
     """ Verify that srpm is indeed an RPM """
-    cmd = ["rpm", "-qp", srpm]
+    cmd = ["rpm", "-qp", "--nomanifest", srpm]
     err = utils.unchecked_call(cmd)
     if err:
         raise Error("rpm: %s does not look like an RPM" % srpm)

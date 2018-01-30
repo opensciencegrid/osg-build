@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
 import glob
 import logging
 import re
@@ -60,13 +59,19 @@ class UsageError(Error):
 
 def download_srpm(url, output=None):
     """Download an srpm from url. Return the filename."""
-    # TODO: This should probably use urllib2
     if output is None:
         output = os.path.basename(url)
     cmd = ["wget", "-q", url, "-O", output]
     utils.checked_call(cmd)
+    verifyRPM(output)
     return output
 
+def verifyRPM(srpm):
+    """ Verify that srpm is indeed an RPM """
+    cmd = ["rpm", "-qp", srpm]
+    err = utils.unchecked_call(cmd)
+    if err:
+        raise Error("rpm: %s does not look like an RPM" % srpm)
 
 def srpm_nvr(srpm):
     """Extract the NVR (Name, Version, Release) from the name of an srpm."""
@@ -184,7 +189,7 @@ def get_spec_name_in_srpm(srpm):
     if ret != 0:
         raise Error("Unable to get list of spec files from %s" % srpm)
     try:
-        spec_name = [_f for _f in [x.strip() for x in out.split("\n")] if _f][0]
+        spec_name = filter(None, [x.strip() for x in out.split("\n")])[0]
     except IndexError:
         spec_name = None
 
@@ -471,12 +476,12 @@ downloading and putting the SRPM into the upstream cache.
 
     except UsageError as e:
         parser.print_help()
-        print(str(e), file=sys.stderr)
+        print >>sys.stderr, str(e)
         return 2
     except SystemExit as e:
         return e.code
     except KeyboardInterrupt:
-        print("Interrupted", file=sys.stderr)
+        print >>sys.stderr, "Interrupted"
         return 3
     except Error as e:
         logging.critical(str(e))

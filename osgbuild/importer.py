@@ -60,13 +60,19 @@ class UsageError(Error):
 
 def download_srpm(url, output=None):
     """Download an srpm from url. Return the filename."""
-    # TODO: This should probably use urllib2
     if output is None:
         output = os.path.basename(url)
     cmd = ["wget", "-q", url, "-O", output]
     utils.checked_call(cmd)
+    verifyRPM(output)
     return output
 
+def verifyRPM(srpm):
+    """ Verify that srpm is indeed an RPM """
+    cmd = ["rpm", "-qp", "--nomanifest", srpm]
+    err = utils.unchecked_call(cmd)
+    if err:
+        raise Error("rpm: %s does not look like an RPM" % srpm)
 
 def srpm_nvr(srpm):
     """Extract the NVR (Name, Version, Release) from the name of an srpm."""

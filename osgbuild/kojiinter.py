@@ -431,6 +431,12 @@ class KojiLibInter(object):
         self.weburl = os.path.join(KOJI_WEB, "koji")
         self.dry_run = dry_run
 
+        # "Fix" for SOFTWARE-3112:
+        # python-requests, via urllib3, requests keep-alives by default, which are apparently disabled on koji-hub.
+        # This leads to "resetting dropped connection" messages.  I can't find a way to turn off keep-alives so I
+        # turn off those messages.
+        logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+        logging.getLogger("requests.packages.urllib3.connectionpool").setLevel(logging.WARNING)
 
     def read_config_file(self, config_file=None):
         if not config_file:

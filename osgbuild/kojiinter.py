@@ -460,7 +460,7 @@ class KojiLibInter(object):
             except configparser.NoOptionError:
                 pass
 
-            if sys.version_info[0] == 2:
+            if sys.version_info[0] == 2 and use_old_ssl is not None:
                 self.use_old_ssl = use_old_ssl
             else:
                 if use_old_ssl:

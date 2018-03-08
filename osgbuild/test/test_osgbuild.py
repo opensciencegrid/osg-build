@@ -23,7 +23,8 @@ from osgbuild.utils import (
     checked_call,
     CalledProcessError,
     find_file,
-    errprintf)
+    errprintf,
+    unslurp)
 
 TRUNK = "native/redhat/trunk"
 
@@ -37,14 +38,18 @@ if not osg_build_path:
 
 osg_build_command = [osg_build_path]
 
+def go_to_temp_dir():
+    working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
+    atexit.register(shutil.rmtree, working_dir)
+    os.chdir(working_dir)
+    return working_dir
+
 def common_setUp(path, rev):
     '''Create a temporary directory, ensure it gets deleted on exit, cd to it,
     and check out a specific revision of a path from our SVN.
 
     '''
-    working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
-    atexit.register(shutil.rmtree, working_dir)
-    os.chdir(working_dir)
+    working_dir = go_to_temp_dir()
     svn_export(path, rev, os.path.basename(path))
     return opj(working_dir, os.path.basename(path))
 
@@ -263,6 +268,7 @@ class TestFetch(XTestCase):
             "Spec file not overridden")
 
     def test_github_fetch(self):
+        go_to_temp_dir()
         svn_export('native/redhat/branches/matyas/osg-build', '{2017-04-26}', 'osg-build1')
         checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build1"])
         contents = get_listing('osg-build1')
@@ -275,6 +281,7 @@ class TestFetch(XTestCase):
             "source tarball not found")
 
     def test_github_fetch_spec(self):
+        go_to_temp_dir()
         svn_export('native/redhat/trunk/osg-build', '{2018-01-24}', 'osg-build2')
         checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build2"])
         contents = get_listing('osg-build2')
@@ -285,6 +292,17 @@ class TestFetch(XTestCase):
         self.assertTrue(
             "osg-build-1.11.1.tar.gz" in contents,
             "source tarball not found")
+
+    def test_github_fetch_spec_with_release(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=git url=https://github.com/opensciencegrid/cvmfs-config-osg.git tag=v2.1-2 hash=5ea1914b621cef204879ec1cc55e0216e3812785")
+        checked_call(["python", "-m", "osgbuild.fetch_sources", "."])
+        contents = get_listing(".")
+
+        self.assertFalse("cvmfs-config-osg-2.1-2.tar.gz" in contents, "source tarball has incorrect name")
+        self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
 
 
 class TestMock(XTestCase):

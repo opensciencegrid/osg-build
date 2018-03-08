@@ -53,16 +53,24 @@ def process_meta_url(line, destdir):
     tag = contents.get("tag")
     if not tag:
         raise Error("No package tag specified: %s" % line)
-    tag_version = tag
-    if re.match("v[0-9]+", tag_version):
-            tag_version = tag_version[1:]
+
+    tarball_version = tag
+    if re.match("v[0-9]+", tarball_version):
+        tarball_version = tarball_version[1:]
+    # Chop off the release tag (if there is one). This is something like
+    # the "-1" in "3.3-1".  Dashes are not allowed in RPM version numbers
+    # so chop off the first dash and everything afterward.
+    dashidx = tarball_version.find('-')
+    if dashidx != -1:
+        tarball_version = tarball_version[:dashidx]
+
     # we create the archive as a tar file and gzip it ourselves because
     # git-archive was not capable of directly creating .tar.gz files on git
     # 1.7.1 (SLF 6)
     destdir = os.path.abspath(destdir)
-    dest_file = "%s-%s.tar" % (name, tag_version)
+    dest_file = "%s-%s.tar" % (name, tarball_version)
     full_dest_file = os.path.join(destdir, dest_file)
-    prefix = "%s-%s" % (name, tag_version)
+    prefix = "%s-%s" % (name, tarball_version)
     git_hash = contents.get("hash")
     if not git_hash:
         raise Error("git hash not provided.")

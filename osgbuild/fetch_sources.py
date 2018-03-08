@@ -59,7 +59,7 @@ def process_meta_url(line, destdir):
         if not git_url:
             raise Error("No git URL provided: %s" % line)
         if not name:
-            basename = os.path.split(git_url)[-1]
+            basename = os.path.basename(git_url)
             if basename[-4:] == '.git':
                 name = basename[:-4]
             else:

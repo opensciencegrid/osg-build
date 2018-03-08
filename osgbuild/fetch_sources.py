@@ -30,25 +30,44 @@ def process_meta_url(line, destdir):
     Process a serialized URL spec.  Should be of the format:
      type=git url=https://github.com/opensciencegrid/cvmfs-config-osg.git name=cvmfs-config-osg tag=0.1 hash=e2b54cd1b94c9e3eaee079490c9d85f193c52249
     'name' can be derived from the URL if the last component in the URL is of the form 'NAME.git'
+    OR
+     type=github repo=opensciencegrid/cvmfs-config-osg tag=0.1 hash=e2b54cd1b94c9e3eaee079490c9d85f193c52249
+    'name' can be taken from the repo if not specified.
     """
     contents = {}
     for entry in line.split():
         info = entry.split("=", 1)
         if len(info) > 1:
             contents[info[0].strip()] = info[1].strip()
-    tag_type = contents.get("type", "")
-    if tag_type != "git":
-        raise Error("Only 'git'-type URLs are understood: %s" % line)
-    git_url = contents.get('url')
-    if not git_url:
-        raise Error("No git URL provided: %s" % line)
+
     name = contents.get("name")
-    if not name:
-        basename = os.path.split(git_url)[-1]
-        if basename[-4:] == '.git':
-            name = basename[:-4]
-        else:
-            raise Error("No package name specified: %s" % line)
+    tag_type = contents.get("type", "")
+    if tag_type == "github":
+        repo = contents.get("repo")
+        if not repo:
+            raise Error("No repo specified: %s" % line)
+        m = re.match(r"([^\s/]+)/([^\s/]+?)(?:.git)?$", repo)
+        if not m:
+            raise Error("Repo syntax must be owner/project: %s" % line)
+        owner, project = m.group(1, 2)
+        git_url = "https://github.com/%s/%s" % (owner, project)
+        if not name:
+            name = project
+
+    elif tag_type == "git":
+        git_url = contents.get('url')
+        if not git_url:
+            raise Error("No git URL provided: %s" % line)
+        if not name:
+            basename = os.path.basename(git_url)
+            if basename[-4:] == '.git':
+                name = basename[:-4]
+            else:
+                raise Error("No package name specified: %s" % line)
+
+    else:
+        raise Error("Only 'git'- and 'github'-type sources are understood: %s" % line)
+
     log.info("Checking out git repo for %s.", name)
     tag = contents.get("tag")
     if not tag:

@@ -279,7 +279,7 @@ class TestFetch(XTestCase):
             r"Patch0:\s+multilib-python.patch",
             "Spec file not overridden")
 
-    def test_github_fetch(self):
+    def test_git_fetch(self):
         common_setUp("native/redhat/branches/matyas/osg-build", "{2017-04-26}")
         checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
         contents = get_listing('osg-build')
@@ -291,7 +291,7 @@ class TestFetch(XTestCase):
             "osg-build-1.8.90.tar.gz" in contents,
             "source tarball not found")
 
-    def test_github_fetch_spec(self):
+    def test_git_fetch_spec(self):
         common_setUp(opj(TRUNK, "osg-build"), "{2018-01-24}")
         checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
         contents = get_listing('osg-build')
@@ -303,11 +303,22 @@ class TestFetch(XTestCase):
             "osg-build-1.11.1.tar.gz" in contents,
             "source tarball not found")
 
-    def test_github_fetch_spec_with_release(self):
+    def test_git_fetch_spec_with_release(self):
         go_to_temp_dir()
         os.mkdir("upstream")
         unslurp("upstream/github.source",
                 "type=git url=https://github.com/opensciencegrid/cvmfs-config-osg.git tag=v2.1-2 hash=5ea1914b621cef204879ec1cc55e0216e3812785")
+        checked_call(["python", "-m", "osgbuild.fetch_sources", "."])
+        contents = get_listing(".")
+
+        self.assertFalse("cvmfs-config-osg-2.1-2.tar.gz" in contents, "source tarball has incorrect name")
+        self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
+
+    def test_github_fetch_spec_with_release(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 hash=5ea1914b621cef204879ec1cc55e0216e3812785")
         checked_call(["python", "-m", "osgbuild.fetch_sources", "."])
         contents = get_listing(".")
 

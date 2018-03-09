@@ -13,17 +13,19 @@ import re
 import os
 import tempfile
 import shutil
+import sys
 try:
     from six.moves import urllib
 except ImportError:
     from .six.moves import urllib
 
 
-from .constants import *
+from . import constants as C
 from .error import Error, GlobNotFoundError
 from . import utils
 
 log = logging.getLogger(__name__)
+
 
 def process_meta_url(line, destdir):
     """
@@ -149,6 +151,7 @@ def process_meta_url(line, destdir):
 
     return files
 
+
 def process_dot_source(cache_prefix, sfilename, destdir):
     """Read a .source file, fetch any files mentioned in it from the
     cache.
@@ -230,10 +233,10 @@ def copy_with_filter(files_list, destdir):
     """
     for fname in files_list:
         base = os.path.basename(fname)
-        if (base in [WD_RESULTS,
-                     WD_PREBUILD,
-                     WD_UNPACKED,
-                     WD_UNPACKED_TARBALL] or
+        if (base in [C.WD_RESULTS,
+                     C.WD_PREBUILD,
+                     C.WD_UNPACKED,
+                     C.WD_UNPACKED_TARBALL] or
                 base.endswith('~') or
                 os.path.isdir(fname)):
             log.debug("Skipping file " + fname)
@@ -244,7 +247,7 @@ def copy_with_filter(files_list, destdir):
 
 def fetch(package_dir,
           destdir=None,
-          cache_prefix=WEB_CACHE_PREFIX,
+          cache_prefix=C.WEB_CACHE_PREFIX,
           unpacked_dir=None,
           want_full_extract=False,
           unpacked_tarball_dir=None):

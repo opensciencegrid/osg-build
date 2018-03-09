@@ -74,18 +74,12 @@ def process_meta_url(line, destdir):
     if not git_hash:
         raise Error("git hash not provided.")
 
-    tag = contents.get("tag")
-    if not tag:
-        raise Error("No package tag specified: %s" % line)
-
-    log.info("Checking out git repo for %s.", name)
-
-    tarball = contents.get("tarball")
+    tag, tarball = contents.get("tag"), contents.get("tarball")
     if tarball:
         if not tarball[-7:] == ".tar.gz":
             raise Error("tarball must end with .tar.gz: %s" % line)
         dest_file = tarball[:-3]  # the .tar file; we'll gzip it ourselves
-    else:
+    elif tag:
         tarball_version = tag
         if re.match("v[0-9]+", tarball_version):
             tarball_version = tarball_version[1:]
@@ -96,6 +90,10 @@ def process_meta_url(line, destdir):
         if dashidx != -1:
             tarball_version = tarball_version[:dashidx]
         dest_file = "%s-%s.tar" % (name, tarball_version)  # the .tar file; we'll gzip it ourselves
+    else:
+        raise Error("No package tag or tarball specified: %s" % line)
+
+    log.info("Checking out git repo for %s.", name)
 
     destdir = os.path.abspath(destdir)
     checkout_dir = tempfile.mkdtemp(prefix=dest_file, dir=destdir)
@@ -107,12 +105,13 @@ def process_meta_url(line, destdir):
         orig_dir = os.getcwd()
         os.chdir(checkout_dir)
         try:
-            output, rc = utils.sbacktick(["git", "show-ref", tag])
-            if rc:
-                raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
-            sha1 = output.split()[0]
-            if sha1 != git_hash:
-                raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
+            if tag:
+                output, rc = utils.sbacktick(["git", "show-ref", tag])
+                if rc:
+                    raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
+                sha1 = output.split()[0]
+                if sha1 != git_hash:
+                    raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
             # Check out the branch/tag/ref we're building; we're looking for the
             # spec file in the working dir, not the archive. Can't check it out
             # directly in git clone (with "--branch") b/c on el6 git versions

@@ -344,6 +344,19 @@ class TestFetch(XTestCase):
         finally:
             tarfh.close()
 
+    def test_github_fetch_hash_only(self):
+        go_to_temp_dir()
+        tarball = "tarfile.tar.gz"
+        hash = "5ea1914b621cef204879ec1cc55e0216e3812785"
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tarball=%s hash=%s" % (tarball, hash))
+        contents = self.fetch_sources(".")
+
+        self.assertTrue(tarball in contents, "source tarball not found")
+        tarhash = checked_backtick("gunzip -c %s | git get-tar-commit-id" % tarball, shell=True)
+        self.assertEqual(hash, tarhash, "source tarball has wrong hash")
+
 
 class TestMock(XTestCase):
     """Tests for mock"""

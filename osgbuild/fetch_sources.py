@@ -68,74 +68,83 @@ def process_meta_url(line, destdir):
     else:
         raise Error("Only 'git'- and 'github'-type sources are understood: %s" % line)
 
-    log.info("Checking out git repo for %s.", name)
+    git_hash = contents.get("hash")
+    if not git_hash:
+        raise Error("git hash not provided.")
+
     tag = contents.get("tag")
     if not tag:
         raise Error("No package tag specified: %s" % line)
 
-    tarball_version = tag
-    if re.match("v[0-9]+", tarball_version):
-        tarball_version = tarball_version[1:]
-    # Chop off the release tag (if there is one). This is something like
-    # the "-1" in "3.3-1".  Dashes are not allowed in RPM version numbers
-    # so chop off the first dash and everything afterward.
-    dashidx = tarball_version.find('-')
-    if dashidx != -1:
-        tarball_version = tarball_version[:dashidx]
+    log.info("Checking out git repo for %s.", name)
 
-    # we create the archive as a tar file and gzip it ourselves because
-    # git-archive was not capable of directly creating .tar.gz files on git
-    # 1.7.1 (SLF 6)
+    tarball = contents.get("tarball")
+    if tarball:
+        if not tarball[-7:] == ".tar.gz":
+            raise Error("tarball must end with .tar.gz: %s" % line)
+        dest_file = tarball[:-3]  # the .tar file; we'll gzip it ourselves
+    else:
+        tarball_version = tag
+        if re.match("v[0-9]+", tarball_version):
+            tarball_version = tarball_version[1:]
+        # Chop off the release tag (if there is one). This is something like
+        # the "-1" in "3.3-1".  Dashes are not allowed in RPM version numbers
+        # so chop off the first dash and everything afterward.
+        dashidx = tarball_version.find('-')
+        if dashidx != -1:
+            tarball_version = tarball_version[:dashidx]
+        dest_file = "%s-%s.tar" % (name, tarball_version)  # the .tar file; we'll gzip it ourselves
+
     destdir = os.path.abspath(destdir)
-    dest_file = "%s-%s.tar" % (name, tarball_version)
-    full_dest_file = os.path.join(destdir, dest_file)
-    prefix = "%s-%s" % (name, tarball_version)
-    git_hash = contents.get("hash")
-    if not git_hash:
-        raise Error("git hash not provided.")
     checkout_dir = tempfile.mkdtemp(prefix=dest_file, dir=destdir)
-
-    rc = utils.unchecked_call(["git", "clone", git_url, checkout_dir])
-    if rc:
-        shutil.rmtree(checkout_dir)
-        raise Error("`git clone %s %s` failed with exit code %d" % (git_url, checkout_dir, rc))
-    orig_dir = os.getcwd()
     try:
+        rc = utils.unchecked_call(["git", "clone", git_url, checkout_dir])
+        if rc:
+            raise Error("`git clone %s %s` failed with exit code %d" % (git_url, checkout_dir, rc))
+
+        orig_dir = os.getcwd()
         os.chdir(checkout_dir)
-        output, rc = utils.sbacktick(["git", "show-ref", tag])
-        if rc:
-            raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
-        sha1 = output.split()[0]
-        if sha1 != git_hash:
-            raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
-        # Check out the branch/tag/ref we're building; we're looking for the
-        # spec file in the working dir, not the archive. Can't check it out
-        # directly in git clone (with "--branch") b/c on el6 git versions
-        # that doesn't work on non-branches (e.g. tags).
-        rc = utils.unchecked_call(["git", "checkout", git_hash])
-        if rc:
-            raise Error("Unable to check out %s for some reason." % git_hash)
-        rc = utils.unchecked_call(["git", "archive", "--format=tar", "--prefix=%s/" % prefix, git_hash, "--output=%s" % full_dest_file])
-        if rc:
-            raise Error("Failed to create an archive of hash %s" % git_hash)
-        # gzip -n will keep hashes of gzips of identical tarballs identical (by
-        # omitting timestamp information)
-        rc = utils.unchecked_call(["gzip", "-fn", full_dest_file])
-        if rc:
-            raise Error("Failed to compress archive at %s" % full_dest_file)
+        try:
+            output, rc = utils.sbacktick(["git", "show-ref", tag])
+            if rc:
+                raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
+            sha1 = output.split()[0]
+            if sha1 != git_hash:
+                raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
+            # Check out the branch/tag/ref we're building; we're looking for the
+            # spec file in the working dir, not the archive. Can't check it out
+            # directly in git clone (with "--branch") b/c on el6 git versions
+            # that doesn't work on non-branches (e.g. tags).
+            rc = utils.unchecked_call(["git", "checkout", git_hash])
+            if rc:
+                raise Error("Unable to check out %s for some reason." % git_hash)
 
-        files = [full_dest_file + ".gz"]
+            full_dest_file = os.path.join(destdir, dest_file)
+            prefix = dest_file[:-4]  # the tar file minus the .tar
+            rc = utils.unchecked_call(["git", "archive", "--format=tar", "--prefix=%s/" % prefix, git_hash, "--output=%s" % full_dest_file])
+            if rc:
+                raise Error("Failed to create an archive of hash %s" % git_hash)
 
-        spec_file = os.path.join(checkout_dir, "rpm", name + ".spec")
-        log.info("Looking for spec file %s in repo", spec_file)
-        if os.path.exists(spec_file):
-            log.info("Found spec file")
-            shutil.copy(spec_file, destdir)
-            files.append(spec_file)
-        else:
-            log.info("Did not find spec file")
+            # git-archive can't create .tar.gz files on git 1.7.1 (SLF 6) so gzip the tar file ourselves
+            # gzip -n will keep hashes of gzips of identical tarballs identical (by
+            # omitting timestamp information)
+            rc = utils.unchecked_call(["gzip", "-fn", full_dest_file])
+            if rc:
+                raise Error("Failed to compress archive at %s" % full_dest_file)
+
+            files = [full_dest_file + ".gz"]
+
+            spec_file = os.path.join(checkout_dir, "rpm", name + ".spec")
+            log.info("Looking for spec file %s in repo", spec_file)
+            if os.path.exists(spec_file):
+                log.info("Found spec file")
+                shutil.copy(spec_file, destdir)
+                files.append(spec_file)
+            else:
+                log.info("Did not find spec file")
+        finally:
+            os.chdir(orig_dir)
     finally:
-        os.chdir(orig_dir)
         shutil.rmtree(checkout_dir)
 
     return files
@@ -154,7 +163,6 @@ def process_dot_source(cache_prefix, sfilename, destdir):
                 continue
             if line == '':
                 continue
-            basename = os.path.basename(line)
             if len(line.split()) > 1:
                 filenames = process_meta_url(line, destdir)
                 downloaded.extend(filenames)
@@ -176,7 +184,7 @@ def process_dot_source(cache_prefix, sfilename, destdir):
                 handle = urllib.request.urlopen(uri)
             except urllib.error.URLError as err:
                 raise Error("Unable to download %s\n%s" % (uri, str(err)))
-            filename = os.path.join(destdir, basename)
+            filename = os.path.join(destdir, os.path.basename(line))
             try:
                 with open(filename, 'wb') as desthandle:
                     desthandle.write(handle.read())

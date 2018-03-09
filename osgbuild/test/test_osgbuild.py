@@ -11,6 +11,7 @@ from os.path import join as opj
 import pwd
 import shutil
 import tempfile
+import tarfile
 import unittest
 from unittest import makeSuite
 import sys
@@ -323,6 +324,25 @@ class TestFetch(XTestCase):
 
         self.assertFalse("cvmfs-config-osg-2.1-2.tar.gz" in contents, "source tarball has incorrect name")
         self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
+
+    def test_github_fetch_with_tarball(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 tarball=tarfile.tar.gz hash=5ea1914b621cef204879ec1cc55e0216e3812785")
+        contents = self.fetch_sources(".")
+
+        self.assertTrue("tarfile.tar.gz" in contents, "source tarball not found")
+
+        tarfh = tarfile.open("./tarfile.tar.gz", "r")
+        try:
+            try:
+                tardir = tarfh.getmember("tarfile")
+            except KeyError:
+                self.fail("directory not found in tarball")
+            self.assertTrue(tardir.isdir(), "directory not a directory in tarball")
+        finally:
+            tarfh.close()
 
 
 class TestMock(XTestCase):

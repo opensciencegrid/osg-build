@@ -327,4 +327,8 @@ if __name__ == '__main__':
     except IndexError:
         package_dir = "."
     nocheck = "--nocheck" in sys.argv
-    fetch(os.path.abspath(package_dir), nocheck=nocheck)
+    try:
+        fetch(os.path.abspath(package_dir), nocheck=nocheck)
+    except Error as e:
+        print("Error: %s" % e, file=sys.stderr)
+        sys.exit(1)

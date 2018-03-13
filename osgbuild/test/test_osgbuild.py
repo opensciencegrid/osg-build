@@ -262,8 +262,11 @@ class TestPrepare(XTestCase):
 class TestFetch(XTestCase):
     """Tests for fetch-sources"""
     @staticmethod
-    def fetch_sources(pdir):
-        checked_call(["python", "-m", "osgbuild.fetch_sources", pdir])
+    def fetch_sources(pdir, nocheck=False):
+        cmd = ["python", "-m", "osgbuild.fetch_sources", pdir]
+        if nocheck:
+            cmd.append("--nocheck")
+        checked_call(cmd)
         return get_listing(pdir)
 
     def test_cache_fetch(self):
@@ -351,11 +354,23 @@ class TestFetch(XTestCase):
         os.mkdir("upstream")
         unslurp("upstream/github.source",
                 "type=github repo=opensciencegrid/cvmfs-config-osg tarball=%s hash=%s" % (tarball, hash))
-        contents = self.fetch_sources(".")
+        self.assertRaises(CalledProcessError, self.fetch_sources, ".", nocheck=False)
+        contents = self.fetch_sources(".", nocheck=True)
 
         self.assertTrue(tarball in contents, "source tarball not found")
         tarhash = checked_backtick("gunzip -c %s | git get-tar-commit-id" % tarball, shell=True)
         self.assertEqual(hash, tarhash, "source tarball has wrong hash")
+
+    def test_github_fetch_wrong_hash(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 hash=0000000000000000000000000000000000000000")
+        self.assertRaises(CalledProcessError, self.fetch_sources, ".", nocheck=False)
+        contents = self.fetch_sources(".", nocheck=True)
+
+        self.assertFalse("cvmfs-config-osg-2.1-2.tar.gz" in contents, "source tarball has incorrect name")
+        self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
 
 
 class TestMock(XTestCase):

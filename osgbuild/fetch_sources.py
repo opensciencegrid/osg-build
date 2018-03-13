@@ -27,7 +27,7 @@ from . import utils
 log = logging.getLogger(__name__)
 
 
-def process_meta_url(line, destdir):
+def process_meta_url(line, destdir, nocheck):
     """
     Process a serialized URL spec.  Should be of the format:
      type=git url=https://github.com/opensciencegrid/cvmfs-config-osg.git name=cvmfs-config-osg tag=0.1 hash=e2b54cd1b94c9e3eaee079490c9d85f193c52249
@@ -35,6 +35,8 @@ def process_meta_url(line, destdir):
     OR
      type=github repo=opensciencegrid/cvmfs-config-osg tag=0.1 hash=e2b54cd1b94c9e3eaee079490c9d85f193c52249
     'name' can be taken from the repo if not specified.
+
+    If nocheck is True, hashes do not have to match.
     """
     contents = {}
     for entry in line.split():
@@ -75,6 +77,8 @@ def process_meta_url(line, destdir):
         raise Error("git hash not provided.")
 
     tag, tarball = contents.get("tag"), contents.get("tarball")
+    if not tag and not nocheck:
+        raise Error("tag not specified: %s" % line)
     if tarball:
         if not tarball[-7:] == ".tar.gz":
             raise Error("tarball must end with .tar.gz: %s" % line)
@@ -111,7 +115,12 @@ def process_meta_url(line, destdir):
                     raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
                 sha1 = output.split()[0]
                 if sha1 != git_hash:
-                    raise Error("Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash))
+                    msg = "Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash)
+                    if nocheck:
+                        log.warning(msg)
+                        git_hash = sha1
+                    else:
+                        raise Error(msg)
             # Check out the branch/tag/ref we're building; we're looking for the
             # spec file in the working dir, not the archive. Can't check it out
             # directly in git clone (with "--branch") b/c on el6 git versions
@@ -151,7 +160,7 @@ def process_meta_url(line, destdir):
     return files
 
 
-def process_dot_source(cache_prefix, sfilename, destdir):
+def process_dot_source(cache_prefix, sfilename, destdir, nocheck):
     """Read a .source file, fetch any files mentioned in it from the
     cache.
 
@@ -166,7 +175,7 @@ def process_dot_source(cache_prefix, sfilename, destdir):
             if line == '':
                 continue
             if len(line.split()) > 1:
-                filenames = process_meta_url(line, destdir)
+                filenames = process_meta_url(line, destdir, nocheck)
                 downloaded.extend(filenames)
                 continue
             elif line.startswith('/'):
@@ -249,7 +258,8 @@ def fetch(package_dir,
           cache_prefix=C.WEB_CACHE_PREFIX,
           unpacked_dir=None,
           want_full_extract=False,
-          unpacked_tarball_dir=None):
+          unpacked_tarball_dir=None,
+          nocheck=False):
     """Process *.source files in upstream/ directory, downloading upstream
     sources mentioned in them from the software cache. Unpack SRPMs if
     there are any. Override upstream files with those in the osg/
@@ -273,7 +283,7 @@ def fetch(package_dir,
     downloaded = []
     for src in dot_sources:
         log.debug('Processing .source file %s', src)
-        for fname in process_dot_source(cache_prefix, src, destdir):
+        for fname in process_dot_source(cache_prefix, src, destdir, nocheck):
             downloaded.append(os.path.abspath(fname))
 
     # Process downloaded SRPMs
@@ -316,4 +326,5 @@ if __name__ == '__main__':
         package_dir = sys.argv[1]
     except IndexError:
         package_dir = "."
-    fetch(os.path.abspath(package_dir))
+    nocheck = "--nocheck" in sys.argv
+    fetch(os.path.abspath(package_dir), nocheck=nocheck)

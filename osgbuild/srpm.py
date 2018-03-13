@@ -154,7 +154,8 @@ class SRPMBuild(object):
             cache_prefix=self.buildopts['cache_prefix'],
             unpacked_dir=self.unpacked_dir,
             want_full_extract=self.buildopts.get('full_extract'),
-            unpacked_tarball_dir=self.unpacked_tarball_dir)
+            unpacked_tarball_dir=self.unpacked_tarball_dir,
+            nocheck=True)
 
     def prebuild(self):
         """prebuild task.

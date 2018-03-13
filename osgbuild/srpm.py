@@ -244,7 +244,6 @@ class SRPMBuild(object):
             cmd += ["--target", self.buildopts['target_arch']]
         err = utils.unchecked_call(cmd)
 
-        # TODO Parse rpmbuild output instead of using glob
         if err:
             raise OSGBuildError('Making RPM failed (command was: ' +
                                 " ".join(cmd) +')')

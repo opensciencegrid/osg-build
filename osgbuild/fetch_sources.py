@@ -77,8 +77,12 @@ def process_meta_url(line, destdir, nocheck):
         raise Error("git hash not provided.")
 
     tag, tarball = contents.get("tag"), contents.get("tarball")
-    if not tag and not nocheck:
-        raise Error("tag not specified: %s" % line)
+    if not tag:
+        msg = "tag not specified: %s" % line
+        if nocheck:
+            log.warning(msg + "\n    (ignored)")
+        else:
+            raise Error(msg)
     if tarball:
         if not tarball[-7:] == ".tar.gz":
             raise Error("tarball must end with .tar.gz: %s" % line)
@@ -115,9 +119,10 @@ def process_meta_url(line, destdir, nocheck):
                     raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
                 sha1 = output.split()[0]
                 if sha1 != git_hash:
-                    msg = "Repository hash %s corresponding to tag %s does not match expected hash %s" % (sha1, tag, git_hash)
+                    msg = "Hash mismatch for %s tag %s\n    expected: %s\n    actual:   %s" % \
+                          (git_url, tag, git_hash, sha1)
                     if nocheck:
-                        log.warning(msg)
+                        log.warning(msg + "\n    (ignored)")
                         git_hash = sha1
                     else:
                         raise Error(msg)

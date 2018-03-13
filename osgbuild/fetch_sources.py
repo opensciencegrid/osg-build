@@ -125,7 +125,7 @@ def process_meta_url(line, destdir, nocheck):
             # spec file in the working dir, not the archive. Can't check it out
             # directly in git clone (with "--branch") b/c on el6 git versions
             # that doesn't work on non-branches (e.g. tags).
-            rc = utils.unchecked_call(["git", "checkout", git_hash])
+            rc = utils.unchecked_call(["git", "checkout", "-q", git_hash])
             if rc:
                 raise Error("Unable to check out %s for some reason." % git_hash)
 

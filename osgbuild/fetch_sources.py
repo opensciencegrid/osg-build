@@ -24,7 +24,12 @@ from . import constants as C
 from .error import Error, GlobNotFoundError
 from . import utils
 
-log = logging.getLogger(__name__)
+
+if __name__ != "__main__":
+    log = logging.getLogger(__name__)
+else:
+    log = logging.getLogger()
+    logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 
 def process_meta_url(line, destdir, nocheck):

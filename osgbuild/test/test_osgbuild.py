@@ -369,8 +369,22 @@ class TestFetch(XTestCase):
         self.assertRaises(CalledProcessError, self.fetch_sources, ".", nocheck=False)
         contents = self.fetch_sources(".", nocheck=True)
 
-        self.assertFalse("cvmfs-config-osg-2.1-2.tar.gz" in contents, "source tarball has incorrect name")
         self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
+
+    def test_osgbuild_prebuild_fetch_wrong_hash(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1 hash=0000000000000000000000000000000000000000")
+        checked_osg_build(["prebuild"])
+        contents = get_listing(C.WD_PREBUILD)
+
+        self.assertTrue(
+            regex_in_list(
+                r"cvmfs-config-osg-2[.]1-1[.]osg[.]el\d[.]src[.]rpm",
+                contents),
+            "srpm not successfully built")
+
 
 
 class TestMock(XTestCase):

@@ -332,13 +332,19 @@ def fetch(package_dir,
 
 
 if __name__ == '__main__':
+    nocheck = False
+    package_dirs = []
+    if len(sys.argv) < 2:
+        package_dirs = ["."]
+    else:
+        for arg in sys.argv[1:]:
+            if arg == "--nocheck":
+                nocheck = True
+            else:
+                package_dirs.append(arg)
     try:
-        package_dir = sys.argv[1]
-    except IndexError:
-        package_dir = "."
-    nocheck = "--nocheck" in sys.argv
-    try:
-        fetch(os.path.abspath(package_dir), nocheck=nocheck)
+        for package_dir in package_dirs:
+            fetch(os.path.abspath(package_dir), nocheck=nocheck)
     except Error as e:
         print("Error: %s" % e, file=sys.stderr)
         sys.exit(1)

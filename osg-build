@@ -43,7 +43,7 @@ To submit build(s) for EL6 or EL7 only:
     %(prog)s koji --el7 PACKAGE1 <PACKAGE2..n>
 
 Also see the documentation at:
-    https://twiki.grid.iu.edu/bin/view/SoftwareTeam/OSGBuildTools
+    https://opensciencegrid.github.io/technology/software/osg-build-tools/
 """ % {'prog': os.path.basename(sys.argv[0])}, file=sys.stderr)
     sys.exit(2)
 except SystemExit as err:

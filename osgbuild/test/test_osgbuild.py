@@ -11,6 +11,7 @@ from os.path import join as opj
 import pwd
 import shutil
 import tempfile
+import tarfile
 import unittest
 from unittest import makeSuite
 import sys
@@ -260,11 +261,17 @@ class TestPrepare(XTestCase):
 
 class TestFetch(XTestCase):
     """Tests for fetch-sources"""
+    @staticmethod
+    def fetch_sources(pdir, nocheck=False):
+        cmd = ["python", "-m", "osgbuild.fetch_sources", pdir]
+        if nocheck:
+            cmd.append("--nocheck")
+        checked_call(cmd)
+        return get_listing(pdir)
 
     def test_cache_fetch(self):
         common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
-        checked_call(["python", "-m", "osgbuild.fetch_sources", "mash"])
-        contents = get_listing('mash')
+        contents = self.fetch_sources("mash")
 
         self.assertTrue(
             "mash.spec" in contents,
@@ -281,8 +288,7 @@ class TestFetch(XTestCase):
 
     def test_git_fetch(self):
         common_setUp("native/redhat/branches/matyas/osg-build", "{2017-04-26}")
-        checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
-        contents = get_listing('osg-build')
+        contents = self.fetch_sources("osg-build")
 
         self.assertTrue(
             "osg-build.spec" in contents,
@@ -293,8 +299,7 @@ class TestFetch(XTestCase):
 
     def test_git_fetch_spec(self):
         common_setUp(opj(TRUNK, "osg-build"), "{2018-01-24}")
-        checked_call(["python", "-m", "osgbuild.fetch_sources", "osg-build"])
-        contents = get_listing('osg-build')
+        contents = self.fetch_sources("osg-build")
 
         self.assertTrue(
             "osg-build.spec" in contents,
@@ -303,27 +308,83 @@ class TestFetch(XTestCase):
             "osg-build-1.11.1.tar.gz" in contents,
             "source tarball not found")
 
-    def test_git_fetch_spec_with_release(self):
+    def test_git_fetch_with_release(self):
         go_to_temp_dir()
         os.mkdir("upstream")
         unslurp("upstream/github.source",
                 "type=git url=https://github.com/opensciencegrid/cvmfs-config-osg.git tag=v2.1-2 hash=5ea1914b621cef204879ec1cc55e0216e3812785")
-        checked_call(["python", "-m", "osgbuild.fetch_sources", "."])
-        contents = get_listing(".")
+        contents = self.fetch_sources(".")
 
         self.assertFalse("cvmfs-config-osg-2.1-2.tar.gz" in contents, "source tarball has incorrect name")
         self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
 
-    def test_github_fetch_spec_with_release(self):
+    def test_github_fetch_with_release(self):
         go_to_temp_dir()
         os.mkdir("upstream")
         unslurp("upstream/github.source",
                 "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 hash=5ea1914b621cef204879ec1cc55e0216e3812785")
-        checked_call(["python", "-m", "osgbuild.fetch_sources", "."])
-        contents = get_listing(".")
+        contents = self.fetch_sources(".")
 
         self.assertFalse("cvmfs-config-osg-2.1-2.tar.gz" in contents, "source tarball has incorrect name")
         self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
+
+    def test_github_fetch_with_tarball(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 tarball=tarfile.tar.gz hash=5ea1914b621cef204879ec1cc55e0216e3812785")
+        contents = self.fetch_sources(".")
+
+        self.assertTrue("tarfile.tar.gz" in contents, "source tarball not found")
+
+        tarfh = tarfile.open("./tarfile.tar.gz", "r")
+        try:
+            try:
+                tardir = tarfh.getmember("tarfile")
+            except KeyError:
+                self.fail("directory not found in tarball")
+            self.assertTrue(tardir.isdir(), "directory not a directory in tarball")
+        finally:
+            tarfh.close()
+
+    def test_github_fetch_hash_only(self):
+        go_to_temp_dir()
+        tarball = "tarfile.tar.gz"
+        hash = "5ea1914b621cef204879ec1cc55e0216e3812785"
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tarball=%s hash=%s" % (tarball, hash))
+        self.assertRaises(CalledProcessError, self.fetch_sources, ".", nocheck=False)
+        contents = self.fetch_sources(".", nocheck=True)
+
+        self.assertTrue(tarball in contents, "source tarball not found")
+        tarhash = checked_backtick("gunzip -c %s | git get-tar-commit-id" % tarball, shell=True)
+        self.assertEqual(hash, tarhash, "source tarball has wrong hash")
+
+    def test_github_fetch_wrong_hash(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 hash=0000000000000000000000000000000000000000")
+        self.assertRaises(CalledProcessError, self.fetch_sources, ".", nocheck=False)
+        contents = self.fetch_sources(".", nocheck=True)
+
+        self.assertTrue("cvmfs-config-osg-2.1.tar.gz" in contents, "source tarball not found")
+
+    def test_osgbuild_prebuild_fetch_wrong_hash(self):
+        go_to_temp_dir()
+        os.mkdir("upstream")
+        unslurp("upstream/github.source",
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1 hash=0000000000000000000000000000000000000000")
+        checked_osg_build(["prebuild"])
+        contents = get_listing(C.WD_PREBUILD)
+
+        self.assertTrue(
+            regex_in_list(
+                r"cvmfs-config-osg-2[.]1-1[.]osg[.]el\d[.]src[.]rpm",
+                contents),
+            "srpm not successfully built")
+
 
 
 class TestMock(XTestCase):

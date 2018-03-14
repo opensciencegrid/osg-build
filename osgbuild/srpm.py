@@ -154,7 +154,8 @@ class SRPMBuild(object):
             cache_prefix=self.buildopts['cache_prefix'],
             unpacked_dir=self.unpacked_dir,
             want_full_extract=self.buildopts.get('full_extract'),
-            unpacked_tarball_dir=self.unpacked_tarball_dir)
+            unpacked_tarball_dir=self.unpacked_tarball_dir,
+            nocheck=True)
 
     def prebuild(self):
         """prebuild task.
@@ -244,7 +245,6 @@ class SRPMBuild(object):
             cmd += ["--target", self.buildopts['target_arch']]
         err = utils.unchecked_call(cmd)
 
-        # TODO Parse rpmbuild output instead of using glob
         if err:
             raise OSGBuildError('Making RPM failed (command was: ' +
                                 " ".join(cmd) +')')

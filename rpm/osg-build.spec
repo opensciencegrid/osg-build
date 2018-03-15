@@ -106,6 +106,7 @@ rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 %{python_sitelib}/osgbuild/srpm.py*
 %{python_sitelib}/osgbuild/svn.py*
 %{python_sitelib}/osgbuild/utils.py*
+%{python_sitelib}/osgbuild/version.py*
 %{_datadir}/%{name}/rpmlint.cfg
 
 %files mock

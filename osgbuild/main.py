@@ -723,9 +723,13 @@ def print_version_and_exit():
     # '@'+'VERSION'+'@' is so sed will leave it alone during 'make dist'
     if __version__ == '@' + 'VERSION' + '@':
         scriptpath = utils.shell_quote(os.path.dirname(os.path.realpath(sys.argv[0])))
-        out, ret = utils.sbacktick("cd %s && git describe --tags" % scriptpath,
-                                   err2out=False)
-        print("osg-build development version", end=' ')
+        out, ret = "", 0
+        try:
+            out, ret = utils.sbacktick("cd %s && git describe --tags" % scriptpath,
+                                       err2out=False, shell=True)
+        except OSError:
+            pass
+        print("osg-build development version", end='')
         if not ret:
             print(" " + out)
         else:

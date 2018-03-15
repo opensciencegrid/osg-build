@@ -561,6 +561,12 @@ class TestMisc(XTestCase):
         self.assertTrue('--define=el7 0' in defines_el['el6'],
                         "%el7 not unset for el6 build")
 
+    def test_version(self):
+        try:
+            _ = backtick_osg_build(["--version"])
+        except (CalledProcessError, OSError):
+            self.fail("osg-build --version failed")
+
 
 short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc, TestKoji)
 TestSuiteShort = unittest.TestSuite()

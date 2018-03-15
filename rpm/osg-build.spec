@@ -1,8 +1,8 @@
 #global betatag .pre
-%global _release 2
+%global _release 1
 
 Name:           osg-build
-Version:        1.12.0
+Version:        1.12.1
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -125,9 +125,9 @@ rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 
 
 %changelog
-* Thu Mar 15 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.0-2
+* Thu Mar 15 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.1-1
 - Fix osg-build --version
-  Release notes at https://github.com/opensciencegrid/osg-build/releases/tag/v1.12.0-2
+  Release notes at https://github.com/opensciencegrid/osg-build/releases/tag/v1.12.1
 
 * Wed Mar 14 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.0-1
 - Release for 1.12.0 (SOFTWARE-3172)

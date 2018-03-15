@@ -1,4 +1,4 @@
-%global betatag .pre
+#global betatag .pre
 %global _release 1
 
 Name:           osg-build
@@ -125,8 +125,8 @@ rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 
 
 %changelog
-* Wed Mar 14 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.0-0.1
-- Prerelease for 1.12.0 (SOFTWARE-3172)
+* Wed Mar 14 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.0-1
+- Release for 1.12.0 (SOFTWARE-3172)
   Release notes at https://github.com/opensciencegrid/osg-build/releases/tag/v1.12.0
 
 * Wed Jan 24 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.11.2-1

@@ -1,1 +1,4 @@
 *.py[co]
+upstream/test.source
+_final_srpm_contents/
+_build_results/

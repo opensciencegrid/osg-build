@@ -1,5 +1,6 @@
 # version now specified in osgbuild/version.py
 VERSION = $(shell python -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
+HASH = $(shell git rev-parse HEAD)
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osgbuild
@@ -93,4 +94,14 @@ lint:
 tags:
 	-ctags -R --exclude='.backup' --exclude='.bak' --exclude='*~' --exclude='.svn' --exclude='_darcs' --exclude='.git' --exclude='CVS' --exclude='.pyc' --exclude='Attic/*' --exclude='data/*' --exclude='doc/*' .
 
-.PHONY: _default clean install-common install install-python26 dist afsdist release check test shorttest lint tags
+testsource:
+	mkdir -p upstream
+	echo "type=git url=. name=osg-build tarball=$(NAME_VERSION).tar.gz hash=$(HASH)" > upstream/test.source
+
+rpmbuild: testsource
+	osg-build rpmbuild
+
+kojiscratch: testsource
+	osg-build koji --scratch --getfiles
+
+.PHONY: _default clean install-common install install-python26 dist afsdist release check test shorttest lint tags testsource rpmbuild kojiscratch

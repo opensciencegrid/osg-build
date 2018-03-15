@@ -1,4 +1,5 @@
-VERSION = 1.12.1
+# version now specified in osgbuild/version.py
+VERSION = $(shell python -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osgbuild
@@ -56,7 +57,6 @@ install-python26: install-common
 dist:
 	mkdir -p $(NAME_VERSION)
 	cp -rp $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(PYDIR) $(SVNDATADIR) Makefile pylintrc $(NAME_VERSION)/
-	sed -i -e '/__version__/s/@VERSION@/$(VERSION)/' $(NAME_VERSION)/$(PYDIR)/main.py
 	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]' --exclude='*/*~'
 
 afsdist: dist

@@ -33,17 +33,20 @@ SVN_RESTRICTED_BRANCHES = {
     r'^trunk$'                             : 'main',
     r'^branches/upcoming$'                 : 'upcoming',
     r'^branches/osg-internal$'             : 'internal',
-    r'^branches/osg-(?P<osgver>\d+\.\d+)$' : 'versioned'}
+    r'^branches/osg-(?P<osgver>\d+\.\d+)$' : 'versioned',
+    r'^branches/condor'                    : 'condor'}
 KOJI_RESTRICTED_TARGETS = {
     r'^osg-(el\d+)$'                       : 'main',
     r'^osg-upcoming-(el\d+)$'              : 'upcoming',
     r'^osg-(el\d+)-internal$'              : 'internal',
-    r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'  : 'versioned'}
+    r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'  : 'versioned',
+    r'^condor-(el\d+)$'                    : 'condor'}
 GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?master$'                     : 'main',
     r'^(\w*/)?upcoming$'                   : 'upcoming',
     r'^(\w*/)?internal$'                   : 'internal',
-    r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned'}
+    r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned',
+    r'^(\w*/)?condor-(el\d+)'              : 'condor'}
 
 CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.11.0"
 
@@ -100,6 +103,7 @@ DEFAULT_DVERS_BY_REPO = {
     '3.4': ['el6', 'el7'],
     'osg-3.4': ['el6', 'el7'],
     'internal': ['el6', 'el7'],
+    'condor': ['el6', 'el7'],
 }
 assert FALLBACK_DVER in DVERS
 for d in DEFAULT_DVERS:

@@ -275,39 +275,39 @@ def verify_correct_branch(package_dir, buildopts):
     if remote not in constants.KNOWN_GIT_REMOTES:
         return
 
-    if remote == constants.OSG_REMOTE:
+    if remote in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
         verify_git_svn_commit(package_dir)
 
     for dver in buildopts['enabled_dvers']:
         target = buildopts['targetopts_by_dver'][dver]['koji_target']
         if target.startswith("hcc-"):
-            if branch.find("master") < 0:
+            if "master" not in branch:
                 raise Error("""\
 Error: Incorrect branch for koji build
 Only allowed to build into the HCC repo from the
 master branch!  You must switch branches.""")
-            if remote != constants.HCC_REMOTE and remote != constants.HCC_AUTH_REMOTE:
+            if remote not in [constants.HCC_REMOTE, constants.HCC_AUTH_REMOTE]:
                 raise Error("""\
 Error: You must build into the HCC repo when building from
 a HCC git checkout.  You must switch git repos or build targets.""")
         elif target.endswith('osg-upcoming'):
-            if remote != constants.OSG_REMOTE:
+            if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
                 raise Error("""\
 Error: You may not build into the OSG repo when building from
 a non-OSG target.  You must switch git repos or build targets.
 Try adding "--repo=hcc" to the command line.""")
-            if branch.find("master") >= 0:
+            if "master" in branch:
                 raise Error("""\
 Error: Incorrect branch for koji build
 Not allowed to build into the upcoming targets from
 master branch!  You must switch branches or build targets.""")
-        elif target.find("osg") >= 0:
-            if remote != constants.OSG_REMOTE:
+        elif "osg" in target:
+            if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
                 raise Error("""\
 Error: You may not build into the OSG repo when building from
 a non-OSG target.  You must switch git repos or build targets.
 Try adding "--repo=hcc" to the command line.""")
-            if branch.find("upcoming") >= 0:
+            if "upcoming" in branch:
                 raise Error("""\
 Error: Incorrect branch for koji build
 Only allowed to build packages from the upcoming branch

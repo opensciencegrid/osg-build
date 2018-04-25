@@ -2,16 +2,9 @@
 from __future__ import print_function
 
 import os
-import re
 import shutil
 import sys
-import tempfile
-try:
-    from six.moves import urllib
-except ImportError:
-    from osgbuild.six.moves import urllib
 
-from collections import namedtuple
 from optparse import OptionParser
 
 from osgbuild.constants import (
@@ -25,36 +18,8 @@ from osgbuild.utils import (
     find_file,
     safe_make_backup,
     safe_makedirs,
-    shell_quote,
-    slurp,
-    to_str,
-    unslurp)
+    shell_quote)
 
-
-class Cert(namedtuple('Cert', 'subject o098hash o1xhash')):  # pylint: disable=missing-docstring
-    __slots__ = ()
-    @property
-    def filename(self):  # pylint: disable=missing-docstring
-        return self.o098hash + '.0'
-
-DIGICERT_CA_CERTS = [
-    #                                                                                OpenSSL     OpenSSL
-    #     subject                                                                    0.9.8 hash  1.x hash
-    Cert('/C=US/O=DigiCert Inc/OU=www.digicert.com/CN=DigiCert Assured ID Root CA', '69105f4f', 'b1159c4c'),
-    Cert('/DC=com/DC=DigiCert-Grid/O=DigiCert Grid/CN=DigiCert Grid CA-1',          'c7a717ce', '82c2b224'),
-    Cert('/DC=com/DC=DigiCert-Grid/O=DigiCert Grid/CN=DigiCert Grid Root CA',       '2694e4f2', '74a04bb6'),
-    Cert('/C=US/O=DigiCert Grid/OU=www.digicert.com/CN=DigiCert Grid Trust CA',     '38f7145f', '67707166')
-]
-
-CILOGON_OSG_CA_CERT = (
-    #                                                                                OpenSSL     OpenSSL
-    #     subject                                                                    0.9.8 hash  1.x hash
-    Cert('/DC=org/DC=cilogon/C=US/O=CILogon/CN=CILogon OSG CA 1',                   'd690e530', '70d35895')
-)
-CILOGON_OSG_CA_CERT_URL = "https://cilogon.org/cilogon-osg.pem"
-
-DIGICERT_GRID_BASEURL = "http://www.digicert-grid.com"
-GRID_CERTS_DIR = "/etc/grid-security/certificates"
 
 OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
 GLOBUS_DIR = os.path.expanduser("~/.globus")
@@ -166,91 +131,6 @@ def get_openssl_version():
     return _openssl_version
 
 
-def checked_download(dest, url):
-    """Download a file from 'url' to 'dest'"""
-    if os.path.isdir(dest):
-        realdest = os.path.join(dest, os.path.basename(url))
-    else:
-        realdest = dest
-    try:
-        urlhandle = urllib.request.urlopen(url)
-        realdesthandle = open(realdest, 'w')
-        realdesthandle.write(urlhandle.read())
-        realdesthandle.close()
-    except Exception as err:  # pylint: disable=broad-except
-        raise Error("Error downloading from %s to %s: %s" % (
-                    url, realdest, err))
-    return realdest
-
-
-def validate_cert(cert_path, cert):
-    """Verify that the cert file at 'cert_path' has the same hash and subject
-    as in 'cert'. Raise an Error if not.
-
-    """
-    if get_openssl_version() >= (1, 1, 0):
-        # turn something like
-        # subject= /C=US/O=DigiCert Inc/OU=www.digicert.com/CN=DigiCert Assured ID Root CA
-        # into
-        # subject=C = US, O = DigiCert Inc, OU = www.digicert.com, CN = DigiCert Assured ID Root CA
-        expected_subject = re.sub('=', ' = ', cert.subject[1:])
-        expected_subject = re.sub(r'(?<![\\])/', ', ', expected_subject)
-        expected_subject = 'subject=' + expected_subject
-    else:
-        expected_subject = "subject= " + cert.subject
-
-    if get_openssl_version()[0] == 0:
-        expected_hash = cert.o098hash
-    else:
-        expected_hash = cert.o1xhash
-    real_subject = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-subject"])
-    real_hash = backtick(["openssl", "x509", "-in", cert_path, "-noout", "-hash"])
-    if real_subject != expected_subject:
-        raise Error(("Subject for %s doesn't match expected:\n"
-                     "Expected: %r, got: %r") %
-                    (cert_path, expected_subject, real_subject))
-    if real_hash != expected_hash:
-        raise Error(("Hash for %s doesn't match expected:\n"
-                     "Expected: %r, got: %r") %
-                    (cert_path, expected_hash, real_hash))
-
-
-def create_ca_bundle(working_dir):
-    """Create the ca-bundle.crt file in working_dir"""
-    if os.path.isdir(GRID_CERTS_DIR):
-        # Use local grid certificates
-        certs_dir = GRID_CERTS_DIR
-    else:
-        certs_dir = os.path.join(working_dir, 'certs')
-        os.mkdir(certs_dir)
-        # Download DigiCert grid certificates
-        for cert in DIGICERT_CA_CERTS:
-            checked_download(certs_dir,
-                             os.path.join(DIGICERT_GRID_BASEURL, cert.filename))
-        # Download CILogon-OSG cert
-        checked_download(certs_dir, CILOGON_OSG_CA_CERT_URL)
-
-    bundle_contents = ""
-
-    # Add DigiCert certs
-    for cert in DIGICERT_CA_CERTS:
-        cert_path = os.path.join(certs_dir, cert.filename)
-        validate_cert(cert_path, cert)
-        bundle_contents += slurp(cert_path) + "\n"
-
-    # Add CILogon-OSG cert
-    cert_fname = os.path.basename(CILOGON_OSG_CA_CERT_URL)
-    cert_path = os.path.join(certs_dir, cert_fname)
-    validate_cert(cert_path, CILOGON_OSG_CA_CERT)
-    bundle_contents += slurp(cert_path) + "\n"
-
-    # Write bundle
-    bundle_filename = os.path.join(working_dir, "ca-bundle.crt")
-    unslurp(bundle_filename, bundle_contents)
-
-    return bundle_filename
-
-
 def setup_koji_config_file(write_client_conf):
     """Create the koji config file (if needed)."""
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
@@ -277,10 +157,8 @@ def setup_koji_server_cert():
     """Create the koji server cert file."""
     new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
                                         SERVER_CERT_FILE)
-    working_dir = tempfile.mkdtemp(prefix='osg-koji-setup-')
     safe_make_backup(new_server_cert_path)
-    shutil.copy(create_ca_bundle(working_dir), new_server_cert_path)
-    shutil.rmtree(working_dir, ignore_errors=True)
+    shutil.copy(find_file(SERVER_CERT_FILE, DATA_FILE_SEARCH_PATH), new_server_cert_path)
 
 
 def with_safe_umask(function_to_wrap):

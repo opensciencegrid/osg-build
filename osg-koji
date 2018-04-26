@@ -101,12 +101,20 @@ def setup_parse_args(args):
         dest="dot_koji_symlink",
         help="Do not create a ~/.koji -> ~/.osg-koji symlink. Default: ask")
 
+    parser.add_option(
+        "--no-server-cert", action="store_false",
+        dest="server_cert",
+        help="Do not overwrite the server CA certs bundle. Default: overwrite"
+    )
+
     parser.set_defaults(
         user_cert=os.path.join(GLOBUS_DIR, "usercert.pem"),
         user_key=os.path.join(GLOBUS_DIR, "userkey.pem"),
         proxy=None,
         write_client_conf=None,
-        dot_koji_symlink=None)
+        dot_koji_symlink=None,
+        server_cert=True
+    )
 
     options = parser.parse_args(args)[0]
 
@@ -281,7 +289,9 @@ def run_setup(options):
     user_cert, user_key = options.user_cert, options.user_key
     safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
     setup_koji_config_file(options.write_client_conf)
-    setup_koji_server_cert()
+    if not os.path.exists(os.path.join(OSG_KOJI_USER_CONFIG_DIR, SERVER_CERT_FILE)) or \
+            options.server_cert:
+        setup_koji_server_cert()
     setup_koji_client_cert(user_cert, user_key, options.proxy)
 
     if not os.path.exists(KOJI_USER_CONFIG_DIR):

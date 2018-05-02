@@ -441,7 +441,7 @@ def main(argv=None):
     if os.path.exists(CSL_KOJI_DIR):
         os.environ['PATH'] = (os.path.join(CSL_KOJI_DIR, "cli")
                               + os.pathsep + os.environ['PATH'])
-        if os.environ.has_key('PYTHONPATH'):
+        if "PYTHONPATH" in os.environ:
             os.environ['PYTHONPATH'] = (CSL_KOJI_DIR
                                         + os.pathsep + os.environ['PYTHONPATH'])
         else:

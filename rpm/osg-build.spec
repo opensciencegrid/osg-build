@@ -1,5 +1,5 @@
 #global betatag .pre
-%global _release 1
+%global _release 2
 
 Name:           osg-build
 Version:        1.12.2
@@ -85,6 +85,16 @@ make install DESTDIR=$RPM_BUILD_ROOT
 rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 # ^ don't bundle "six" in the RPM; it's a dependency instead
 
+%check
+SW_VERSION=$(python -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
+if [[ $SW_VERSION != %{version} ]]; then
+    echo "Version mismatch between RPM version (%{version}) and software version ($SW_VERSION)"
+    echo "Edit osgbuild/version.py"
+    exit 1
+fi
+
+
+
 %files
 
 %files tests
@@ -126,6 +136,9 @@ rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 
 
 %changelog
+* Wed Jun 20 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.2-2
+- Add version check to spec file
+
 * Thu Mar 15 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.2-1
 - Fix osg-build --version
   Release notes at https://github.com/opensciencegrid/osg-build/releases/tag/v1.12.2

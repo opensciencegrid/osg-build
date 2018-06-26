@@ -1,8 +1,8 @@
 #global betatag .pre
-%global _release 2
+%global _release 1
 
 Name:           osg-build
-Version:        1.12.2
+Version:        1.13.0
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -133,9 +133,14 @@ fi
 %{_datadir}/%{name}/osg-koji-site.conf
 %{_datadir}/%{name}/osg-koji-home.conf
 %{_datadir}/%{name}/promoter.ini
+%{_datadir}/%{name}/osg-ca-bundle.crt
 
 
 %changelog
+* Tue Jun 26 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.13.0-1
+- Prevent building into condor repo from osg branches and vice versa (SOFTWARE-3176)
+- Pre-create CA bundle and add InCommon and Let's Encrypt CA certs to it (SOFTWARE-3092)
+
 * Wed Jun 20 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.12.2-2
 - Add version check to spec file
 

@@ -249,7 +249,7 @@ class TestPrepare(XTestCase):
     def test_prepare(self):
         checked_osg_build(["prepare", self.pkg_dir])
         self.assertTrue(os.path.exists(opj(self.pkg_dir, C.WD_RESULTS, "BUILD",
-                        "globus_gatekeeper-8.1")), "SRPM unpacked")
+                        "globus_gatekeeper-8.1")), "SRPM not unpacked")
         head_out = checked_backtick(
             ["head", "-n", "10", opj(self.pkg_dir, C.WD_RESULTS, "BUILD",
             "globus_gatekeeper-8.1", "init", "globus-gatekeeper-lsb.in")])

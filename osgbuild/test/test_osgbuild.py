@@ -191,7 +191,7 @@ class TestPrebuild(XTestCase):
             "multilib-python.patch" in final_contents,
             "osg patch not in final contents")
         self.assertTrue(
-            regex_in_list(r"mash-0[.]5[.]22-1[.]osg[.]el\d[.]src[.]rpm", final_contents),
+            regex_in_list(r"mash-0[.]5[.]22-3[.]osg[.]el\d[.]src[.]rpm", final_contents),
             "srpm not successfully built")
 
     def test_prebuild_osgonly(self):
@@ -243,20 +243,17 @@ class TestPrepare(XTestCase):
     """Tests for 'prepare' task"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "globus-gatekeeper"),
-                                    "{2011-12-14}")
+        self.pkg_dir = common_setUp(opj(TRUNK, "mash"),
+                                    "{2018-06-27}")
 
     def test_prepare(self):
         checked_osg_build(["prepare", self.pkg_dir])
-        self.assertTrue(os.path.exists(opj(self.pkg_dir, C.WD_RESULTS, "BUILD",
-                        "globus_gatekeeper-8.1")), "SRPM not unpacked")
-        head_out = checked_backtick(
-            ["head", "-n", "10", opj(self.pkg_dir, C.WD_RESULTS, "BUILD",
-            "globus_gatekeeper-8.1", "init", "globus-gatekeeper-lsb.in")])
-        self.assertRegexpMatches(
-            head_out,
-            r"Default-Stop:\s+0 1 2 3 4 5 6",
-            "Patches not applied")
+        srcdir = opj(self.pkg_dir, C.WD_RESULTS, "BUILD", "mash-0.5.22")
+        self.assertTrue(os.path.exists(srcdir), "SRPM not unpacked")
+        try:
+            checked_call(["grep", "-q", "LCMAPS plugins", opj(srcdir, "mash/multilib.py")])
+        except CalledProcessError:
+            self.fail("Patches not applied")
 
 
 class TestFetch(XTestCase):

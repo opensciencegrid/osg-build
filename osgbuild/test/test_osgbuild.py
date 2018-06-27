@@ -125,14 +125,14 @@ class TestLint(XTestCase):
     """Tests for 'lint' task"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"), "{2011-12-06}")
+        self.pkg_dir = common_setUp(opj(TRUNK, "condor"), "{2018-06-27}")
 
     def test_lint(self):
         out = backtick_osg_build(["lint", self.pkg_dir])
         try:
             self.assertRegexpMatches(
                 out,
-                re.escape("yum-remove-osg.src:25: E: hardcoded-library-path"),
+                re.escape("condor.src:114: W: macro-in-comment %condor_base_release"),
                 "expected error not found")
             self.assertRegexpMatches(
                 out,
@@ -140,7 +140,7 @@ class TestLint(XTestCase):
                 "unexpected number of packages checked")
             self.assertRegexpMatches(
                 out,
-                re.escape("rpmlint found problems with yum-remove-osg"),
+                re.escape("rpmlint found problems with condor"),
                 "expected problems not found")
         except:
             errprintf("Problems found. Output:\n%s", out)
@@ -151,8 +151,8 @@ class TestRpmbuild(XTestCase):
     """Tests for 'rpmbuild' task"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
-                                    "{2011-12-06}")
+        self.pkg_dir = common_setUp(opj(TRUNK, "osg-build"),
+                                    "{2018-06-01}")
 
     def test_rpmbuild(self):
         out = backtick_osg_build(["rpmbuild", self.pkg_dir])
@@ -161,7 +161,7 @@ class TestRpmbuild(XTestCase):
                 out,
                 r'(?ms) >> The following RPM[(]s[)] have been created:\n'
                 r'[^\n]+'
-                r'yum-remove-osg-1[.]0-0[.]2[.]osg[.]el\d[.]noarch[.]rpm',
+                r'osg-build-1[.]12[.]2-1[.]osg[.]el\d[.]noarch[.]rpm',
                 "rpm created message not found")
         except:
             errprintf("Problems found. Output:\n%s", out)
@@ -191,30 +191,30 @@ class TestPrebuild(XTestCase):
             "multilib-python.patch" in final_contents,
             "osg patch not in final contents")
         self.assertTrue(
-            regex_in_list(r"mash-0[.]5[.]22-2[.]osg[.]el\d[.]src[.]rpm", final_contents),
+            regex_in_list(r"mash-0[.]5[.]22-1[.]osg[.]el\d[.]src[.]rpm", final_contents),
             "srpm not successfully built")
 
     def test_prebuild_osgonly(self):
-        pkg_osgonly_dir = common_setUp(opj(TRUNK, "yum-remove-osg"),
-                                       "{2012-01-26}")
+        pkg_osgonly_dir = common_setUp(opj(TRUNK, "osg-build"),
+                                       "{2018-06-01}")
         checked_osg_build(["prebuild", pkg_osgonly_dir])
         final_contents = get_listing(opj(pkg_osgonly_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
-                r"yum-remove-osg-1[.]0-0[.]2[.]osg.el\d[.]src[.]rpm",
+                r"osg-build-1[.]12[.]2-1[.]osg[.]el\d[.]src[.]rpm",
                 final_contents),
             "srpm not successfully built")
 
     def test_prebuild_passthrough(self):
-        pkg_passthrough_dir = common_setUp(opj(TRUNK, "globus-core"),
-                                           "{2012-01-26}")
+        pkg_passthrough_dir = common_setUp(opj(TRUNK, "osg-build"),
+                                           "{2018-06-01}")
         checked_osg_build(["prebuild", pkg_passthrough_dir])
         final_contents = get_listing(opj(pkg_passthrough_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
-                r"globus-core-8[.]5-2[.]osg[.]el\d[.]src[.]rpm",
+                r"osg-build-1[.]12[.]2-1[.]osg[.]el\d[.]src[.]rpm",
                 final_contents),
             "srpm not successfully built")
 

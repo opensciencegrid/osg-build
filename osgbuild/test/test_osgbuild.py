@@ -132,10 +132,6 @@ class TestLint(XTestCase):
         try:
             self.assertRegexpMatches(
                 out,
-                re.escape("condor.src:114: W: macro-in-comment %condor_base_release"),
-                "expected error not found")
-            self.assertRegexpMatches(
-                out,
                 re.escape("1 packages and 0 specfiles checked"),
                 "unexpected number of packages checked")
             self.assertRegexpMatches(
@@ -159,9 +155,7 @@ class TestRpmbuild(XTestCase):
         try:
             self.assertRegexpMatches(
                 out,
-                r'(?ms) >> The following RPM[(]s[)] have been created:\n'
-                r'[^\n]+'
-                r'osg-build-1[.]12[.]2-1[.]osg[.]el\d[.]noarch[.]rpm',
+                r'(?ms)The following RPM[(]s[)] have been created:\n',
                 "rpm created message not found")
         except:
             errprintf("Problems found. Output:\n%s", out)

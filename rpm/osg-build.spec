@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.13.0
+Version:        1.13.0.1
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -137,7 +137,7 @@ fi
 
 
 %changelog
-* Tue Jun 26 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.13.0-1
+* Tue Jun 26 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.13.0.1-1
 - Prevent building into condor repo from osg branches and vice versa (SOFTWARE-3176)
 - Pre-create CA bundle and add InCommon and Let's Encrypt CA certs to it (SOFTWARE-3092)
 

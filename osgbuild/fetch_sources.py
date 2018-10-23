@@ -123,7 +123,7 @@ def process_meta_url(line, destdir, nocheck):
                 if rc:
                     raise Error("Repository %s does not contain a tag named %s." % (git_url, tag))
                 sha1 = output.split()[0]
-                if sha1 != git_hash:
+                if sha1 != git_hash and deref_git_sha(sha1) != deref_git_sha(git_hash):
                     msg = "Hash mismatch for %s tag %s\n    expected: %s\n    actual:   %s" % \
                           (git_url, tag, git_hash, sha1)
                     if nocheck:
@@ -169,6 +169,11 @@ def process_meta_url(line, destdir, nocheck):
 
     return files
 
+def deref_git_sha(sha):
+    output, rc = utils.sbacktick(["git", "rev-parse", sha + "^{}"])
+    if rc:
+        raise Error("Git failed to parse rev: '%s'" % sha)
+    return output
 
 def process_dot_source(cache_prefix, sfilename, destdir, nocheck):
     """Read a .source file, fetch any files mentioned in it from the

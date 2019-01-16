@@ -156,12 +156,14 @@ def checked_backtick(*args, **kwargs):
     if sp_kwargs.pop('clocale', True):
         sp_kwargs['env'] = dict(sp_kwargs.pop('env', os.environ), LC_ALL='C', LANG='C')
 
+    log.debug("Running `%s`" % cmd)
     proc = subprocess.Popen(cmd, *args[1:], **sp_kwargs)
 
     output = to_str(proc.communicate()[0])
     if not nostrip:
         output = output.strip()
     err = proc.returncode
+    log.debug("Subprocess returned " + str(err))
 
     if err:
         raise CalledProcessError([args, kwargs], err, output)

@@ -96,6 +96,38 @@ def unchecked_call(*args, **kwargs):
     log.debug("Subprocess returned " + str(err))
     return err
 
+def checked_pipeline(cmd1, cmd2, stdin=None, stdout=None, **kw):
+    """Run two commands pipelined together, raises CalledProcessError if
+    either has a nonzero return code.
+
+    cmd1 and cmd2 each are interpreted as a cmd argument for subprocess.Popen
+    stdin  (optional) applies only to cmd1
+    stdout (optional) applies only to cmd2
+    any additional kw args apply to both cmd1 and cmd2
+
+    Prints the commands to run and the results if loglevel is DEBUG.
+    """
+    err = unchecked_pipeline(cmd1, cmd2, stdin, stdout, **kw)
+    if err:
+        raise CalledProcessError([cmd1, cmd2, kw], err, None)
+
+def unchecked_pipeline(cmd1, cmd2, stdin=None, stdout=None, **kw):
+    """Run two commands pipelined together, returns zero if both succeed,
+    or else the first nonzero return code if either fails.
+
+    argument semantics are the same as checked_pipeline
+
+    Prints the commands to run and the results if loglevel is DEBUG.
+    """
+    log.debug("Running %s | %s" % (cmd1, cmd2))
+    p1 = subprocess.Popen(cmd1, stdin=stdin, stdout=subprocess.PIPE, **kw)
+    p2 = subprocess.Popen(cmd2, stdin=p1.stdout, stdout=stdout, **kw)
+    p1.stdout.close()
+    p1.stdout = None
+    e1 = p1.wait()
+    e2 = p2.wait()
+    log.debug("Subprocess returned (%s,%s)" % (e1,e2))
+    return e1 or e2
 
 def backtick(*args, **kwargs):
     """Call a process and return its output, ignoring return code.

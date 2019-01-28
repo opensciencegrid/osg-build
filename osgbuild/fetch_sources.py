@@ -395,6 +395,20 @@ def deref_git_sha(sha):
         return sha
     return output
 
+def parse_source_line(line):
+    kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))
+    return [ a[1] for a in args ], dict(kv)
+
+def dual_filter(cond, seq):
+    pos,neg = [],[]
+    for x in seq:
+        (pos if cond(x) else neg).append(x)
+    return pos,neg
+
+def kvmatch(arg):
+    # return (key,val) for "key=val", else return (None, arg)
+    return re.search(r'^(?:(\w+)=)?(.*)', arg).groups()
+
 def process_dot_source(cache_prefix, sfilename, destdir, nocheck):
     """Read a .source file, fetch any files mentioned in it from the
     cache.

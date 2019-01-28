@@ -103,6 +103,10 @@ FetchOptions = collections.namedtuple('FetchOptions',
 #       **kw  # only list if extra args are intended (to pass to another fn)
 #   )
 
+def fetch_cached_source(relpath, sha1sum=None, ops=None):
+    uri = os.path.join(ops.cache_prefix, relpath)
+    return fetch_uri_source(uri, sha1sum, ops=ops)
+
 def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
     if uri.startswith('/'):
         uri = "file://" + uri

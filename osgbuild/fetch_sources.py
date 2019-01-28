@@ -171,6 +171,13 @@ def _mk_prefix(name, tag, tarball):
         prefix = "%s-%s" % (name, tarball_version)
     return prefix
 
+def fetch_github_source(repo, tag, hash=None, ops=None, **kw):
+    m = re.match(r"([^\s/]+)/([^\s/]+?)(?:.git)?$", repo)
+    if not m:
+        raise Error("'repo' syntax for type=github must be owner/project")
+    url = "https://github.com/" + repo
+    return fetch_git_source(url, tag, hash, ops=ops, **kw)
+
 def fetch_git_source(url, tag, hash=None, ops=None,
         name=None, spec=None, tarball=None, prefix=None):
     name = name or re.sub(r'\.git$', '', os.path.basename(url))

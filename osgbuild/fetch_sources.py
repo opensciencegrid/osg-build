@@ -465,8 +465,7 @@ def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
         log.error(e)
     raise Error("Invalid parameters for %s=%s source line" % (xtype,meta_type))
 
-def process_dot_source(cache_prefix, sfilename, destdir, nocheck,
-                                                         want_spec=True):
+def process_dot_source(cache_prefix, sfilename, destdir, nocheck, want_spec):
     """Read a .source file, fetch any sources specified in it."""
     ops = FetchOptions(destdir=destdir, cache_prefix=cache_prefix,
                        nocheck=nocheck, want_spec=want_spec)
@@ -537,7 +536,8 @@ def fetch(package_dir,
           unpacked_dir=None,
           want_full_extract=False,
           unpacked_tarball_dir=None,
-          nocheck=False):
+          nocheck=False,
+          want_spec=True):
     """Process *.source files in upstream/ directory, downloading upstream
     sources mentioned in them from the software cache. Unpack SRPMs if
     there are any. Override upstream files with those in the osg/
@@ -561,7 +561,8 @@ def fetch(package_dir,
     downloaded = []
     for src in dot_sources:
         log.debug('Processing .source file %s', src)
-        for fname in process_dot_source(cache_prefix, src, destdir, nocheck):
+        for fname in process_dot_source(cache_prefix, src, destdir, nocheck,
+                                                                    want_spec):
             downloaded.append(os.path.abspath(fname))
 
     # Process downloaded SRPMs

@@ -465,6 +465,25 @@ def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
         log.error(e)
     raise Error("Invalid parameters for %s=%s source line" % (xtype,meta_type))
 
+def process_dot_source(cache_prefix, sfilename, destdir, nocheck,
+                                                         want_spec=True):
+    """Read a .source file, fetch any sources specified in it."""
+    ops = FetchOptions(destdir=destdir, cache_prefix=cache_prefix,
+                       nocheck=nocheck, want_spec=want_spec)
+
+    utils.safe_makedirs(destdir)
+    filenames = []
+    for line in open(sfilename):
+        line = re.sub(r'(^|\s)#.*', '', line).strip()
+        if line:
+            try:
+                filenames += process_source_line(line, ops)
+            except Error as e:
+                log.error("Error processing source line: '%s'" % line)
+                raise
+
+    return filenames
+
 def process_dot_source(cache_prefix, sfilename, destdir, nocheck):
     """Read a .source file, fetch any files mentioned in it from the
     cache.

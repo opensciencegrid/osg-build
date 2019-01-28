@@ -153,6 +153,23 @@ def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
         else:
             raise Error(msg)
 
+def run_with_tmp_git_dir(destdir, call):
+    git_dir = tempfile.mkdtemp(dir=destdir)
+    old_git_dir = update_env('GIT_DIR', git_dir)
+    try:
+        return call()
+    finally:
+        shutil.rmtree(git_dir)
+        update_env('GIT_DIR', old_git_dir)
+
+def update_env(key, val):
+    oldval = os.environ.get(key)
+    if val is None:
+        del os.environ[key]
+    else:
+        os.environ[key] = val
+    return oldval
+
 def git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops):
     log.info('Retrieving %s %s' % (url, tag))
     utils.checked_call(['git', 'init', '-q', '--bare'])

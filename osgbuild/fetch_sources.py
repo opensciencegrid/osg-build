@@ -404,13 +404,24 @@ def process_source_line(line, ops):
         cached = fetch_cached_source,
         uri    = fetch_uri_source,
     )
-    meta_type = kv.pop('type', None)
+    explicit_type = kv.pop('type', None)
+    meta_type = explicit_type or get_auto_source_type(*args, **kv)
     if meta_type in handlers:
         handler = handlers[meta_type]
         return handler(*args, ops=ops, **kv)
     else:
         raise Error("Unrecognized type '%s' (valid types are: %s)"
                     % (meta_type, sorted(handlers)))
+
+def get_auto_source_type(*args, **kw):
+    if not args:
+        raise Error("No type specified and no default arg provided")
+    if re.search(r'^\w+://', args[0]):
+        return 'git' if args[0].endswith('.git') else 'uri'
+    elif args[0].startswith('/'):
+        return 'uri'
+    else:
+        return 'github' if args[0].endswith('.git') else 'cached'
 
 def parse_source_line(line):
     kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))

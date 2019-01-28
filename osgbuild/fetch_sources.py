@@ -484,52 +484,6 @@ def process_dot_source(cache_prefix, sfilename, destdir, nocheck,
 
     return filenames
 
-def process_dot_source(cache_prefix, sfilename, destdir, nocheck):
-    """Read a .source file, fetch any files mentioned in it from the
-    cache.
-
-    """
-    utils.safe_makedirs(destdir)
-    downloaded = []
-    with open(sfilename, 'r') as sfile:
-        for lineno, line in enumerate(sfile):
-            line = line.strip()
-            if line.startswith('#'):
-                continue
-            if line == '':
-                continue
-            if len(line.split()) > 1:
-                filenames = process_meta_url(line, destdir, nocheck)
-                downloaded.extend(filenames)
-                continue
-            elif line.startswith('/'):
-                uri = "file://" + line
-                log.warning(
-                    "An absolute path has been given in %s line %d. "
-                    "It is recommended to use only paths relative to %s"
-                    "in your source files.", sfilename, lineno+1,
-                    cache_prefix)
-            elif not re.match(r'/|\w+://', line): # relative path
-                uri = os.path.join(cache_prefix, line)
-            else:
-                uri = line
-
-            log.info('Retrieving ' + uri)
-            try:
-                handle = urllib.request.urlopen(uri)
-            except urllib.error.URLError as err:
-                raise Error("Unable to download %s\n%s" % (uri, str(err)))
-            filename = os.path.join(destdir, os.path.basename(line))
-            try:
-                with open(filename, 'wb') as desthandle:
-                    desthandle.write(handle.read())
-            except EnvironmentError as err:
-                raise Error("Unable to save downloaded file to %s\n%s" % (filename, str(err)))
-            downloaded.append(filename)
-
-    return downloaded
-# end of process_dot_source()
-
 
 def full_extract(unpacked_dir, archives_downloaded, destdir):
     """Extract downloaded archives plus archives inside downloaded SRPMs"""

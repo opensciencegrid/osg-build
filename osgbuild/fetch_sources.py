@@ -153,7 +153,7 @@ def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
         else:
             raise Error(msg)
 
-def git_archive_remote_ref(url, tag, hash, prefix, tarball, ops):
+def git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops):
     log.info('Retrieving %s %s' % (url, tag))
     utils.checked_call(['git', 'init', '-q', '--bare'])
     utils.checked_call(['git', 'remote', 'add', 'origin', url])
@@ -170,7 +170,21 @@ def git_archive_remote_ref(url, tag, hash, prefix, tarball, ops):
     with open(dest_tar_gz, "w") as destf:
         utils.checked_pipeline([git_archive_cmd, gzip_cmd], stdout=destf)
 
-    return [dest_tar_gz]
+    if spec:
+        spec = try_get_spec(ops.destdir, got_sha, spec)
+
+    return list(filter(None, [dest_tar_gz, spec]))
+
+def try_get_spec(destdir, tree_sha, spec):
+    dest_spec = os.path.join(destdir, os.path.basename(spec))
+    spec_rev = '%s:%s' % (tree_sha, spec)
+    _, rc = utils.sbacktick(['git', 'rev-parse', '-q', '--verify', spec_rev])
+    if rc:
+        log.debug("No spec file found under %s" % spec_rev)
+        return None
+    with open(dest_spec, "w") as specf:
+        utils.checked_call(['git', 'show', spec_rev], stdout=specf)
+    return dest_spec
 
 def check_git_hash(url, tag, sha, got_sha, nocheck):
     efmt = "Hash mismatch for %s tag %s\n    expected: %s\n    actual:   %s"

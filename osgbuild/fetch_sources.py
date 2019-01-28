@@ -153,6 +153,23 @@ def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
         else:
             raise Error(msg)
 
+def git_archive_remote_ref(url, tag, prefix, tarball, ops):
+    log.info('Retrieving %s %s' % (url, tag))
+    utils.checked_call(['git', 'init', '-q', '--bare'])
+    utils.checked_call(['git', 'remote', 'add', 'origin', url])
+    utils.checked_call(['git', 'fetch', '-q', '--depth=1', 'origin', tag])
+    got_sha = utils.checked_backtick(['git', 'rev-parse', 'FETCH_HEAD'])
+
+    dest_tar_gz = os.path.join(ops.destdir, tarball)
+    git_archive_cmd = ['git', 'archive', '--format=tar',
+                                         '--prefix=%s/' % prefix, got_sha]
+    gzip_cmd = ['gzip', '-n']
+
+    with open(dest_tar_gz, "w") as destf:
+        utils.checked_pipeline([git_archive_cmd, gzip_cmd], stdout=destf)
+
+    return [dest_tar_gz]
+
 def process_meta_url(line, destdir, nocheck):
     """
     Process a serialized URL spec.  Should be of the format:

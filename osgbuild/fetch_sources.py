@@ -153,6 +153,37 @@ def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
         else:
             raise Error(msg)
 
+def _required(item, key):
+    if item is None:
+        raise Error("No '%s' specified" % key)
+
+def _nvl(arg, default):
+    return default if arg is None else arg
+
+def _mk_prefix(name, tag, tarball):
+    if tarball:
+        if not tarball.endswith('.tar.gz'):
+            raise Error("tarball must end with .tar.gz: '%s'" % tarball)
+        prefix = tarball[:-len('.tar.gz')]
+    else:
+        tag = os.path.basename(tag)
+        tarball_version = re.match(r'(?:v(?=\d))?([^-]+)', tag).group(1)
+        prefix = "%s-%s" % (name, tarball_version)
+    return prefix
+
+def fetch_git_source(url, tag, hash=None, ops=None,
+        name=None, spec=None, tarball=None, prefix=None):
+    name = name or re.sub(r'\.git$', '', os.path.basename(url))
+    ops.nocheck or _required(hash, 'hash')
+    spec = ops.want_spec and _nvl(spec, "rpm/%s.spec" % name)
+    prefix = prefix and prefix.strip('/')
+    prefix = prefix or _mk_prefix(name, tag, tarball)
+    tarball = tarball and os.path.basename(tarball)
+    tarball = tarball or prefix + ".tar.gz"
+
+    return run_with_tmp_git_dir(ops.destdir, lambda:
+        git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops))
+
 def run_with_tmp_git_dir(destdir, call):
     git_dir = tempfile.mkdtemp(dir=destdir)
     old_git_dir = update_env('GIT_DIR', git_dir)

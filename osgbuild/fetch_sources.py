@@ -60,6 +60,7 @@ If type is unspecified, it will be inferred by the form of the first argument:
 # pylint: disable=W0614
 from __future__ import absolute_import
 from __future__ import print_function
+import collections
 import fnmatch
 import logging
 import glob
@@ -85,6 +86,21 @@ else:
     log = logging.getLogger()
     logging.basicConfig(format="%(message)s", level=logging.INFO)
 
+
+# common fetch options not found in .source line
+FetchOptions = collections.namedtuple('FetchOptions',
+    ['destdir', 'cache_prefix', 'nocheck', 'want_spec']
+)
+
+# fetch handlers are defined like:
+#
+#   fetch_xyz_source(
+#       required_named_or_positional_arg, ...,
+#       optional_named_or_positional_arg=None, ...,
+#       ops=None,  # no positional args allowed after 'ops'; only named fields
+#       named_arg=None, ...,
+#       **kw  # only list if extra args are intended (to pass to another fn)
+#   )
 
 def process_meta_url(line, destdir, nocheck):
     """

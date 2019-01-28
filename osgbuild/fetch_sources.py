@@ -62,6 +62,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 import collections
 import fnmatch
+import hashlib
 import logging
 import glob
 import re
@@ -101,6 +102,52 @@ FetchOptions = collections.namedtuple('FetchOptions',
 #       named_arg=None, ...,
 #       **kw  # only list if extra args are intended (to pass to another fn)
 #   )
+
+def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
+    if uri.startswith('/'):
+        uri = "file://" + uri
+        log.warning("Absolute path names in .source files break the 4th wall")
+
+    outfile = os.path.join(ops.destdir, os.path.basename(filename or uri))
+    got_sha1sum = download_uri(uri, outfile)
+    log.debug("got sha1sum=%s for uri=%s" % (got_sha1sum, uri))
+
+    if sha1sum: # or not ops.nocheck:
+        check_file_checksum(outfile, sha1sum, got_sha1sum, ops.nocheck)
+
+    return [outfile]
+
+def download_uri(uri, outfile):
+    log.info('Retrieving ' + uri)
+    try:
+        handle = urllib.request.urlopen(uri)
+    except urllib.error.URLError as err:
+        raise Error("Unable to download %s\n%s" % (uri, err))
+
+    sha = hashlib.sha1()
+    try:
+        with open(outfile, 'wb') as desthandle:
+            for chunk in chunked_read(handle):
+                desthandle.write(chunk)
+                sha.update(chunk)
+    except EnvironmentError as e:
+        raise Error("Unable to save downloaded file to %s\n%s" % (outfile, e))
+    return sha.hexdigest()
+
+def chunked_read(handle, size=64*1024):
+    chunk = handle.read(size)
+    while chunk:
+        yield chunk
+        chunk = handle.read(size)
+
+def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
+    efmt = "sha1 mismatch for '%s':\n    expected: %s\n         got: %s"
+    if sha1sum != got_sha1sum:
+        msg = efmt % (path, sha1sum, got_sha1sum)
+        if nocheck:
+            log.warning(msg + "\n    (ignored)")
+        else:
+            raise Error(msg)
 
 def process_meta_url(line, destdir, nocheck):
     """

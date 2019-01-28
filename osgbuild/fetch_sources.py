@@ -153,12 +153,14 @@ def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
         else:
             raise Error(msg)
 
-def git_archive_remote_ref(url, tag, prefix, tarball, ops):
+def git_archive_remote_ref(url, tag, hash, prefix, tarball, ops):
     log.info('Retrieving %s %s' % (url, tag))
     utils.checked_call(['git', 'init', '-q', '--bare'])
     utils.checked_call(['git', 'remote', 'add', 'origin', url])
     utils.checked_call(['git', 'fetch', '-q', '--depth=1', 'origin', tag])
     got_sha = utils.checked_backtick(['git', 'rev-parse', 'FETCH_HEAD'])
+    if hash or not ops.nocheck:
+        check_git_hash(url, tag, hash, got_sha, ops.nocheck)
 
     dest_tar_gz = os.path.join(ops.destdir, tarball)
     git_archive_cmd = ['git', 'archive', '--format=tar',
@@ -169,6 +171,15 @@ def git_archive_remote_ref(url, tag, prefix, tarball, ops):
         utils.checked_pipeline([git_archive_cmd, gzip_cmd], stdout=destf)
 
     return [dest_tar_gz]
+
+def check_git_hash(url, tag, sha, got_sha, nocheck):
+    efmt = "Hash mismatch for %s tag %s\n    expected: %s\n    actual:   %s"
+    if sha != got_sha and deref_git_sha(sha) != deref_git_sha(got_sha):
+        msg = efmt % (url, tag, sha, got_sha)
+        if nocheck:
+            log.warning(msg + "\n    (ignored)")
+        else:
+            raise Error(msg)
 
 def process_meta_url(line, destdir, nocheck):
     """

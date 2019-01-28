@@ -408,7 +408,10 @@ def process_source_line(line, ops):
     meta_type = explicit_type or get_auto_source_type(*args, **kv)
     if meta_type in handlers:
         handler = handlers[meta_type]
-        return handler(*args, ops=ops, **kv)
+        try:
+            return handler(*args, ops=ops, **kv)
+        except TypeError as e:
+            fancy_source_error(meta_type, explicit_type, handler, args, kv, e)
     else:
         raise Error("Unrecognized type '%s' (valid types are: %s)"
                     % (meta_type, sorted(handlers)))
@@ -436,6 +439,31 @@ def dual_filter(cond, seq):
 def kvmatch(arg):
     # return (key,val) for "key=val", else return (None, arg)
     return re.search(r'^(?:(\w+)=)?(.*)', arg).groups()
+
+def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
+    xtype = "type" if explicit_type else "implicit type"
+    log.error("Error processing source line of %s '%s'" % (xtype, meta_type))
+    varnames = handler.__code__.co_varnames
+    fn_argcount = handler.__code__.co_argcount
+    maxargs = varnames.index('ops')
+    posargs = varnames[:maxargs]
+    posargs_provided = posargs[:len(args)]
+    dupe_args = set(posargs_provided) & set(kw)
+
+    pos_usage = ' '.join("[%s=]arg%s" % (a,i+1) for i,a in enumerate(posargs))
+    log.error("Up to %s unnamed initial arguments are allowed: %s"
+              % (maxargs, pos_usage))
+
+    if dupe_args:
+        for arg in dupe_args:
+            log.error("No unnamed positional arguments allowed after"
+                      " explicit '%s' named field" % arg)
+    elif len(args) > maxargs:
+        log.error("Provided %s positional arguments: %s"
+                  % (len(args), ' '.join(args)))
+    else:
+        log.error(e)
+    raise Error("Invalid parameters for %s=%s source line" % (xtype,meta_type))
 
 def process_dot_source(cache_prefix, sfilename, destdir, nocheck):
     """Read a .source file, fetch any files mentioned in it from the

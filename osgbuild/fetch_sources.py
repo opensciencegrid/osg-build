@@ -395,6 +395,23 @@ def deref_git_sha(sha):
         return sha
     return output
 
+def process_source_line(line, ops):
+    args,kv = parse_source_line(line)
+
+    handlers = dict(
+        git    = fetch_git_source,
+        github = fetch_github_source,
+        cached = fetch_cached_source,
+        uri    = fetch_uri_source,
+    )
+    meta_type = kv.pop('type', None)
+    if meta_type in handlers:
+        handler = handlers[meta_type]
+        return handler(*args, ops=ops, **kv)
+    else:
+        raise Error("Unrecognized type '%s' (valid types are: %s)"
+                    % (meta_type, sorted(handlers)))
+
 def parse_source_line(line):
     kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))
     return [ a[1] for a in args ], dict(kv)

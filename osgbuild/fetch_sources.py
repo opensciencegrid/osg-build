@@ -1,6 +1,60 @@
-"""Fetch sources from the upstream cache and combine them with sources from
+"""Fetch sources from upstream locations and combine them with sources from
 the osg/ dir in the package.
 
+
+Lines from upstream/*.source files have syntax like a python function call:
+
+    [args...] [field=value...]
+
+
+Possible fields names:
+
+    type:     {git|github|cached|uri}
+    url:      git clone url (type=git)
+    name:     repo name if different from url basename (type=git, optional)
+    tag:      git tag or ref to archive (type=git/github)
+    hash:     git commit hash (type=git/github, optional if nocheck=True)
+    repo:     owner/repo (type=github)
+    prefix:   archive prefix dir if not name-tag (type=git/github, optional)
+    tarball:  archive name if not prefix.tar.gz (type=git/github, optional)
+              (setting tarball will also set a default prefix accordingly)
+    spec:     path rpm spec, if not rpm/name.spec (type=git/github, optional)
+    relpath:  upstream cache relative path (type=cached)
+    uri:      uri for file to download (type=uri)
+    filename: outfile if different than uri basename (type=uri, optional)
+    sha1sum:  chksum of downloaded file (type=uri/cached, optional)
+
+
+Each line is associated with a source 'type':
+
+    git:      a git repo url to fetch and produce a git archive
+    github:   same as git, but repo=owner/project is shorthand for the url
+
+    cached:   a file to be retrieved from the vdt upstream cache
+    uri:      a generic proto://... uri for a file to download
+
+
+Some initial unnamed args are allowed for each type:
+
+    git:      url  [tag [hash]]
+    github:   repo [tag [hash]]
+
+    cached:   relpath [sha1sum]
+    uri:      uri     [sha1sum]
+
+
+All other options must be specified as name=value keyword args.
+
+
+If type is unspecified, it will be inferred by the form of the first argument:
+
+    unnamed-arg1         -> inferred-type
+    --------------------    -------------
+    owner/repo.git       -> github
+    proto://.../repo.git -> git
+    pkg/version/file.ext -> cached
+    proto://...          -> uri
+    /abs/path/to/file    -> uri (file://)
 """
 
 # pylint: disable=W0614

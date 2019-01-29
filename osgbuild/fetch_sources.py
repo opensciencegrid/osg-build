@@ -34,14 +34,10 @@ Each line is associated with a source 'type':
     uri:      a generic proto://... uri for a file to download
 
 
-Some initial unnamed args are allowed for each type:
-
-    git:      url  [tag [hash]]
-    github:   repo [tag [hash]]
+Some initial unnamed args are allowed for the pre-git types:
 
     cached:   relpath [sha1sum]
     uri:      uri     [sha1sum]
-
 
 All other options must be specified as name=value keyword args.
 
@@ -50,8 +46,6 @@ If type is unspecified, it will be inferred by the form of the first argument:
 
     unnamed-arg1         -> inferred-type
     --------------------    -------------
-    owner/repo.git       -> github
-    proto://.../repo.git -> git
     pkg/version/file.ext -> cached
     proto://...          -> uri
     /abs/path/to/file    -> uri (file://)
@@ -282,12 +276,12 @@ def process_source_line(line, ops):
 def get_auto_source_type(*args, **kw):
     if not args:
         raise Error("No type specified and no default arg provided")
-    if re.search(r'^\w+://', args[0]):
-        return 'git' if args[0].endswith('.git') else 'uri'
-    elif args[0].startswith('/'):
+    if args[0].endswith('.git'):
+        raise Error("No automatic types allowed for git sources")
+    if re.search(r'^\w+://', args[0]) or args[0].startswith('/'):
         return 'uri'
     else:
-        return 'github' if args[0].endswith('.git') else 'cached'
+        return 'cached'
 
 def parse_source_line(line):
     kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))

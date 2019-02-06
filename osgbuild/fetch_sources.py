@@ -329,6 +329,7 @@ def process_dot_source(cache_prefix, sfilename, destdir, nocheck, want_spec):
     utils.safe_makedirs(destdir)
     filenames = []
     for line in open(sfilename):
+        # strip comments and leading/trailing whitespace
         line = re.sub(r'(^|\s)#.*', '', line).strip()
         if line:
             try:

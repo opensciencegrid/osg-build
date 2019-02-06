@@ -158,6 +158,8 @@ def _mk_prefix(name, tag, tarball):
         prefix = tarball[:-len('.tar.gz')]
     else:
         tag = os.path.basename(tag)
+        # strip 'v' prefix for numeric tags, and -release suffix if present
+        # eg: 'v1.2.3-4', 'v1.2.3', '1.2.3-4', '1.2.3' all map to '1.2.3'
         tarball_version = re.match(r'(?:v(?=\d))?([^-]+)', tag).group(1)
         prefix = "%s-%s" % (name, tarball_version)
     return prefix

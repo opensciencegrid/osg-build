@@ -297,6 +297,14 @@ def kvmatch(arg):
     return re.search(r'^(?:(\w+)=)?(.*)', arg).groups()
 
 def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
+    # A TypeError is thrown if, eg, a source line does not have all the
+    # required fields for a given type, or if it has fields that the
+    # type does not accept.
+    #
+    # Inspect the call signature for the fetch handler function, along
+    # with the arguments provided, in order to provide the user with a
+    # more helpful error message explaining what went wrong.
+
     xtype = "type" if explicit_type else "implicit type"
     log.error("Error processing source line of %s '%s'" % (xtype, meta_type))
     varnames = handler.__code__.co_varnames

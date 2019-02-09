@@ -2,9 +2,14 @@
 the osg/ dir in the package.
 
 
-Lines from upstream/*.source files have syntax like a python function call:
+Lines from upstream/*.source files can specify a cached upstream source
+archive, relative to the upstream cache prefix:
 
-    [args...] [field=value...]
+    pkg/version/file.ext [sha1sum=...]
+
+OR a field=value sequence, with support for building from git sources:
+
+    type=... [field=value...]
 
 
 Possible fields names:

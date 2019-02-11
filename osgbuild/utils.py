@@ -96,6 +96,42 @@ def unchecked_call(*args, **kwargs):
     log.debug("Subprocess returned " + str(err))
     return err
 
+def checked_pipeline(cmds, stdin=None, stdout=None, **kw):
+    """Run a list of commands pipelined together, raises CalledProcessError if
+    any have a nonzero return code.
+
+    Each item in cmds is interpreted as a cmd argument for subprocess.Popen
+    stdin  (optional) applies only to cmd[0]
+    stdout (optional) applies only to cmd[-1]
+    any additional kw args apply to all cmds
+
+    Prints the commands to run and the results if loglevel is DEBUG.
+    """
+    err = unchecked_pipeline(cmds, stdin, stdout, **kw)
+    if err:
+        raise CalledProcessError([cmds, kw], err, None)
+
+def unchecked_pipeline(cmds, stdin=None, stdout=None, **kw):
+    """Run a list of commands pipelined together, returns zero if all succeed,
+    otherwise the first nonzero return code if any fail.
+
+    Argument semantics are the same as checked_pipeline
+
+    Prints the commands to run and the results if loglevel is DEBUG.
+    """
+    log.debug("Running %s" % ' | '.join(map(str, cmds)))
+    pipes = []
+    final = len(cmds) - 1
+    for i,cmd in enumerate(cmds):
+        _stdin  = stdin  if i == 0     else pipes[-1].stdout
+        _stdout = stdout if i == final else subprocess.PIPE
+        pipes.append(subprocess.Popen(cmd, stdin=_stdin, stdout=_stdout, **kw))
+        if i > 0:
+            pipes[-2].stdout.close()
+            pipes[-2].stdout = None
+    rets = [ p.wait() for p in pipes ]
+    log.debug("Subprocesses returned (%s)" % ','.join(map(str, rets)))
+    return list(filter(None, rets))[0] if any(rets) else 0
 
 def backtick(*args, **kwargs):
     """Call a process and return its output, ignoring return code.
@@ -156,12 +192,14 @@ def checked_backtick(*args, **kwargs):
     if sp_kwargs.pop('clocale', True):
         sp_kwargs['env'] = dict(sp_kwargs.pop('env', os.environ), LC_ALL='C', LANG='C')
 
+    log.debug("Running `%s`" % cmd)
     proc = subprocess.Popen(cmd, *args[1:], **sp_kwargs)
 
     output = to_str(proc.communicate()[0])
     if not nostrip:
         output = output.strip()
     err = proc.returncode
+    log.debug("Subprocess returned " + str(err))
 
     if err:
         raise CalledProcessError([args, kwargs], err, output)

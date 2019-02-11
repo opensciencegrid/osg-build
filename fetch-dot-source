@@ -1,0 +1,80 @@
+#!/usr/bin/python
+
+from __future__ import print_function
+import logging
+import getopt
+import sys
+import os
+
+from osgbuild.main          import log, log_consolehandler
+from osgbuild.error         import Error
+from osgbuild.fetch_sources import C, process_dot_source
+
+def usage():
+    print("Usage: {script} [-d destdir] [options] upstream.source [...]\n\n"
+          "Options:\n"
+          "  -d destdir   specify output location\n"
+          "  -n           do not require matching hashes (nocheck)\n"
+          "  -s           extract rpm spec from git sources (want_spec)\n"
+          "  -v           verbose; set loglevel to DEBUG\n"
+          "  -q           quiet; set loglevel to WARNING (no INFO msgs)\n"
+          "  -c cachepfx  specify upstream cache location prefix\n"
+          "  -a           set upstream cache prefix to UW AFS location\n"
+          .format(script=os.path.basename(__file__)))
+    sys.exit(0)
+
+def setloglevel(level):
+    log.setLevel(level)
+    log_consolehandler.setLevel(level)
+
+options = dict(
+    cache_prefix = C.WEB_CACHE_PREFIX,
+    destdir = '.',
+    nocheck = False,
+    want_spec = False
+)
+
+try:
+    ops, dot_sources = getopt.getopt(sys.argv[1:], 'd:nsvqc:a')
+except getopt.GetoptError:
+    usage()
+
+if not dot_sources:
+    usage()
+
+for op,val in ops:
+    if   op == '-n': options['nocheck'] = True
+    elif op == '-s': options['want_spec'] = True
+    elif op == '-d': options['destdir'] = val
+    elif op == '-c': options['cache_prefix'] = val
+    elif op == '-a': options['cache_prefix'] = C.AFS_CACHE_PREFIX
+    elif op == '-v': setloglevel(logging.DEBUG)
+    elif op == '-q': setloglevel(logging.WARNING)
+
+def main():
+    for src in dot_sources:
+        files = process_dot_source(sfilename=src, **options)
+        for f in files:
+            print(f)
+
+try:
+    main()
+except SystemExit as err:
+    raise
+except KeyboardInterrupt:
+    print("-" * 79, file=sys.stderr)
+    print("Interrupted", file=sys.stderr)
+    print("-" * 79, file=sys.stderr)
+    sys.exit(3)
+except Error as err:
+    print("-" * 79, file=sys.stderr)
+    print(err, file=sys.stderr)
+    print("-" * 79, file=sys.stderr)
+    sys.exit(4)
+except Exception as err:
+    print("-" * 79, file=sys.stderr)
+    print("Unhandled exception:", file=sys.stderr)
+    print(err, file=sys.stderr)
+    print("-" * 79, file=sys.stderr)
+    sys.exit(1)
+

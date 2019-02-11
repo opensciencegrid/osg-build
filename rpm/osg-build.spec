@@ -1,5 +1,5 @@
 #global betatag .pre
-%global _release 1
+%global _release 2
 
 Name:           osg-build
 Version:        1.13.0.1
@@ -81,6 +81,7 @@ Summary:        OSG-Build tests
 %setup -q -n %{name}-%{version}
 
 %install
+find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/bin/python,' '{}' +
 make install DESTDIR=$RPM_BUILD_ROOT
 rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 # ^ don't bundle "six" in the RPM; it's a dependency instead
@@ -137,6 +138,9 @@ fi
 
 
 %changelog
+* Wed Jan 30 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.13.0.1-2
+- Force using OS Python (SOFTWARE-3552)
+
 * Tue Jun 26 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.13.0.1-1
 - Prevent building into condor repo from osg branches and vice versa (SOFTWARE-3176)
 - Pre-create CA bundle and add InCommon and Let's Encrypt CA certs to it (SOFTWARE-3092)

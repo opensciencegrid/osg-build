@@ -81,7 +81,7 @@ Summary:        OSG-Build tests
 %setup -q -n %{name}-%{version}
 
 %install
-find . -type f -print | xargs sed -r -i -e '1s|^#!/usr/bin/env (\S+)|#!/usr/bin/\1|'
+find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/bin/python,' '{}' +
 make install DESTDIR=$RPM_BUILD_ROOT
 rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 # ^ don't bundle "six" in the RPM; it's a dependency instead
@@ -139,7 +139,7 @@ fi
 
 %changelog
 * Wed Jan 30 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.13.0.1-2
-- Don't use /usr/bin/env... to find interpreters (SOFTWARE-3552)
+- Force using OS Python (SOFTWARE-3552)
 
 * Tue Jun 26 2018 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.13.0.1-1
 - Prevent building into condor repo from osg branches and vice versa (SOFTWARE-3176)

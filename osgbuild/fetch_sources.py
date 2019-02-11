@@ -106,10 +106,6 @@ def fetch_cached_source(relpath, sha1sum=None, ops=None):
 def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
     if uri.startswith('/'):
         uri = "file://" + uri
-        log.warning("Absolute path names in .source files should not be used"
-                    " for OSG builds.  Provide a path relative to the "
-                    " upstream cache prefix instead (%s)" % C.WEB_CACHE_PREFIX)
-
     outfile = os.path.join(ops.destdir, os.path.basename(filename or uri))
     got_sha1sum = download_uri(uri, outfile)
     log.debug("got sha1sum=%s for uri=%s" % (got_sha1sum, uri))

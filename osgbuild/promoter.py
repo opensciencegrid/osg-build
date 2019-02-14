@@ -75,8 +75,8 @@ class Build(object):
 
 
 class Reject(object):
-    REASON_DISTINCT_ACROSS_DISTS = "Build versions matching %(pkg_or_build)s distinct across dist tags"
-    REASON_NOMATCHING_FOR_DIST = "No build matching %(pkg_or_build)s for dist %(dist)s"
+    REASON_DISTINCT_ACROSS_DISTS = "%(pkg_or_build)s: Matching build versions distinct across dist tags"
+    REASON_NOMATCHING_FOR_DIST = "%(pkg_or_build)s: No matching build for dist %(dist)s"
 
     def __init__(self, pkg_or_build, dist, reason):
         self.pkg_or_build = pkg_or_build
@@ -188,8 +188,8 @@ def _commajoin(l):
     return ", ".join([str(x) for x in sorted(l)])
 
 
-def _newlinejoin(l):
-    return "\n".join([str(x) for x in sorted(l)])
+def _bulletedlist(l, prefix=" - "):
+    return prefix + ("\n"+prefix).join([str(x) for x in sorted(l)])
 
 
 def load_configuration(inifile):
@@ -629,7 +629,10 @@ def parse_cmdline_args(configuration, argv):
     if not options.routes:
         wanted_routes = [configuration.default_route]
     else:
-        wanted_routes = _get_wanted_routes(configuration, options.routes)
+        try:
+            wanted_routes = _get_wanted_routes(configuration, options.routes)
+        except error.Error as e:
+            parser.error(str(e))
 
     return options, wanted_routes, pkgs_or_builds
 
@@ -653,9 +656,9 @@ def _get_wanted_routes(configuration, route_args):
         else:
             matching_routes = starting_match(arg, configuration.all_names)
             if len(matching_routes) > 1:
-                raise error.UsageError("Ambiguous route '%s'. Matching routes are: %s" % (arg, _commajoin(matching_routes)))
+                raise error.Error("Ambiguous route '%s'.\nMatching routes are: %s" % (arg, _commajoin(matching_routes)))
             elif not matching_routes:
-                raise error.UsageError("Invalid route '%s'. Valid routes are: %s" % (arg, _commajoin(configuration.all_names)))
+                raise error.Error("Invalid route '%s'." % arg)
             else:
                 matched_routes.extend(configuration.matching_route_names(matching_routes[0]))
 
@@ -686,7 +689,7 @@ def main(argv=None):
                route.from_tag_hint % 'el*',
                route.to_tag_hint % 'el*',
                _commajoin(dvers))
-    printf("Examining the following packages/builds:\n%s", _newlinejoin(pkgs_or_builds))
+    printf("Examining the following packages/builds:\n%s", _bulletedlist(pkgs_or_builds))
 
     dvers = set()
     for _, x in route_dvers_pairs:
@@ -696,14 +699,14 @@ def main(argv=None):
         promoter.add_promotion(pkgb, options.ignore_rejects)
 
     if promoter.rejects:
-        print("Rejected package or builds:\n%s" % _newlinejoin(promoter.rejects))
-        print("Rejects will not be promoted! Rerun with --ignore-rejects to promote them anyway.")
+        print("Rejected package or builds:\n%s" % _bulletedlist(promoter.rejects))
+        print("Rejects will not be promoted!  Rerun with --ignore-rejects to promote them anyway.")
 
-    print("Promotion plan:")
     if any(promoter.tag_pkg_args.values()):
         text_args = {}
         for tag, builds in promoter.tag_pkg_args.items():
             text_args[tag] = [x.nvr for x in builds]
+        print("Promotion plan:")
         print_table(text_args)
     else:
         printf("Nothing will be promoted!")

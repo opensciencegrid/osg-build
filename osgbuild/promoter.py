@@ -642,7 +642,7 @@ def starting_match(partial, choices):
 
 
 def _get_wanted_routes(configuration, route_args):
-    matched_routes = []
+    matched_routes = set()
 
     expanded_routes = set()
     for arg in route_args:
@@ -652,7 +652,7 @@ def _get_wanted_routes(configuration, route_args):
     for arg in expanded_routes:
         if arg in configuration.all_names:
             # exact match
-            matched_routes.extend(configuration.matching_route_names(arg))
+            matched_routes.update(configuration.matching_route_names(arg))
         else:
             matching_routes = starting_match(arg, configuration.all_names)
             if len(matching_routes) > 1:
@@ -660,7 +660,7 @@ def _get_wanted_routes(configuration, route_args):
             elif not matching_routes:
                 raise error.Error("Invalid route '%s'." % arg)
             else:
-                matched_routes.extend(configuration.matching_route_names(matching_routes[0]))
+                matched_routes.update(configuration.matching_route_names(matching_routes[0]))
 
     return matched_routes
 

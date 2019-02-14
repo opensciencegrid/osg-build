@@ -10,6 +10,10 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+try:
+    from typing import Dict, Set
+except ImportError:
+    pass
 
 from . import constants
 from . import error
@@ -88,12 +92,6 @@ class Reject(object):
 # Utility functions
 #
 
-def any(iterable): # Don't warn about redefining this. pylint: disable=W0622
-    """True if any member of 'iterable' is true, False otherwise"""
-    for element in iterable:
-        if element:
-            return True
-    return False
 
 def split_nvr(build):
     """Split an NVR into a (Name, Version, Release) tuple"""
@@ -215,6 +213,15 @@ def load_routes(inifile):
                 raise error.Error("Alias %s to %s failed: %s does not exist" % (newname, newname, oldname))
 
     return routes
+
+
+def all_route_dvers(routes):
+    # type: (Dict[Route]) -> Set
+    dvers = set()
+    for route in routes.values():
+        dvers.update(route.dvers)
+        dvers.update(route.extra_dvers)
+    return dvers
 
 
 class Promoter(object):
@@ -417,16 +424,6 @@ class KojiHelper(kojiinter.KojiLibInter):
         self.read_config_file()
         self.init_koji_session(login=do_login)
 
-    def get_all_dvers(self):
-        """Return all possible dvers supported by any tag (as a list)"""
-        pat = re.compile(r"(?:\b|^)(el\d+)")
-        dvers = set()
-        for tag in self.get_tags():
-            match = pat.search(tag)
-            if match:
-                dvers.add(match.group(1))
-        return sorted(list(dvers))
-
     def get_build_in_tag(self, tag, pkg_or_build):
         """Return the build matching 'pkg_or_build' in 'tag'.
         If pkg_or_build is not in the tag, returns None. Otherwise:
@@ -553,11 +550,13 @@ def format_valid_routes(valid_routes):
     return formatted
 
 
-def parse_cmdline_args(all_dvers, valid_routes, argv):
+def parse_cmdline_args(valid_routes, argv):
     """Return a tuple of (options, positional args)"""
     helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
     helpstring += "\n\nValid routes are:\n"
     helpstring += format_valid_routes(valid_routes)
+
+    all_dvers = all_route_dvers(valid_routes)
 
     parser = OptionParser(helpstring)
 
@@ -631,17 +630,14 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    kojihelper = KojiHelper(False)
-
     valid_routes = load_routes(INIFILE)
 
-    options, pkgs_or_builds = parse_cmdline_args(kojihelper.get_all_dvers(), valid_routes, argv)
-
+    options, pkgs_or_builds = parse_cmdline_args(valid_routes, argv)
     routenames = options.routes
-
     route_dvers_pairs = _get_route_dvers_pairs(routenames, valid_routes, options.extra_dvers, options.no_dvers,
                                                options.only_dver)
 
+    kojihelper = KojiHelper(False)
     if not options.dry_run:
         kojihelper.login_to_koji()
 

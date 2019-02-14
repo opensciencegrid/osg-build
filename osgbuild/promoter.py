@@ -11,7 +11,7 @@ try:
 except ImportError:
     import ConfigParser as configparser
 try:
-    from typing import Dict, Set
+    from typing import Dict, Set, List
 except ImportError:
     pass
 
@@ -155,7 +155,7 @@ def _parse_list_str(list_str):
     filtered_items = [_f for _f in items if _f]
     return filtered_items
 
-
+multiroutes=dict()
 def load_routes(inifile):
     """Load dict of routes (key is the route name, value is a Route object
     from a .ini file.
@@ -180,11 +180,13 @@ def load_routes(inifile):
     defined.
 
     """
+    global multiroutes
+
     config = configparser.RawConfigParser()
 
-    config.read([os.path.join(x, INIFILE) for x in constants.DATA_FILE_SEARCH_PATH])
+    config.read([os.path.join(x, inifile) for x in constants.DATA_FILE_SEARCH_PATH])
     if not config.sections():
-        raise error.FileNotFoundError(INIFILE, constants.DATA_FILE_SEARCH_PATH)
+        raise error.FileNotFoundError(inifile, constants.DATA_FILE_SEARCH_PATH)
 
     routes = {}
 
@@ -207,10 +209,20 @@ def load_routes(inifile):
 
     if config.has_section('aliases'):
         for newname, oldname in config.items('aliases'):
-            try:
-                routes[newname] = routes[oldname]
-            except KeyError:
-                raise error.Error("Alias %s to %s failed: %s does not exist" % (newname, newname, oldname))
+            routelist = _parse_list_str(oldname)
+            if len(routelist) > 1:  # this alias points to multipe routes
+                multiroutes[newname] = []
+                for r in routelist:
+                    if r not in routes:
+                        raise error.Error(
+                            "Alias {0} to {1} failed: {2} does not exist".format(
+                                newname, oldname, r))
+                    multiroutes[newname].append(r)
+            else:
+                try:
+                    routes[newname] = routes[oldname]
+                except KeyError:
+                    raise error.Error("Alias {0} to {1} failed: {1} does not exist".format(newname, oldname))
 
     return routes
 
@@ -550,11 +562,21 @@ def format_valid_routes(valid_routes):
     return formatted
 
 
+def format_multiroutes(multiroutes):
+    return "\n".join(
+        [" - %-20s: %s" % (name, ", ".join(routeslist))
+         for name, routeslist in multiroutes.items()]
+    )
+
+
 def parse_cmdline_args(valid_routes, argv):
     """Return a tuple of (options, positional args)"""
     helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
     helpstring += "\n\nValid routes are:\n"
     helpstring += format_valid_routes(valid_routes)
+    if multiroutes:
+        helpstring += "\nThe following alias(es) to multiple routes exist:\n"
+        helpstring += format_multiroutes(multiroutes)
 
     all_dvers = all_route_dvers(valid_routes)
 
@@ -637,9 +659,7 @@ def main(argv=None):
     route_dvers_pairs = _get_route_dvers_pairs(routenames, valid_routes, options.extra_dvers, options.no_dvers,
                                                options.only_dver)
 
-    kojihelper = KojiHelper(False)
-    if not options.dry_run:
-        kojihelper.login_to_koji()
+    kojihelper = KojiHelper(not options.dry_run)
 
     for route, dvers in route_dvers_pairs:
         printf("Promoting from %s to %s for dvers: %s",

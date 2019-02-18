@@ -92,6 +92,65 @@ class Configuration(object):
     aliases = {}
     default_route = DEFAULT_ROUTE
 
+    def load_inifile(self, inifile):
+        """Load routes from an ini file.
+
+        A section called "route X" creates a route named "X".
+        Required attributes in a route section are:
+        - from_tag_hint: the name of the koji tag to promote from, with '%s'
+          where the dver would be
+        - to_tag_hint: the name of the koji tag to promote to, with '%s' where
+          the dver would be
+        - repotag: the 'repo' part of the dist tag, e.g. 'osg33' for a dist tag
+          like '.osg33.el5'
+        - dvers: a comma or space separated list of distro versions (dvers)
+          supported by default for the tags in the route, e.g. "el5 el6"
+        The optional attribute is:
+        - extra_dvers: a comma or space separated list of dvers that are supported
+          by the tags in the route but should not be on by default
+
+        A section called "aliases" defined alternate names for a route.
+        The key of each attribute in the section is the new name, and the value
+        is the old name, e.g. "testing=3.2-testing".  Aliases to aliases cannot be
+        defined.
+
+        """
+        cp = configparser.RawConfigParser()
+        cp.read(utils.find_files(inifile, constants.DATA_FILE_SEARCH_PATH))
+        if not cp.sections():
+            raise error.FileNotFoundError(inifile, constants.DATA_FILE_SEARCH_PATH)
+
+        for sec in cp.sections():
+            if not sec.startswith('route '):
+                continue
+            routename = sec.split(None, 1)[1]
+            try:
+                from_tag_hint = cp.get(sec, 'from')
+                to_tag_hint = cp.get(sec, 'to')
+                repotag = cp.get(sec, 'repotag')
+                dvers = _parse_list_str(cp.get(sec, 'dvers'))
+            except configparser.NoOptionError as err:
+                raise error.Error("Malformed config file: %s" % str(err))
+            extra_dvers = []
+            if cp.has_option(sec, 'extra_dvers'):
+                extra_dvers = _parse_list_str(cp.get(sec, 'extra_dvers'))
+
+            self.routes[routename] = Route(from_tag_hint, to_tag_hint, repotag, dvers,
+                                                    extra_dvers)
+
+        if cp.has_section('aliases'):
+            for newname, target in cp.items('aliases'):
+                routelist = _parse_list_str(target)
+                for r in routelist:
+                    if r not in self.routes:
+                        raise error.Error(
+                            "Alias {0} to {1} failed: {2} does not exist".format(
+                                newname, target, r))
+                if newname.lower() == "default":
+                    self.default_route = target
+                else:
+                    self.aliases[newname] = routelist
+
     def matching_route_names(self, route_or_alias):
         if route_or_alias in self.routes:
             return [route_or_alias]
@@ -190,68 +249,6 @@ def _commajoin(l):
 
 def _bulletedlist(l, prefix=" - "):
     return prefix + ("\n"+prefix).join([str(x) for x in sorted(l)])
-
-
-def load_configuration(inifile):
-    """Load routes from an ini file.
-
-    A section called "route X" creates a route named "X".
-    Required attributes in a route section are:
-    - from_tag_hint: the name of the koji tag to promote from, with '%s'
-      where the dver would be
-    - to_tag_hint: the name of the koji tag to promote to, with '%s' where
-      the dver would be
-    - repotag: the 'repo' part of the dist tag, e.g. 'osg33' for a dist tag
-      like '.osg33.el5'
-    - dvers: a comma or space separated list of distro versions (dvers)
-      supported by default for the tags in the route, e.g. "el5 el6"
-    The optional attribute is:
-    - extra_dvers: a comma or space separated list of dvers that are supported
-      by the tags in the route but should not be on by default
-
-    A section called "aliases" defined alternate names for a route.
-    The key of each attribute in the section is the new name, and the value
-    is the old name, e.g. "testing=3.2-testing".  Aliases to aliases cannot be
-    defined.
-
-    """
-    cp = configparser.RawConfigParser()
-    cp.read(utils.find_files(inifile, constants.DATA_FILE_SEARCH_PATH))
-    if not cp.sections():
-        raise error.FileNotFoundError(inifile, constants.DATA_FILE_SEARCH_PATH)
-
-    configuration = Configuration()
-    for sec in cp.sections():
-        if not sec.startswith('route '):
-            continue
-        routename = sec.split(None, 1)[1]
-        try:
-            from_tag_hint = cp.get(sec, 'from')
-            to_tag_hint = cp.get(sec, 'to')
-            repotag = cp.get(sec, 'repotag')
-            dvers = _parse_list_str(cp.get(sec, 'dvers'))
-        except configparser.NoOptionError as err:
-            raise error.Error("Malformed config file: %s" % str(err))
-        extra_dvers = []
-        if cp.has_option(sec, 'extra_dvers'):
-            extra_dvers = _parse_list_str(cp.get(sec, 'extra_dvers'))
-
-        configuration.routes[routename] = Route(from_tag_hint, to_tag_hint, repotag, dvers, extra_dvers)
-
-    if cp.has_section('aliases'):
-        for newname, target in cp.items('aliases'):
-            routelist = _parse_list_str(target)
-            for r in routelist:
-                if r not in configuration.routes:
-                    raise error.Error(
-                        "Alias {0} to {1} failed: {2} does not exist".format(
-                            newname, target, r))
-            if newname.lower() == "default":
-                configuration.default_route = target
-            else:
-                configuration.aliases[newname] = routelist
-
-    return configuration
 
 
 class Promoter(object):
@@ -626,6 +623,7 @@ def parse_cmdline_args(configuration, argv):
 
     options, pkgs_or_builds = parser.parse_args(argv[1:])
 
+    wanted_routes = None
     if not options.routes:
         wanted_routes = [configuration.default_route]
     else:
@@ -675,7 +673,8 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    configuration = load_configuration(INIFILE)
+    configuration = Configuration()
+    configuration.load_inifile(INIFILE)
 
     options, wanted_routes, pkgs_or_builds = parse_cmdline_args(configuration, argv)
     valid_routes = configuration.routes

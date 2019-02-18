@@ -86,6 +86,8 @@ class Reject(object):
     def __str__(self):
         return self.reason % {'pkg_or_build': self.pkg_or_build, 'dist': self.dist}
 
+    __repr__ = __str__
+
 
 class Configuration(object):
     routes = {}

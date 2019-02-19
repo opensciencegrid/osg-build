@@ -3,13 +3,16 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
-import os
 import re
 import sys
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+try:
+    from typing import Dict, Set, List
+except ImportError:
+    pass
 
 from . import constants
 from . import error
@@ -33,7 +36,6 @@ class KojiTagsAreMessedUp(Exception):
 
 
 Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repo', 'dvers', 'extra_dvers'])
-# Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repo'])
 
 
 class Build(object):
@@ -73,8 +75,8 @@ class Build(object):
 
 
 class Reject(object):
-    REASON_DISTINCT_ACROSS_DISTS = "Build versions matching %(pkg_or_build)s distinct across dist tags"
-    REASON_NOMATCHING_FOR_DIST = "No build matching %(pkg_or_build)s for dist %(dist)s"
+    REASON_DISTINCT_ACROSS_DISTS = "%(pkg_or_build)s: Matching build versions distinct across dist tags"
+    REASON_NOMATCHING_FOR_DIST = "%(pkg_or_build)s: No matching build for dist %(dist)s"
 
     def __init__(self, pkg_or_build, dist, reason):
         self.pkg_or_build = pkg_or_build
@@ -84,16 +86,101 @@ class Reject(object):
     def __str__(self):
         return self.reason % {'pkg_or_build': self.pkg_or_build, 'dist': self.dist}
 
+    __repr__ = __str__
+
+
+class Configuration(object):
+    routes = {}
+    aliases = {}
+    default_route = DEFAULT_ROUTE
+
+    def load_inifile(self, inifile):
+        """Load routes from an ini file.
+
+        A section called "route X" creates a route named "X".
+        Required attributes in a route section are:
+        - from_tag_hint: the name of the koji tag to promote from, with '%s'
+          where the dver would be
+        - to_tag_hint: the name of the koji tag to promote to, with '%s' where
+          the dver would be
+        - repotag: the 'repo' part of the dist tag, e.g. 'osg33' for a dist tag
+          like '.osg33.el5'
+        - dvers: a comma or space separated list of distro versions (dvers)
+          supported by default for the tags in the route, e.g. "el5 el6"
+        The optional attribute is:
+        - extra_dvers: a comma or space separated list of dvers that are supported
+          by the tags in the route but should not be on by default
+
+        A section called "aliases" defined alternate names for a route.
+        The key of each attribute in the section is the new name, and the value
+        is the old name, e.g. "testing=3.2-testing".  Aliases to aliases cannot be
+        defined.
+
+        """
+        cp = configparser.RawConfigParser()
+        cp.read(utils.find_files(inifile, constants.DATA_FILE_SEARCH_PATH))
+        if not cp.sections():
+            raise error.FileNotFoundError(inifile, constants.DATA_FILE_SEARCH_PATH)
+
+        for sec in cp.sections():
+            if not sec.startswith('route '):
+                continue
+            routename = sec.split(None, 1)[1]
+            try:
+                from_tag_hint = cp.get(sec, 'from')
+                to_tag_hint = cp.get(sec, 'to')
+                repotag = cp.get(sec, 'repotag')
+                dvers = _parse_list_str(cp.get(sec, 'dvers'))
+            except configparser.NoOptionError as err:
+                raise error.Error("Malformed config file: %s" % str(err))
+            extra_dvers = []
+            if cp.has_option(sec, 'extra_dvers'):
+                extra_dvers = _parse_list_str(cp.get(sec, 'extra_dvers'))
+
+            self.routes[routename] = Route(from_tag_hint, to_tag_hint, repotag, dvers,
+                                                    extra_dvers)
+
+        if cp.has_section('aliases'):
+            for newname, target in cp.items('aliases'):
+                routelist = _parse_list_str(target)
+                for r in routelist:
+                    if r not in self.routes:
+                        raise error.Error(
+                            "Alias {0} to {1} failed: {2} does not exist".format(
+                                newname, target, r))
+                if newname.lower() == "default":
+                    self.default_route = target
+                else:
+                    self.aliases[newname] = routelist
+
+    def matching_route_names(self, route_or_alias):
+        if route_or_alias in self.routes:
+            return [route_or_alias]
+        elif route_or_alias in self.aliases:
+            return self.aliases[route_or_alias]
+        return []
+
+    def matching_routes(self, route_or_alias):
+        names = self.matching_route_names(route_or_alias)
+        return [self.routes[n] for n in names]
+
+    @property
+    def all_names(self):
+        return list(self.routes.keys()) + list(self.aliases.keys())
+
+    @property
+    def all_dvers(self):
+        dvers = set()
+        for route in self.routes.values():
+            dvers.update(route.dvers)
+            dvers.update(route.extra_dvers)
+        return dvers
+
+
 #
 # Utility functions
 #
 
-def any(iterable): # Don't warn about redefining this. pylint: disable=W0622
-    """True if any member of 'iterable' is true, False otherwise"""
-    for element in iterable:
-        if element:
-            return True
-    return False
 
 def split_nvr(build):
     """Split an NVR into a (Name, Version, Release) tuple"""
@@ -151,70 +238,19 @@ def split_repo_dver(build, known_repos=None):
 
 
 def _parse_list_str(list_str):
-    # split string on spaces or commas
-    items = re.split(r'[ ,]', list_str)
+    # split string on whitespace or commas
+    items = re.split(r'[ ,\t\n]', list_str)
     # remove empty strings from the list
     filtered_items = [_f for _f in items if _f]
     return filtered_items
 
 
-def load_routes(inifile):
-    """Load dict of routes (key is the route name, value is a Route object
-    from a .ini file.
+def _commajoin(l):
+    return ", ".join([str(x) for x in sorted(l)])
 
-    A section called "route X" creates a route named "X".
-    Required attributes in a route section are:
-    - from_tag_hint: the name of the koji tag to promote from, with '%s'
-      where the dver would be
-    - to_tag_hint: the name of the koji tag to promote to, with '%s' where
-      the dver would be
-    - repotag: the 'repo' part of the dist tag, e.g. 'osg33' for a dist tag
-      like '.osg33.el5'
-    - dvers: a comma or space separated list of distro versions (dvers)
-      supported by default for the tags in the route, e.g. "el5 el6"
-    The optional attribute is:
-    - extra_dvers: a comma or space separated list of dvers that are supported
-      by the tags in the route but should not be on by default
 
-    A section called "aliases" defined alternate names for a route.
-    The key of each attribute in the section is the new name, and the value
-    is the old name, e.g. "testing=3.2-testing".  Aliases to aliases cannot be
-    defined.
-
-    """
-    config = configparser.RawConfigParser()
-
-    config.read([os.path.join(x, INIFILE) for x in constants.DATA_FILE_SEARCH_PATH])
-    if not config.sections():
-        raise error.FileNotFoundError(INIFILE, constants.DATA_FILE_SEARCH_PATH)
-
-    routes = {}
-
-    for sec in config.sections():
-        if not sec.startswith('route '):
-            continue
-        routename = sec.split(None, 1)[1]
-        try:
-            from_tag_hint = config.get(sec, 'from')
-            to_tag_hint = config.get(sec, 'to')
-            repotag = config.get(sec, 'repotag')
-            dvers = _parse_list_str(config.get(sec, 'dvers'))
-        except configparser.NoOptionError as err:
-            raise error.Error("Malformed config file: %s" % str(err))
-        extra_dvers = []
-        if config.has_option(sec, 'extra_dvers'):
-            extra_dvers = _parse_list_str(config.get(sec, 'extra_dvers'))
-
-        routes[routename] = Route(from_tag_hint, to_tag_hint, repotag, dvers, extra_dvers)
-
-    if config.has_section('aliases'):
-        for newname, oldname in config.items('aliases'):
-            try:
-                routes[newname] = routes[oldname]
-            except KeyError:
-                raise error.Error("Alias %s to %s failed: %s does not exist" % (newname, newname, oldname))
-
-    return routes
+def _bulletedlist(l, prefix=" - "):
+    return prefix + ("\n"+prefix).join([str(x) for x in sorted(l)])
 
 
 class Promoter(object):
@@ -417,16 +453,6 @@ class KojiHelper(kojiinter.KojiLibInter):
         self.read_config_file()
         self.init_koji_session(login=do_login)
 
-    def get_all_dvers(self):
-        """Return all possible dvers supported by any tag (as a list)"""
-        pat = re.compile(r"(?:\b|^)(el\d+)")
-        dvers = set()
-        for tag in self.get_tags():
-            match = pat.search(tag)
-            if match:
-                dvers.add(match.group(1))
-        return sorted(list(dvers))
-
     def get_build_in_tag(self, tag, pkg_or_build):
         """Return the build matching 'pkg_or_build' in 'tag'.
         If pkg_or_build is not in the tag, returns None. Otherwise:
@@ -536,14 +562,13 @@ def write_jira(kojihelper, promoted_builds, routes, out=None):
 #
 # Command line and main
 #
-
 def format_valid_routes(valid_routes):
     formatted = ""
-    for route_name in sorted(valid_routes.keys()):
+    for route_name in sorted(valid_routes):
         route = valid_routes[route_name]
-        dvers_list = ', '.join(sorted(route.dvers))
+        dvers_list = _commajoin(route.dvers)
         if route.extra_dvers:
-            dvers_list += ', [' + ','.join(sorted(route.extra_dvers)) + ']'
+            dvers_list += ', [%s]' % _commajoin(route.extra_dvers)
         formatted += " - %-20s: %-26s -> %-26s (%s)\n" % (
             route_name,
             route.from_tag_hint % '*',
@@ -553,18 +578,31 @@ def format_valid_routes(valid_routes):
     return formatted
 
 
-def parse_cmdline_args(all_dvers, valid_routes, argv):
+def format_aliases(aliases):
+    # type: (Dict[List[str]]) -> str
+    return "\n".join(
+        [" - %-20s: %s" % (name, _commajoin(aliases[name]))
+         for name in sorted(aliases)]
+    )
+
+
+def parse_cmdline_args(configuration, argv):
     """Return a tuple of (options, positional args)"""
     helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
-    helpstring += "\n\nValid routes are:\n"
-    helpstring += format_valid_routes(valid_routes)
+    helpstring += "\n\nThe following routes exist:\n"
+    helpstring += format_valid_routes(configuration.routes)
+    if configuration.aliases:
+        helpstring += "\nThe following aliases to routes exist:\n"
+        helpstring += format_aliases(configuration.aliases)
+    helpstring += "\n\nThe default route is %s.\n" % configuration.default_route
+
+    all_dvers = configuration.all_dvers
 
     parser = OptionParser(helpstring)
 
     parser.add_option("-r", "--route", dest="routes", action="append",
                       help="The promotion route to use. May be specified multiple times. "
-                      "If not specified, will use the %r route. Multiple routes may also "
-                      "be separated by commas" % DEFAULT_ROUTE)
+                      "Multiple routes may also be separated by commas")
     parser.add_option("-n", "--dry-run", action="store_true", default=False,
                       help="Do not promote, just show what would be done")
     parser.add_option("--ignore-rejects", dest="ignore_rejects", action="store_true", default=False,
@@ -585,72 +623,74 @@ def parse_cmdline_args(all_dvers, valid_routes, argv):
         parser.print_help()
         sys.exit(2)
 
-    options, args = parser.parse_args(argv[1:])
+    options, pkgs_or_builds = parser.parse_args(argv[1:])
 
-    options.routes = _get_wanted_routes(valid_routes, parser, options)
-
-    return options, args
-
-
-def _get_wanted_routes(valid_routes, parser, options):
-    matched_routes = []
-
-    routes = options.routes
-    if routes:
-        expanded_routes = []
-        for route in routes:
-            if route.find(',') != -1:  # We have a comma -- this means multiple routes.
-                expanded_routes.extend(route.split(','))
-            else:
-                expanded_routes.append(route)
-        # User is allowed to specify the shortest unambiguous prefix of a route
-        for route in expanded_routes:
-            if route in valid_routes.keys():
-                # exact match
-                matched_routes.append(route)
-                continue
-            matching_routes = [x for x in valid_routes.keys() if x.startswith(route)]
-            if len(matching_routes) > 1:
-                parser.error("Ambiguous route %r. Matching routes are: %s" % (route, ", ".join(matching_routes)))
-            elif not matching_routes:
-                parser.error("Invalid route %r. Valid routes are: %s" % (route, ", ".join(valid_routes.keys())))
-            else:
-                matched_routes.append(matching_routes[0])
+    wanted_routes = None
+    if not options.routes:
+        wanted_routes = [configuration.default_route]
     else:
-        matched_routes = [DEFAULT_ROUTE]
+        try:
+            wanted_routes = _get_wanted_routes(configuration, options.routes)
+        except error.Error as e:
+            parser.error(str(e))
+
+    return options, wanted_routes, pkgs_or_builds
+
+
+def starting_match(partial, choices):
+    return [x for x in choices if x.startswith(partial)]
+
+
+def _get_wanted_routes(configuration, route_args):
+    matched_routes = set()
+
+    expanded_routes = set()
+    for arg in route_args:
+        expanded_routes.update(arg.split(','))
+
+    # User is allowed to specify the shortest unambiguous prefix of a route
+    for arg in expanded_routes:
+        if arg in configuration.all_names:
+            # exact match
+            matched_routes.update(configuration.matching_route_names(arg))
+        else:
+            matching_routes = starting_match(arg, configuration.all_names)
+            if len(matching_routes) > 1:
+                raise error.Error("Ambiguous route '%s'.\nMatching routes are: %s" % (arg, _commajoin(matching_routes)))
+            elif not matching_routes:
+                raise error.Error("Invalid route '%s'." % arg)
+            else:
+                matched_routes.update(configuration.matching_route_names(matching_routes[0]))
+
     return matched_routes
 
 
 def _print_route_dvers(routename, route):
-    printf("The default dver(s) for %s are: %s", routename, ", ".join(route.dvers))
+    printf("The default dver(s) for %s are: %s", routename, _commajoin(route.dvers))
     if route.extra_dvers:
-        printf("The route optionally supports these dver(s): %s", ", ".join(route.extra_dvers))
+        printf("The route optionally supports these dver(s): %s", _commajoin(route.extra_dvers))
 
 
 def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    kojihelper = KojiHelper(False)
+    configuration = Configuration()
+    configuration.load_inifile(INIFILE)
 
-    valid_routes = load_routes(INIFILE)
-
-    options, pkgs_or_builds = parse_cmdline_args(kojihelper.get_all_dvers(), valid_routes, argv)
-
-    routenames = options.routes
-
-    route_dvers_pairs = _get_route_dvers_pairs(routenames, valid_routes, options.extra_dvers, options.no_dvers,
+    options, wanted_routes, pkgs_or_builds = parse_cmdline_args(configuration, argv)
+    valid_routes = configuration.routes
+    route_dvers_pairs = _get_route_dvers_pairs(wanted_routes, valid_routes, options.extra_dvers, options.no_dvers,
                                                options.only_dver)
 
-    if not options.dry_run:
-        kojihelper.login_to_koji()
+    kojihelper = KojiHelper(not options.dry_run)
 
     for route, dvers in route_dvers_pairs:
         printf("Promoting from %s to %s for dvers: %s",
                route.from_tag_hint % 'el*',
                route.to_tag_hint % 'el*',
-               ", ".join(sorted(dvers)))
-    printf("Examining the following packages/builds:\n%s", "\n".join(["'" + x + "'" for x in pkgs_or_builds]))
+               _commajoin(dvers))
+    printf("Examining the following packages/builds:\n%s", _bulletedlist(pkgs_or_builds))
 
     dvers = set()
     for _, x in route_dvers_pairs:
@@ -660,14 +700,14 @@ def main(argv=None):
         promoter.add_promotion(pkgb, options.ignore_rejects)
 
     if promoter.rejects:
-        print("Rejected package or builds:\n" + "\n".join([str(x) for x in promoter.rejects]))
-        print("Rejects will not be promoted! Rerun with --ignore-rejects to promote them anyway.")
+        print("Rejected package or builds:\n%s" % _bulletedlist(promoter.rejects))
+        print("Rejects will not be promoted!  Rerun with --ignore-rejects to promote them anyway.")
 
-    print("Promotion plan:")
     if any(promoter.tag_pkg_args.values()):
         text_args = {}
         for tag, builds in promoter.tag_pkg_args.items():
             text_args[tag] = [x.nvr for x in builds]
+        print("Promotion plan:")
         print_table(text_args)
     else:
         printf("Nothing will be promoted!")

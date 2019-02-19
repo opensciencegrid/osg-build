@@ -246,11 +246,11 @@ def _parse_list_str(list_str):
 
 
 def _commajoin(l):
-    return ", ".join([str(x) for x in sorted(l)])
+    return ", ".join(str(x) for x in sorted(l))
 
 
 def _bulletedlist(l, prefix=" - "):
-    return prefix + ("\n"+prefix).join([str(x) for x in sorted(l)])
+    return prefix + ("\n"+prefix).join(str(x) for x in sorted(l))
 
 
 class Promoter(object):

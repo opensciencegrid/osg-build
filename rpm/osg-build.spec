@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.14.0
+Version:        1.14.1
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -138,6 +138,11 @@ fi
 
 
 %changelog
+* Tue Feb 19 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.14.1-1
+- Add osg-promote support for rolling release repositories and route aliases
+  that refer to a list of routes (e.g. 3.4-rfr promotes to 3.4-prerelease _and_
+  3.4-rolling) (SOFTWARE-3465)
+
 * Tue Feb 12 2019 Carl Edquist <edquist@cs.wisc.edu> - 1.14.0-1
 - Add checksum support for cached upstream sources (SOFTWARE-3568)
 

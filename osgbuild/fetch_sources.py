@@ -74,6 +74,7 @@ except ImportError:
 
 from . import constants as C
 from .error import Error, GlobNotFoundError
+from .utils import CalledProcessError
 from . import utils
 
 
@@ -201,11 +202,20 @@ def update_env(key, val):
         os.environ[key] = val
     return oldval
 
+def checked_call2(*args, **kw):
+    # combine output/stderr for failures, otherwise discard
+    utils.checked_backtick(*args, err2out=True, **kw)
+
 def git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops):
     log.info('Retrieving %s %s' % (url, tag))
-    utils.checked_call(['git', 'init', '-q', '--bare'])
-    utils.checked_call(['git', 'remote', 'add', 'origin', url])
-    utils.checked_call(['git', 'fetch', '-q', '--depth=1', 'origin', tag])
+    try:
+        checked_call2(['git', 'init', '-q', '--bare'])
+        checked_call2(['git', 'remote', 'add', 'origin', url])
+        checked_call2(['git', 'fetch', '-q', '--depth=1', 'origin', tag])
+    except CalledProcessError as e:
+        log.error("Failed to retrieve tag '%s' from repo '%s'" % (tag, url))
+        raise Error(e)
+
     got_sha = utils.checked_backtick(['git', 'rev-parse', 'FETCH_HEAD'])
     if hash or not ops.nocheck:
         check_git_hash(url, tag, hash, got_sha, ops.nocheck)

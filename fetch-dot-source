@@ -10,7 +10,7 @@ from osgbuild.main          import log, log_consolehandler
 from osgbuild.error         import Error
 from osgbuild.fetch_sources import C, process_dot_source
 
-def usage():
+def usage(exit):
     print("Usage: {script} [-d destdir] [options] upstream.source [...]\n\n"
           "Options:\n"
           "  -d destdir   specify output location\n"
@@ -21,7 +21,7 @@ def usage():
           "  -c cachepfx  specify upstream cache location prefix\n"
           "  -a           set upstream cache prefix to UW AFS location\n"
           .format(script=os.path.basename(__file__)))
-    sys.exit(0)
+    sys.exit(exit)
 
 def setloglevel(level):
     log.setLevel(level)
@@ -35,12 +35,12 @@ options = dict(
 )
 
 try:
-    ops, dot_sources = getopt.getopt(sys.argv[1:], 'd:nsvqc:a')
+    ops, dot_sources = getopt.getopt(sys.argv[1:], 'd:hnsvqc:a')
 except getopt.GetoptError:
-    usage()
+    usage(2)
 
 if not dot_sources:
-    usage()
+    usage(2)
 
 for op,val in ops:
     if   op == '-n': options['nocheck'] = True
@@ -50,6 +50,7 @@ for op,val in ops:
     elif op == '-a': options['cache_prefix'] = C.AFS_CACHE_PREFIX
     elif op == '-v': setloglevel(logging.DEBUG)
     elif op == '-q': setloglevel(logging.WARNING)
+    elif op == '-h': usage(0)
 
 def main():
     for src in dot_sources:

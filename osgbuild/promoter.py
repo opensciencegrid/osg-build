@@ -9,10 +9,6 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-try:
-    from typing import Dict, Set, List
-except ImportError:
-    pass
 
 from . import constants
 from . import error
@@ -579,7 +575,10 @@ def format_valid_routes(valid_routes):
 
 
 def format_aliases(aliases):
-    # type: (Dict[List[str]]) -> str
+    """ Return a pretty-printed string of the available aliases, for use in the help message.
+    :param aliases: The aliases from a Configuration object
+    :rtype: str
+    """
     return "\n".join(
         [" - %-20s: %s" % (name, _commajoin(aliases[name]))
          for name in sorted(aliases)]
@@ -587,7 +586,11 @@ def format_aliases(aliases):
 
 
 def parse_cmdline_args(configuration, argv):
-    """Return a tuple of (options, positional args)"""
+    """
+    :param configuration: A Configuration object. We need the routes to build the various dver arguments and the list of routes in the help text.
+    :param argv: sys.argv
+    :return: the options, the list of route names the user wants to use, and the list of packages or builds to promote
+    """
     helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
     helpstring += "\n\nThe following routes exist:\n"
     helpstring += format_valid_routes(configuration.routes)

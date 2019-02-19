@@ -309,22 +309,23 @@ def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
     log.error("Error processing source line of %s '%s'" % (xtype, meta_type))
     varnames = handler.__code__.co_varnames
     fn_argcount = handler.__code__.co_argcount
+    minargs = fn_argcount - len(handler.__defaults__)
+    reqargs = varnames[:minargs]
     maxargs = varnames.index('ops')
     posargs = varnames[:maxargs]
     posargs_provided = posargs[:len(args)]
     dupe_args = set(posargs_provided) & set(kw)
+    missing_args = set(reqargs) - set(posargs_provided) - set(kw.keys())
 
-    pos_usage = ' '.join("[%s=]arg%s" % (a,i+1) for i,a in enumerate(posargs))
-    log.error("Up to %s unnamed initial arguments are allowed: %s"
-              % (maxargs, pos_usage))
+    if dupe_args or missing_args:
+        for arg in missing_args:
+            log.error("Missing required field: '%s'" % arg)
 
-    if dupe_args:
         for arg in dupe_args:
             log.error("No unnamed positional arguments allowed after"
                       " explicit '%s' named field" % arg)
     elif len(args) > maxargs:
-        log.error("Provided %s positional arguments: %s"
-                  % (len(args), ' '.join(args)))
+        log.error("Provided too many positional arguments: %s" % ' '.join(args))
     else:
         log.error(e)
     raise Error("Invalid parameters for %s=%s source line" % (xtype,meta_type))

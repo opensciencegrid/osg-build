@@ -65,7 +65,7 @@ tags:
 
 testsource:
 	mkdir -p upstream
-	echo "type=git url=. name=osg-build tarball=$(NAME_VERSION).tar.gz hash=$(HASH)" > upstream/test.source
+	echo "type=git url=. name=osg-build tag=HEAD tarball=$(NAME_VERSION).tar.gz hash=$(HASH)" > upstream/test.source
 
 rpmbuild: testsource
 	osg-build rpmbuild

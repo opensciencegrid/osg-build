@@ -185,7 +185,7 @@ class TestPrebuild(XTestCase):
             "multilib-python.patch" in final_contents,
             "osg patch not in final contents")
         self.assertTrue(
-            regex_in_list(r"mash-0[.]5[.]22-3[.]osg[.]el\d[.]src[.]rpm", final_contents),
+            regex_in_list(r"mash-0[.]5[.]22-2[.]osg[.]el\d[.]src[.]rpm", final_contents),
             "srpm not successfully built")
 
     def test_prebuild_osgonly(self):

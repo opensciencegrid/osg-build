@@ -26,6 +26,7 @@ Possible fields names:
     filename: outfile if different than uri basename (type=uri, optional)
     sha1sum:  chksum of downloaded file (type=uri/cached, optional)
 
+Spaces in file names should be quoted using shell syntax.
 
 Each line is associated with a source 'type':
 
@@ -64,6 +65,7 @@ import glob
 import re
 import os
 import tempfile
+import shlex
 import shutil
 import sys
 try:
@@ -300,7 +302,7 @@ def get_auto_source_type(*args, **kw):
         return 'cached'
 
 def parse_source_line(line):
-    kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))
+    kv, args = dual_filter((lambda t: t[0]), map(kvmatch, shlex.split(line)))
     return [ a[1] for a in args ], dict(kv)
 
 def dual_filter(cond, seq):

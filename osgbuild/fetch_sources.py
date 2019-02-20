@@ -206,12 +206,19 @@ def checked_call2(*args, **kw):
     # combine output/stderr for failures, otherwise discard
     utils.checked_backtick(*args, err2out=True, **kw)
 
+def unchecked_call2(*args, **kw):
+    # discard output/stderr, return True if returncode == 0
+    return utils.sbacktick(*args, err2out=True, **kw)[1] == 0
+
 def git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops):
     log.info('Retrieving %s %s' % (url, tag))
     try:
         checked_call2(['git', 'init', '-q', '--bare'])
         checked_call2(['git', 'remote', 'add', 'origin', url])
-        checked_call2(['git', 'fetch', '-q', '--depth=1', 'origin', tag])
+        fetchcmd = ['git', 'fetch', '-q', '--depth=1', 'origin']
+        # SL6 compat: try to fetch a tag first, else fall back to generic fetch
+        unchecked_call2(fetchcmd + ['tag', tag]) or \
+          checked_call2(fetchcmd + [tag])
     except CalledProcessError as e:
         log.error("Failed to retrieve tag '%s' from repo '%s'" % (tag, url))
         raise Error(e)

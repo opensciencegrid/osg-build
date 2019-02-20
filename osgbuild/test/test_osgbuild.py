@@ -321,14 +321,17 @@ class TestFetch(XTestCase):
 
     def test_github_fetch_with_tarball(self):
         go_to_temp_dir()
+        tarball = "tarfile.tar.gz"
+        hash = "5ea1914b621cef204879ec1cc55e0216e3812785"
         os.mkdir("upstream")
         unslurp("upstream/github.source",
-                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 tarball=tarfile.tar.gz hash=5ea1914b621cef204879ec1cc55e0216e3812785")
+                "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1-2 tarball=%s hash=%s"
+                % (tarball, hash))
         contents = self.fetch_sources(".")
 
-        self.assertTrue("tarfile.tar.gz" in contents, "source tarball not found")
+        self.assertTrue(tarball in contents, "source tarball not found")
 
-        tarfh = tarfile.open("./tarfile.tar.gz", "r")
+        tarfh = tarfile.open(tarball, "r")
         try:
             try:
                 tardir = tarfh.getmember("tarfile")
@@ -337,18 +340,6 @@ class TestFetch(XTestCase):
             self.assertTrue(tardir.isdir(), "directory not a directory in tarball")
         finally:
             tarfh.close()
-
-    def test_github_fetch_hash_only(self):
-        go_to_temp_dir()
-        tarball = "tarfile.tar.gz"
-        hash = "5ea1914b621cef204879ec1cc55e0216e3812785"
-        os.mkdir("upstream")
-        unslurp("upstream/github.source",
-                "type=github repo=opensciencegrid/cvmfs-config-osg tarball=%s hash=%s" % (tarball, hash))
-        self.assertRaises(CalledProcessError, self.fetch_sources, ".", nocheck=False)
-        contents = self.fetch_sources(".", nocheck=True)
-
-        self.assertTrue(tarball in contents, "source tarball not found")
         tarhash = checked_backtick("gunzip -c %s | git get-tar-commit-id" % tarball, shell=True)
         self.assertEqual(hash, tarhash, "source tarball has wrong hash")
 

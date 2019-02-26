@@ -64,10 +64,11 @@ def download_srpm(url, output=None):
         output = os.path.basename(url)
     cmd = ["wget", "-q", url, "-O", output]
     utils.checked_call(cmd)
-    verifyRPM(output)
+    verify_rpm(output)
     return output
 
-def verifyRPM(srpm):
+
+def verify_rpm(srpm):
     """ Verify that srpm is indeed an RPM """
     cmd = ["rpm", "-qp", "--nomanifest", srpm]
     err = utils.unchecked_call(cmd)

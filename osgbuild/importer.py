@@ -462,7 +462,7 @@ downloading and putting the SRPM into the upstream cache.
             " the .source file in the 'upstream' directory."
         )
         parser.add_option(
-            "--nosha1sum", action="store_false", dest="sha1sum",
+            "--nosha1sum", action="store_false", dest="sha1sum", default=True,
             help="Do not add a 'sha1sum' parameter in the .source file. "
                  "Source files with sha1sums need osg-build 1.14+ to use."
         )

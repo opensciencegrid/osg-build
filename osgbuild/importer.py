@@ -88,7 +88,7 @@ def srpm_nvr(srpm):
                     base_srpm)
 
 
-def make_svn_tree(srpm, url, extra_action=None, provider=None):
+def make_svn_tree(srpm, url, extra_action=None, provider=None, sha1sum=None):
     """Create an svn tree for the srpm and populate it as follows:
     $name/osg/*.spec        - the spec file as extracted from the srpm
                               (if extract_spec is True)
@@ -130,14 +130,14 @@ def make_svn_tree(srpm, url, extra_action=None, provider=None):
 
     cached_filename = os.path.join(name, version, os.path.basename(srpm))
 
-    make_source_file(url, cached_filename, upstream_dir, provider)
+    make_source_file(url, cached_filename, upstream_dir, provider, sha1sum)
 
     if len(glob.glob(os.path.join(upstream_dir, "*.source"))) > 1:
         logging.info("More than one .source file found in upstream dir.")
         logging.info("Examine them to make sure there aren't duplicates.")
 
 
-def make_source_file(url, cached_filename, upstream_dir, provider=None):
+def make_source_file(url, cached_filename, upstream_dir, provider=None, sha1sum=None):
     """Create an upstream/*.source file with the appropriate name based
     on either `provider` or `url` if the former is not given.  Also add
     the new file to SVN.
@@ -153,9 +153,9 @@ def make_source_file(url, cached_filename, upstream_dir, provider=None):
     source_filename = os.path.join(upstream_dir, provider+".srpm.source")
 
     source_contents = """\
-%(cached_filename)s
-# Downloaded from '%(url)s'
-""" % locals()
+{0}{1}
+# Downloaded from {2}
+""".format(cached_filename, " sha1sum="+sha1sum if sha1sum else "", url)
 
     if os.path.exists(source_filename):
         logging.info("%s already exists. Backing it up as %s.old", source_filename, source_filename)
@@ -400,6 +400,17 @@ def move_to_cache(srpm, upstream_root):
     return dest_file
 
 
+def get_sha1sum(file_path):
+    """Return the SHA1 checksum of the file located at `file_path` as a string."""
+    out, ret = utils.sbacktick(["sha1sum", file_path])
+    if ret != 0:
+        raise Error("Unable to get sha1sum of %s: error running sha1sum" % file_path)
+    match = re.match(r"[a-f0-9]{40}", out)
+    if not match:
+        raise Error("Unable to get sha1sum of %s: unexpected output" % file_path)
+    return match.group(0)
+
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
@@ -450,6 +461,11 @@ downloading and putting the SRPM into the upstream cache.
             help="If there is an osg/ directory, do a 3-way diff like --diff3-spec.  Otherwise just update"
             " the .source file in the 'upstream' directory."
         )
+        parser.add_option(
+            "--nosha1sum", action="store_false", dest="sha1sum",
+            help="Do not add a 'sha1sum' parameter in the .source file. "
+                 "Source files with sha1sums need osg-build 1.14+ to use."
+        )
 
         options, pos_args = parser.parse_args(argv[1:])
 
@@ -474,7 +490,8 @@ downloading and putting the SRPM into the upstream cache.
             raise UsageError("upstream-url is not a valid url")
 
         srpm = move_to_cache(download_srpm(upstream_url, options.output), options.upstream)
-        make_svn_tree(srpm, upstream_url, options.extra_action, options.provider)
+        sha1sum = get_sha1sum(srpm) if options.sha1sum else None
+        make_svn_tree(srpm, upstream_url, options.extra_action, options.provider, sha1sum)
 
     except UsageError as e:
         parser.print_help()

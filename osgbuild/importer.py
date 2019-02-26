@@ -411,10 +411,7 @@ def get_sha1sum(file_path):
     return match.group(0)
 
 
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
-
+def main(argv=sys.argv):
     parser = OptionParser("""
     %prog [options] <upstream-url>
 

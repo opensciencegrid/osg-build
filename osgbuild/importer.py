@@ -404,10 +404,10 @@ def get_sha1sum(file_path):
     """Return the SHA1 checksum of the file located at `file_path` as a string."""
     out, ret = utils.sbacktick(["sha1sum", file_path])
     if ret != 0:
-        raise Error("Unable to get sha1sum of %s: error running sha1sum" % file_path)
+        raise Error("Unable to get sha1sum of %s: exit %d when running sha1sum" % (file_path, ret))
     match = re.match(r"[a-f0-9]{40}", out)
     if not match:
-        raise Error("Unable to get sha1sum of %s: unexpected output" % file_path)
+        raise Error("Unable to get sha1sum of %s: unexpected output: %s" % (file_path, out))
     return match.group(0)
 
 
@@ -463,8 +463,8 @@ downloading and putting the SRPM into the upstream cache.
         )
         parser.add_option(
             "--nosha1sum", action="store_false", dest="sha1sum", default=True,
-            help="Do not add a 'sha1sum' parameter in the .source file. "
-                 "Source files with sha1sums need osg-build 1.14+ to use."
+            help="Do not add a 'sha1sum' parameter to the .source file. "
+                 ".source files with sha1sums need osg-build 1.14+ to use."
         )
 
         options, pos_args = parser.parse_args(argv[1:])

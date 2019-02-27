@@ -10,6 +10,7 @@ import shutil
 import sys
 import traceback
 
+from osgbuild import fetch_sources
 from osgbuild import utils
 
 # Constants:
@@ -56,19 +57,8 @@ class UsageError(Error):
         Error.__init__(self, "Usage error: " + msg + "\n")
 
 
-
-
-def download_srpm(url, output=None):
-    """Download an srpm from url. Return the filename."""
-    if output is None:
-        output = os.path.basename(url)
-    cmd = ["wget", "-q", url, "-O", output]
-    utils.checked_call(cmd)
-    verifyRPM(output)
-    return output
-
-def verifyRPM(srpm):
-    """ Verify that srpm is indeed an RPM """
+def verify_rpm(srpm):
+    """Verify that srpm is indeed an RPM. Raise Error if not."""
     cmd = ["rpm", "-qp", "--nomanifest", srpm]
     err = utils.unchecked_call(cmd)
     if err:
@@ -87,7 +77,7 @@ def srpm_nvr(srpm):
                     base_srpm)
 
 
-def make_svn_tree(srpm, url, extra_action=None, provider=None):
+def make_svn_tree(srpm, url, extra_action=None, provider=None, sha1sum=None):
     """Create an svn tree for the srpm and populate it as follows:
     $name/osg/*.spec        - the spec file as extracted from the srpm
                               (if extract_spec is True)
@@ -129,14 +119,14 @@ def make_svn_tree(srpm, url, extra_action=None, provider=None):
 
     cached_filename = os.path.join(name, version, os.path.basename(srpm))
 
-    make_source_file(url, cached_filename, upstream_dir, provider)
+    make_source_file(url, cached_filename, upstream_dir, provider, sha1sum)
 
     if len(glob.glob(os.path.join(upstream_dir, "*.source"))) > 1:
         logging.info("More than one .source file found in upstream dir.")
         logging.info("Examine them to make sure there aren't duplicates.")
 
 
-def make_source_file(url, cached_filename, upstream_dir, provider=None):
+def make_source_file(url, cached_filename, upstream_dir, provider=None, sha1sum=None):
     """Create an upstream/*.source file with the appropriate name based
     on either `provider` or `url` if the former is not given.  Also add
     the new file to SVN.
@@ -150,11 +140,11 @@ def make_source_file(url, cached_filename, upstream_dir, provider=None):
             provider = 'developer'
 
     source_filename = os.path.join(upstream_dir, provider+".srpm.source")
-
-    source_contents = """\
-%(cached_filename)s
-# Downloaded from '%(url)s'
-""" % locals()
+    if sha1sum:
+        srcspec = "{cached_filename} sha1sum={sha1sum}".format(**locals())
+    else:
+        srcspec = cached_filename
+    source_contents = "{srcspec}\n# Downloaded from {url}\n".format(**locals())
 
     if os.path.exists(source_filename):
         logging.info("%s already exists. Backing it up as %s.old", source_filename, source_filename)
@@ -399,10 +389,18 @@ def move_to_cache(srpm, upstream_root):
     return dest_file
 
 
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
+def get_sha1sum(file_path):
+    """Return the SHA1 checksum of the file located at `file_path` as a string."""
+    out, ret = utils.sbacktick(["sha1sum", file_path])
+    if ret != 0:
+        raise Error("Unable to get sha1sum of %s: exit %d when running sha1sum" % (file_path, ret))
+    match = re.match(r"[a-f0-9]{40}", out)
+    if not match:
+        raise Error("Unable to get sha1sum of %s: unexpected output: %s" % (file_path, out))
+    return match.group(0)
 
+
+def main(argv=sys.argv):
     parser = OptionParser("""
     %prog [options] <upstream-url>
 
@@ -449,6 +447,11 @@ downloading and putting the SRPM into the upstream cache.
             help="If there is an osg/ directory, do a 3-way diff like --diff3-spec.  Otherwise just update"
             " the .source file in the 'upstream' directory."
         )
+        parser.add_option(
+            "--nosha1sum", action="store_false", dest="want_sha1sum", default=True,
+            help="Do not add a 'sha1sum' parameter to the .source file. "
+                 ".source files with sha1sums need osg-build 1.14+ to use."
+        )
 
         options, pos_args = parser.parse_args(argv[1:])
 
@@ -472,8 +475,13 @@ downloading and putting the SRPM into the upstream cache.
         if not re.match(r'(http|https|ftp):', upstream_url):
             raise UsageError("upstream-url is not a valid url")
 
-        srpm = move_to_cache(download_srpm(upstream_url, options.output), options.upstream)
-        make_svn_tree(srpm, upstream_url, options.extra_action, options.provider)
+        outfile = options.output or os.path.basename(upstream_url)
+        sha1sum = fetch_sources.download_uri(upstream_url, outfile)
+        if not options.want_sha1sum:
+            sha1sum = None
+        verify_rpm(outfile)
+        srpm = move_to_cache(outfile, options.upstream)
+        make_svn_tree(srpm, upstream_url, options.extra_action, options.provider, sha1sum)
 
     except UsageError as e:
         parser.print_help()

@@ -117,6 +117,11 @@ def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
     return [outfile]
 
 def download_uri(uri, outfile):
+    """Download a file from `uri` and save it in `outfile`.  Chunks the
+    contents so they don't all have to be in memory.
+
+    Returns the sha1sum of the file.
+    """
     log.info('Retrieving ' + uri)
     try:
         handle = urllib.request.urlopen(uri)
@@ -134,6 +139,10 @@ def download_uri(uri, outfile):
     return sha.hexdigest()
 
 def chunked_read(handle, size=64*1024):
+    """Iterate over a file in fixed-size chunks.
+
+    Yields the next `size` bytes from a file handle.
+    """
     chunk = handle.read(size)
     while chunk:
         yield chunk

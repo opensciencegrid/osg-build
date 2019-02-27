@@ -144,7 +144,7 @@ def make_source_file(url, cached_filename, upstream_dir, provider=None, sha1sum=
         srcspec = "{cached_filename} sha1sum={sha1sum}".format(**locals())
     else:
         srcspec = cached_filename
-    source_contents = "{srcspec}\n#Downloaded from {url}\n".format(**locals())
+    source_contents = "{srcspec}\n# Downloaded from {url}\n".format(**locals())
 
     if os.path.exists(source_filename):
         logging.info("%s already exists. Backing it up as %s.old", source_filename, source_filename)

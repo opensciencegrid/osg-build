@@ -287,6 +287,9 @@ def check_git_hash(url, tag, sha, got_sha, nocheck):
 
 
 def deref_git_sha(sha):
+    """Dereference a sha that may point to an 'annotated' tag to get the commit
+    hash it actually refers to.  If `sha` is just a regular commit hash, return it.
+    """
     cmd = ["git", "rev-parse", "-q", "--verify", sha + "^{}"]
     output, rc = utils.sbacktick(cmd)
     if rc:
@@ -329,11 +332,22 @@ def get_auto_source_type(*args, **kw):
 
 
 def parse_source_line(line):
+    """Returns a list of positional arguments, and a dict of key=value pairs."""
+    # kvmatch() returns either (key, value) (for key=value pairs)
+    # or (None, arg) for positional arguments; the former match the filter
+    # and get put into the first list (kv), and the latter do not match the
+    # filter so they get put into the second list (args).
+
     kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))
     return [ a[1] for a in args ], dict(kv)
 
 
 def dual_filter(cond, seq):
+    """Use the filter function `cond` to split a sequence into two.
+
+    Returns two lists: the list of items that matched, and the list of items
+    that didn't match.
+    """
     pos,neg = [],[]
     for x in seq:
         (pos if cond(x) else neg).append(x)
@@ -341,6 +355,9 @@ def dual_filter(cond, seq):
 
 
 def kvmatch(arg):
+    """Look for a 'key=value' string in `arg`.  If found, return the key and the
+    value as separate strings; otherwise, return (None, arg).
+    """
     # return (key,val) for "key=val", else return (None, arg)
     return re.search(r'^(?:(\w+)=)?(.*)', arg).groups()
 

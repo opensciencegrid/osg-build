@@ -320,6 +320,25 @@ def verify_koji_dir(config_dir):
                         % (descr, path, config_dir, RUN_SETUP_MSG))
 
 
+def run_koji(args=None, use_exec=False):
+    """Run koji with the given list of args.  Replaces current process if use_exec is true.
+    Returns return code of os.system() otherwise.
+    Catches missing koji binary.
+    """
+    args = args or []
+    try:
+        if use_exec:
+            os.execlp("koji", "koji", *args)
+        else:
+            cmd = "koji"
+            if args:
+                cmd += " " + " ".join(shell_quote(x) for x in args)
+            return os.system(cmd)
+    except OSError as err:
+        if err.errno == 2:  # file not found
+            raise Error("Couldn't find `koji` binary.  Is koji installed and in your PATH?")
+
+
 def main(argv=None):
     "Main function"
     if argv is None:
@@ -351,7 +370,7 @@ If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
 """ % (PROGRAM_NAME))
 
             elif argv[1] == "help":
-                os.system("koji " + ' '.join(argv[1:]))
+                run_koji(args=argv[1:])
                 print(EXTRA_HELP)
             else:
                 if os.path.exists(OSG_KOJI_USER_CONFIG_DIR):
@@ -364,9 +383,9 @@ If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
                 verify_koji_dir(config_dir)
                 args = ["--config=" + os.path.join(config_dir, KOJI_CONFIG_FILE),
                         "--authtype=ssl"] + argv[1:]
-                os.execlp("koji", "koji", *args)
+                run_koji(args=args, use_exec=True)
         else:
-            os.system("koji")
+            run_koji()
             print(EXTRA_HELP)
     except SystemExit as err:
         return err.code

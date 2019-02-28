@@ -314,23 +314,17 @@ def verify_koji_dir(config_dir):
             (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
 
         fullpath = os.path.join(config_dir, path)
-        # Note: use lexists because if we're using grid proxies then the
-        # CLIENT_CERT_FILE may be a broken symlink--and that's ok
-        if not os.path.lexists(fullpath):
+        if os.path.exists(fullpath):
+            continue
+        if path != CLIENT_CERT_FILE or not os.path.lexists(fullpath):
             raise Error("%s (%s) not found in config directory (%s).\n%s"
                         % (descr, path, config_dir, RUN_SETUP_MSG))
-        # Catch broken client cert symlink separately
-        if path == CLIENT_CERT_FILE:
-            try:
-                target = os.readlink(fullpath)
-                if not os.path.exists(fullpath):
-                    print("%s -> %s is a broken symlink.\n"
-                          "You may need to run grid-proxy-init before doing authenticated operations."
-                          % (fullpath, target),
-                          file=sys.stderr)
-            except OSError as e:
-                if e.errno != 22: raise
-                # 22 = "Invalid argument" -- not a symlink
+        # CLIENT_CERT_FILE lexists but not exists -> broken symlink; give a warning
+        target = os.readlink(fullpath)
+        print("%s -> %s is a broken symlink.\n"
+              "You may need to run grid-proxy-init before doing authenticated operations."
+              % (fullpath, target),
+              file=sys.stderr)
 
 
 def run_koji(args=None, use_exec=False):

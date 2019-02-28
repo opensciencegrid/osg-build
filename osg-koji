@@ -350,6 +350,7 @@ def run_koji(args=None, use_exec=False):
     except OSError as err:
         if err.errno == 2:  # file not found
             raise Error("Couldn't find `koji` binary.  Is koji installed and in your PATH?")
+        raise
 
 
 def main(argv=None):

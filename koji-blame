@@ -4,6 +4,7 @@ import re
 import sys
 import datetime
 import time
+import argparse
 
 from osgbuild import utils
 
@@ -12,9 +13,6 @@ try:
 except AttributeError:
     def strptime(date_string, format):
         return datetime.datetime(*(time.strptime(date_string, format)[0:6]))
-
-def transform_date(date_string, from_format, to_format):
-    return strptime(date_string, from_format).strftime(to_format)
 
 class Error(Exception):
     pass
@@ -55,7 +53,7 @@ def run_list_tag_history(item):
         raise Error("%s is not a package, build or tag" % item)
     return utils.sbacktick(cmd)[0]
 
-def parse_history(lth_output):
+def parse_history(lth_output, since=datetime.datetime(1970, 1, 1)):
     # This is what a line of output from koji list-tag-history looks like:
     # Fri May 30 11:45:59 2014: osg-configure-1.0.55-2.osg31.el6 tagged into osg-3.1-el6-development by Matyas Selmeci [still active]
     pattern = re.compile(r"(?P<date>.+?): (?P<build>\S+) (?P<action>tagged into|untagged from) (?P<tag>\S+) by (?P<user>[^\[]+) \[still active\]")
@@ -67,10 +65,12 @@ def parse_history(lth_output):
             if 'Edgar' in user and 'Fajardo' in user:
                 user = "Edgar Fajardo"
             user = re.sub(r" A?\d+$", "", user)
-            parsed.append({'date' : transform_date(m.group('date'), "%a %b %d %H:%M:%S %Y", "%Y-%m-%d"),
-                           'user' : user,
-                           'tag'  : m.group('tag'),
-                           'build': m.group('build')})
+            date = strptime(m.group('date'), "%a %b %d %H:%M:%S %Y")
+            if date > since:
+                parsed.append({'date' : date.strftime("%Y-%m-%d"),
+                               'user' : user,
+                               'tag'  : m.group('tag'),
+                               'build': m.group('build')})
     return parsed
 
 def detect_mode(item):
@@ -92,16 +92,40 @@ def format_history_item(history_item, mode):
     return line
 
 
+def parse_cli(args):
+    """This function parses all the arguments, options, and validates them.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--since', action=SinceAction, dest='since', help="List packages since YYYY-MM-DD")
+    parser.add_argument('koji_object', help='Koji package, tag, or build')
+
+    return parser.parse_args(args)
+
+
+class SinceAction(argparse.Action):
+    """Action for validating state/province options
+    """
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("-s/--since only accepts a single argument")
+        super(SinceAction, self).__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        try:
+            setattr(namespace, self.dest, strptime(values, "%Y-%m-%d"))
+        except ValueError:
+            parser.print_usage()
+            raise
+
+
 def main(argv):
-    if len(argv) < 2 or argv[1] in ('-h', '--help'):
-        print("Usage: koji-blame <PACKAGE or TAG or BUILD>")
-        return 2
+    args = parse_cli(argv[1:])
 
     if not utils.which('osg-koji'):
         raise Error("osg-koji not found in $PATH")
-    mode = detect_mode(argv[1])
-    lth_output = run_list_tag_history(argv[1])
-    print("\n".join([format_history_item(item, mode) for item in parse_history(lth_output)]))
+    mode = detect_mode(args.koji_object)
+    lth_output = run_list_tag_history(args.koji_object)
+    print("\n".join([format_history_item(item, mode) for item in parse_history(lth_output, since=args.since)]))
 
 if __name__ == "__main__":
     try:

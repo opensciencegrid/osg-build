@@ -66,7 +66,7 @@ def parse_history(lth_output):
             user = m.group('user').rstrip()
             if 'Edgar' in user and 'Fajardo' in user:
                 user = "Edgar Fajardo"
-            user = re.sub(r" \d+$", "", user)
+            user = re.sub(r" A?\d+$", "", user)
             parsed.append({'date' : transform_date(m.group('date'), "%a %b %d %H:%M:%S %Y", "%Y-%m-%d"),
                            'user' : user,
                            'tag'  : m.group('tag'),

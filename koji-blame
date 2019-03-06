@@ -8,6 +8,8 @@ import argparse
 
 from osgbuild import utils
 
+EPOCH = datetime.datetime(1, 1, 1)
+
 try:
     strptime = datetime.datetime.strptime
 except AttributeError:
@@ -53,7 +55,7 @@ def run_list_tag_history(item):
         raise Error("%s is not a package, build or tag" % item)
     return utils.sbacktick(cmd)[0]
 
-def parse_history(lth_output, since=datetime.datetime(1970, 1, 1)):
+def parse_history(lth_output, since=EPOCH):
     # This is what a line of output from koji list-tag-history looks like:
     # Fri May 30 11:45:59 2014: osg-configure-1.0.55-2.osg31.el6 tagged into osg-3.1-el6-development by Matyas Selmeci [still active]
     pattern = re.compile(r"(?P<date>.+?): (?P<build>\S+) (?P<action>tagged into|untagged from) (?P<tag>\S+) by (?P<user>[^\[]+) \[still active\]")
@@ -96,7 +98,8 @@ def parse_cli(args):
     """This function parses all the arguments, options, and validates them.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--since', action=SinceAction, dest='since', help="List packages since YYYY-MM-DD")
+    parser.add_argument('-s', '--since', action=SinceAction, dest='since', default=EPOCH,
+                        help="List packages since YYYY-MM-DD")
     parser.add_argument('koji_object', help='Koji package, tag, or build')
 
     return parser.parse_args(args)

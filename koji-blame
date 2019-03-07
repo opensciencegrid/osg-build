@@ -106,7 +106,7 @@ def parse_cli(args):
 
 
 class SinceAction(argparse.Action):
-    """Action for validating state/province options
+    """Action for validating date options
     """
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
         if nargs is not None:

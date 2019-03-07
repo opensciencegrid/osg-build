@@ -116,9 +116,8 @@ class SinceAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         try:
             setattr(namespace, self.dest, strptime(values, "%Y-%m-%d"))
-        except ValueError:
-            parser.print_usage()
-            raise
+        except ValueError as e:
+            parser.error(str(e))
 
 
 def main(argv):

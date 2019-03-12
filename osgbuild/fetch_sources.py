@@ -105,6 +105,7 @@ def fetch_cached_source(relpath, sha1sum=None, ops=None):
     return fetch_uri_source(uri, sha1sum, ops=ops)
 
 def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
+    _almost_required(sha1sum, 'sha1sum')
     if uri.startswith('/'):
         uri = "file://" + uri
     outfile = os.path.join(ops.destdir, os.path.basename(filename or uri))
@@ -152,6 +153,11 @@ def _required(item, key):
     if item is None:
         raise Error("No '%s' specified" % key)
 
+def _almost_required(item, key):
+    if item is None:
+        log.warning("No '%s' specified; Note this field will be required"
+                    " for official builds." % key)
+
 def _mk_prefix(name, tag, tarball):
     if tarball:
         if not tarball.endswith('.tar.gz'):
@@ -175,7 +181,7 @@ def fetch_github_source(repo, tag, hash=None, ops=None, **kw):
 def fetch_git_source(url, tag, hash=None, ops=None,
         name=None, spec=None, tarball=None, prefix=None):
     name = name or re.sub(r'\.git$', '', os.path.basename(url))
-    ops.nocheck or _required(hash, 'hash')
+    (_almost_required if ops.nocheck else _required)(hash, 'hash')
     spec = ops.want_spec and ("rpm/%s.spec" % name if spec is None else spec)
     prefix = prefix and prefix.strip('/')
     prefix = prefix or _mk_prefix(name, tag, tarball)

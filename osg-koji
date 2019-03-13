@@ -227,8 +227,8 @@ def setup_koji_client_cert(user_cert, user_key, proxy):
                 not ask_yn("""
 Client certificate file '%s' already exists.
 Do you want to recreate it now? Enter yes if you have trouble logging in via
-the command-line tools, if you got a new certificate, or want to use a grid
-certificate/key pair instead of a grid proxy or vice versa.
+the command-line tools, if you got a new certificate, or want to switch to
+using a grid certificate/key pair instead of a grid proxy or vice versa.
 """ % new_client_cert_path)):
 
             print("Not writing client cert file " + new_client_cert_path)

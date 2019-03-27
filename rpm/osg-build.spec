@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.14.1
+Version:        1.14.2
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -141,6 +141,11 @@ fi
 
 
 %changelog
+* Wed Mar 27 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.14.2-1
+- Warn on missing sha1sum (SOFTWARE-3619)
+- Have osg-import-srpm add sha1sums to created .source files (SOFTWARE-3593)
+- Add --since option to koji-blame
+
 * Tue Feb 19 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.14.1-1
 - Add osg-promote support for rolling release repositories and route aliases
   that refer to a list of routes (e.g. 3.4-rfr promotes to 3.4-prerelease _and_

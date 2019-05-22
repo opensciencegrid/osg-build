@@ -127,9 +127,9 @@ def main(argv):
         raise Error("osg-koji not found in $PATH")
     mode = detect_mode(args.koji_object)
     lth_output = run_list_tag_history(args.koji_object)
-    print("\n".join([format_history_item(item, mode) for item in parse_history(lth_output,
-                                                                               since=args.since,
-                                                                               until=args.until)]))
+    print("\n".join(format_history_item(item, mode) for item in parse_history(lth_output,
+                                                                              since=args.since,
+                                                                              until=args.until)))
 
 if __name__ == "__main__":
     try:

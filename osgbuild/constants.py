@@ -22,7 +22,7 @@ DATA_DIR = "/usr/share/osg-build"
 KOJI_HUB = "http://koji.chtc.wisc.edu"
 KOJI_WEB = "https://koji.chtc.wisc.edu"
 
-DATA_FILE_SEARCH_PATH = [os.path.abspath(__file__ + "/../../data")]
+DATA_FILE_SEARCH_PATH = [os.path.dirname(os.path.abspath(__file__)) + "/../data"]
 if "OSG_LOCATION" in os.environ:
     DATA_FILE_SEARCH_PATH.append(os.environ["OSG_LOCATION"] + DATA_DIR)
 DATA_FILE_SEARCH_PATH.append(DATA_DIR)

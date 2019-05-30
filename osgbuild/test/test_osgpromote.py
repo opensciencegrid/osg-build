@@ -9,7 +9,7 @@ try:
 except ImportError:
     from io import StringIO
 
-sys.path.insert(0, os.path.abspath(__file__+"/../../.."))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/../.."))
 
 from osgbuild import promoter
 from osgbuild import constants

@@ -22,9 +22,10 @@ DATA_DIR = "/usr/share/osg-build"
 KOJI_HUB = "http://koji.chtc.wisc.edu"
 KOJI_WEB = "https://koji.chtc.wisc.edu"
 
-DATA_FILE_SEARCH_PATH = [sys.path[0],
-                         os.path.join(sys.path[0], "data"),
-                         DATA_DIR]
+DATA_FILE_SEARCH_PATH = [os.path.abspath(os.path.dirname(__file__) + "/../data")]
+if "OSG_LOCATION" in os.environ:
+    DATA_FILE_SEARCH_PATH.append(os.environ["OSG_LOCATION"] + DATA_DIR)
+DATA_FILE_SEARCH_PATH.append(DATA_DIR)
 
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
 SVN_REDHAT_PATH = "/native/redhat"

@@ -129,6 +129,8 @@ You might need to log out and log in for the changes to take effect""")
         rebuild_cmd = self.mock_cmd + ['--resultdir',
                                        resultdir,
                                        '--no-cleanup-after',
+                                       '--enable-network',
+                                       '--config-opts=use_nspawn=False',
                                        'rebuild',
                                        srpm]
         if self.target_arch:

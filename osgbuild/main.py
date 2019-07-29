@@ -71,19 +71,15 @@ def main(argv):
     if task == 'koji' and buildopts['vcs']:
         # verify working dirs
         for pkg in package_dirs:
-            git_ok = False
-            try:
-                git_ok = git.is_git(pkg) and git.verify_working_dir(pkg)
-            except GitError as err:
-                log.info(str(err))
-            svn_ok = False
-            try:
-                svn_ok = svn.is_svn(pkg) and svn.verify_working_dir(pkg)
-            except SVNError as err:
-                log.info(str(err))
-
-            vcs = (git_ok and git) or (svn_ok and svn)
-            if not vcs:
+            vcs_ok = False
+            # vcs is the module for accessing the repo
+            vcs = svn if svn.is_svn(pkg) else git if git.is_git(pkg) else None
+            if vcs:
+                try:
+                    vcs_ok = vcs.verify_working_dir(pkg)
+                except (SVNError, GitError) as err:
+                    log.info(str(err))
+            if not vcs_ok:
                 print("VCS build requested but no usable VCS found for " + pkg)
                 print("Exiting")
                 return 1

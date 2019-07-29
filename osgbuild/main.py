@@ -72,7 +72,8 @@ def main(argv):
         # verify working dirs
         for pkg in package_dirs:
             vcs_ok = False
-            vcs = (svn.is_svn(pkg) and svn) or (git.is_git(pkg) and git)
+            # vcs is the module for accessing the repo
+            vcs = svn if svn.is_svn(pkg) else git if git.is_git(pkg) else None
             if vcs:
                 try:
                     vcs_ok = vcs.verify_working_dir(pkg)

@@ -129,20 +129,21 @@ You might need to log out and log in for the changes to take effect""")
         rebuild_cmd = self.mock_cmd + ['--resultdir',
                                        resultdir,
                                        '--no-cleanup-after',
-                                       '--enable-network',
-                                       '--config-opts=use_nspawn=False',
                                        'rebuild',
                                        srpm]
         if self.target_arch:
             rebuild_cmd += ['--arch', self.target_arch]
-        # ccache on el6 tries to install the el5 package for ccache and dies
-        if str(self.buildopts['redhat_release']) == '6':
+        redhat_release = int(self.buildopts['redhat_release'])
+        if redhat_release == 6:
+            # ccache on el6 tries to install the el5 package for ccache and dies
             rebuild_cmd += ['--disable-plugin=ccache']
+        elif redhat_release >= 7:
+            # systemd-nspawn is often broken; don't use it. network is required for maven builds :(
+            rebuild_cmd += ['--enable-network', '--config-opts=use_nspawn=False']
         ret = utils.unchecked_call(rebuild_cmd)
         if ret:
             raise MockError('Mock build failed (command was: ' + ' '.join(rebuild_cmd) + ')')
 
-        # TODO: Parse the mock logs/output instead of using glob.
         rpms = [x for x in glob(os.path.join(resultdir, "*.rpm")) if not fnmatch(x, "*.src.rpm")]
 
         return rpms

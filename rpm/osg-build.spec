@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.14.2
+Version:        1.14.3
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -141,6 +141,9 @@ fi
 
 
 %changelog
+* Mon Aug 05 2019 Carl Edquist <edquist@cs.wisc.edu> - 1.14.2-2
+- Support new devops routes for osg-3.5 (SOFTWARE-3291)
+
 * Wed Mar 27 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.14.2-1
 - Warn on missing sha1sum (SOFTWARE-3619)
 - Have osg-import-srpm add sha1sums to created .source files (SOFTWARE-3593)

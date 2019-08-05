@@ -141,7 +141,7 @@ fi
 
 
 %changelog
-* Mon Aug 05 2019 Carl Edquist <edquist@cs.wisc.edu> - 1.14.2-2
+* Mon Aug 05 2019 Carl Edquist <edquist@cs.wisc.edu> - 1.14.3-1
 - Support new devops routes for osg-3.5 (SOFTWARE-3291)
 
 * Wed Mar 27 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.14.2-1

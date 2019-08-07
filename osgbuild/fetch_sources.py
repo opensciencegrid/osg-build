@@ -112,7 +112,7 @@ def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
     got_sha1sum = download_uri(uri, outfile)
     log.debug("got sha1sum=%s for uri=%s" % (got_sha1sum, uri))
 
-    if sha1sum: # or not ops.nocheck:
+    if sha1sum or not ops.nocheck:
         check_file_checksum(outfile, sha1sum, got_sha1sum, ops.nocheck)
 
     return [outfile]

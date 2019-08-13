@@ -34,11 +34,13 @@ SVN_RESTRICTED_BRANCHES = {
     r'^trunk$'                             : 'main',
     r'^branches/upcoming$'                 : 'upcoming',
     r'^branches/osg-internal$'             : 'internal',
+    r'^branches/devops$'                   : 'devops',
     r'^branches/osg-(?P<osgver>\d+\.\d+)$' : 'versioned',
     r'^branches/condor'                    : 'condor'}
 KOJI_RESTRICTED_TARGETS = {
     r'^osg-(el\d+)$'                       : 'main',
     r'^osg-upcoming-(el\d+)$'              : 'upcoming',
+    r'^devops-(el\d+)$'                    : 'devops',
     r'^osg-(el\d+)-internal$'              : 'internal',
     r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'  : 'versioned',
     r'^condor-(el\d+)$'                    : 'condor'}
@@ -46,6 +48,7 @@ GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?master$'                     : 'main',
     r'^(\w*/)?upcoming$'                   : 'upcoming',
     r'^(\w*/)?internal$'                   : 'internal',
+    r'^(\w*/)?devops$'                     : 'devops',
     r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned',
     r'^(\w*/)?condor-(el\d+)'              : 'condor'}
 
@@ -110,6 +113,7 @@ DEFAULT_DVERS_BY_REPO = {
     'osg-3.5': ['el7'],
     'internal': ['el6', 'el7'],
     'condor': ['el6', 'el7'],
+    'devops': ['el7'],
 }
 assert FALLBACK_DVER in DVERS
 for d in DEFAULT_DVERS:
@@ -122,6 +126,7 @@ REPO_HINTS_STATIC = {
     'osg': {'target': 'osg-%(dver)s', 'tag': 'osg-%(dver)s'},
     'upcoming': {'target': 'osg-upcoming-%(dver)s', 'tag': 'osg-%(dver)s'},
     'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
+    'devops': {'target': 'devops-%(dver)s', 'tag': 'osg-%(dver)s'},
     'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},
     'condor': {'target': 'condor-%(dver)s', 'tag': 'condor-%(dver)s'},
 }

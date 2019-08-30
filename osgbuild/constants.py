@@ -114,6 +114,7 @@ DEFAULT_DVERS_BY_REPO = {
     'internal': ['el6', 'el7'],
     'condor': ['el6', 'el7'],
     'devops': ['el7'],
+    'upcoming': ['el7'],
 }
 assert FALLBACK_DVER in DVERS
 for d in DEFAULT_DVERS:

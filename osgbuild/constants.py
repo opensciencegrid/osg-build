@@ -103,7 +103,7 @@ for dver in DVERS:
 # If the dver on the current machine can't be detected for some reason, or
 # isn't EL, use this.
 FALLBACK_DVER = 'el7'
-DEFAULT_DVERS = ['el6', 'el7']
+DEFAULT_DVERS = ['el7']
 DEFAULT_DVERS_BY_REPO = {
     '3.3': ['el6', 'el7'],
     'osg-3.3': ['el6', 'el7'],

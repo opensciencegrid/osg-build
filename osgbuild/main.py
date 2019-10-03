@@ -22,8 +22,6 @@ from __future__ import print_function
 import logging
 from optparse import OptionGroup, OptionParser, OptionValueError
 import re
-import os
-import sys
 import tempfile
 
 from .constants import *
@@ -691,7 +689,7 @@ def get_buildopts(options, task):
             else:
                 buildopts['enabled_dvers'] = set(DEFAULT_DVERS)
         else:
-            machine_dver = get_local_machine_dver() or FALLBACK_DVER
+            machine_dver = utils.get_local_machine_dver() or FALLBACK_DVER
             buildopts['enabled_dvers'] = set([machine_dver])
 
     # Hack: make --mock-config on command line override
@@ -756,22 +754,6 @@ def verify_release_in_targetopts_by_dver(targetopts_by_dver):
         return None
 
     return dver or dist_dver or target_dver or tag_dver
-
-
-def get_local_machine_dver():
-    "Return the distro version (e.g. 'el6', 'el7') of the local machine or None"
-    try:
-        redhat_release_contents = utils.slurp('/etc/redhat-release')
-    except EnvironmentError: # some error reading the file
-        return
-
-    for rhellike in ['Scientific', 'Red Hat Enterprise', 'CentOS']:
-        try:
-            if rhellike in redhat_release_contents:
-                match = re.search(r'release (\d+)', redhat_release_contents)
-                return 'el' + match.group(1)
-        except (TypeError, AttributeError): # empty file or no match
-            return
 
 
 def guess_pkg_dir(start_dir):

@@ -461,3 +461,17 @@ def popd():
         raise IndexError("Directory stack empty")
 
 
+def get_local_machine_dver():
+    "Return the distro version (e.g. 'el6', 'el7') of the local machine or None"
+    try:
+        redhat_release_contents = slurp("/etc/redhat-release")
+    except EnvironmentError: # some error reading the file
+        return
+
+    for rhellike in ["Scientific", "Red Hat Enterprise", "CentOS"]:
+        try:
+            if rhellike in redhat_release_contents:
+                match = re.search(r"release (\d+)", redhat_release_contents)
+                return "el" + match.group(1)
+        except (TypeError, AttributeError): # empty file or no match
+            return

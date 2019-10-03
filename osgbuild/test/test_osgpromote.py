@@ -195,7 +195,7 @@ class TestUtil(unittest.TestCase):
 def _config():
     configuration = promoter.Configuration()
     configuration.load_inifile(INIFILE)
-    configuration.load_inifile("osgbuild/test/promoter_extra.ini")
+    configuration.load_inifile("../osgbuild/test/promoter_extra.ini")
     return configuration
 
 
@@ -217,7 +217,7 @@ class TestRouteLoader(unittest.TestCase):
 
     def test_route_alias(self):
         for key in 'from_tag_hint', 'to_tag_hint', 'repo':
-            self.assertEqual(getattr(self.configuration.matching_routes('testing')[0], key), getattr(self.routes['3.4-testing'], key))
+            self.assertEqual(getattr(self.configuration.matching_routes('testing')[0], key), getattr(self.routes['3.5-testing'], key))
             self.assertEqual(getattr(self.configuration.matching_routes('3.4-rfr')[0], key), getattr(self.routes['3.4-prerelease'], key))
             self.assertEqual(getattr(self.configuration.matching_routes('3.4-rfr')[1], key), getattr(self.routes['3.4-rolling'], key))
 

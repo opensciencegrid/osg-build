@@ -37,6 +37,13 @@ class Mock(object):
 
         cfg_path = self._init_get_cfg_path()
         self.mock_cmd = ['mock']
+        mock_version_str = utils.backtick(self.mock_cmd + ["--version"]).strip()
+        m = re.match(r"(\d+)\.(\d+)\.(\d+)", mock_version_str)
+        if m:
+            self.mock_version = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        else:
+            raise MockError("mock --version returned unexpected output: %s" % mock_version_str)
+
         if cfg_path:
             cfg_abspath = os.path.abspath(cfg_path)
             cfg_abspath_no_ext = re.sub(r'\.cfg$', '', cfg_abspath)
@@ -133,13 +140,12 @@ You might need to log out and log in for the changes to take effect""")
                                        srpm]
         if self.target_arch:
             rebuild_cmd += ['--arch', self.target_arch]
-        redhat_release = int(self.buildopts['redhat_release'])
-        if redhat_release == 6:
-            # ccache on el6 tries to install the el5 package for ccache and dies
-            rebuild_cmd += ['--disable-plugin=ccache']
-        elif redhat_release >= 7:
+        if self.mock_version >= (1,4,0):
             # systemd-nspawn is often broken; don't use it. network is required for maven builds :(
             rebuild_cmd += ['--enable-network', '--config-opts=use_nspawn=False']
+        else:
+            # ccache on old versions tries to install the el5 package for ccache and dies
+            rebuild_cmd += ['--disable-plugin=ccache']
         ret = utils.unchecked_call(rebuild_cmd)
         if ret:
             raise MockError('Mock build failed (command was: ' + ' '.join(rebuild_cmd) + ')')
@@ -147,7 +153,6 @@ You might need to log out and log in for the changes to take effect""")
         rpms = [x for x in glob(os.path.join(resultdir, "*.rpm")) if not fnmatch(x, "*.src.rpm")]
 
         return rpms
-
 
 
     def clean(self):

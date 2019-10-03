@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.15.0
+Version:        1.15.1
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -141,6 +141,9 @@ fi
 
 
 %changelog
+* Thu Oct 03 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.1-1
+- Fix mock version detection
+
 * Wed Oct 02 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.0-1
 - Make missing sha1sums an error (SOFTWARE-3787)
 - Use koji.opensciencegrid.org (SOFTWARE-3624)

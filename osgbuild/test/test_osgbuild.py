@@ -465,7 +465,7 @@ class TestKoji(XTestCase):
 
     def test_verify_correct_branch(self):
         try:
-            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(C.SVN_ROOT, 'native/redhat/trunk/koji')])
+            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(C.SVN_ROOT, DEVOPS, "koji")])
         except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(

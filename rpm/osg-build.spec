@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.14.3
+Version:        1.15.0
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -141,6 +141,11 @@ fi
 
 
 %changelog
+* Wed Oct 02 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.0-1
+- Make missing sha1sums an error (SOFTWARE-3787)
+- Use koji.opensciencegrid.org (SOFTWARE-3624)
+- Add support for OSG 3.5
+
 * Mon Aug 05 2019 Carl Edquist <edquist@cs.wisc.edu> - 1.14.3-1
 - Support new devops routes for osg-3.5 (SOFTWARE-3291)
 

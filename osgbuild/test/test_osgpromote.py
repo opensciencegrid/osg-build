@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/../.."))
 from osgbuild import promoter
 from osgbuild import constants
 
-INIFILE = 'data/promoter.ini'
+INIFILE = "promoter.ini"
 
 log = logging.getLogger('osgpromote')
 log.setLevel(logging.ERROR)

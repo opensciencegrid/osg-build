@@ -28,6 +28,7 @@ from osgbuild.utils import (
     unslurp)
 
 TRUNK = "native/redhat/trunk"
+DEVOPS = "native/redhat/branches/devops"
 
 initial_wd = os.getcwd()
 osg_build_path = find_file('osg-build', [initial_wd,
@@ -261,7 +262,7 @@ class TestFetch(XTestCase):
         return get_listing(pdir)
 
     def test_cache_fetch(self):
-        common_setUp(opj(TRUNK, "mash"), "{2011-12-08}")
+        common_setUp(opj(DEVOPS, "mash"), "{2019-10-01}")
         contents = self.fetch_sources("mash")
 
         self.assertTrue(
@@ -278,25 +279,14 @@ class TestFetch(XTestCase):
             "Spec file not overridden")
 
     def test_git_fetch(self):
-        common_setUp("native/redhat/branches/matyas/osg-build", "{2017-04-26}")
+        common_setUp(opj(DEVOPS, "osg-build"), "{2019-10-01}")
         contents = self.fetch_sources("osg-build")
 
         self.assertTrue(
             "osg-build.spec" in contents,
             "spec file not found")
         self.assertTrue(
-            "osg-build-1.8.90.tar.gz" in contents,
-            "source tarball not found")
-
-    def test_git_fetch_spec(self):
-        common_setUp(opj(TRUNK, "osg-build"), "{2018-01-24}")
-        contents = self.fetch_sources("osg-build")
-
-        self.assertTrue(
-            "osg-build.spec" in contents,
-            "spec file not found")
-        self.assertTrue(
-            "osg-build-1.11.1.tar.gz" in contents,
+            "osg-build-1.14.2.tar.gz" in contents,
             "source tarball not found")
 
     def test_git_fetch_with_release(self):
@@ -373,8 +363,8 @@ class TestMock(XTestCase):
     """Tests for mock"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
-                                    "{2012-01-25}")
+        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
+                                    "{2019-10-01}")
 
     def check_for_mock_group(self):
         username = pwd.getpwuid(os.getuid()).pw_name

@@ -15,10 +15,10 @@ from datetime import datetime
 
 try:
     import six
-    from six.moves import input
+    from six.moves import input, zip_longest
 except ImportError:
     from . import six
-    from .six.moves import input
+    from .six.moves import input, zip_longest
 
 
 log = logging.getLogger(__name__)
@@ -421,7 +421,7 @@ def print_table(columns_by_header):
     columns = []
     for entry in sorted(columns_by_header):
         columns.append([entry, '---'] + sorted(columns_by_header[entry]))
-    for columns_in_row in itertools.izip_longest(fillvalue='', *columns):
+    for columns_in_row in zip_longest(fillvalue='', *columns):
         for col in columns_in_row:
             printf("%-*s", field_width - 1, col, end=' ')
         printf("")

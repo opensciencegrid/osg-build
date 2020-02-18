@@ -364,7 +364,7 @@ def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
 
     xtype = "type" if explicit_type else "implicit type"
     log.error("Error processing source line of %s '%s'" % (xtype, meta_type))
-    varnames = handler.__code__.co_varnames     # arg names for handler func
+    varnames = handler.__code__.co_varnames  # func vars, beginning with args
     fn_argcount = handler.__code__.co_argcount  # number of positional args
     minargs = fn_argcount - len(handler.__defaults__)  # number of required args
     reqargs = varnames[:minargs]     # names of required arguments

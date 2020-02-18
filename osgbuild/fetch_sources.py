@@ -121,6 +121,7 @@ def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
 
 
 def download_uri(uri, outfile):
+    """Download uri to outfile, return sha1sum.  Frugal with memory usage."""
     log.info('Retrieving ' + uri)
     try:
         handle = urllib.request.urlopen(uri)
@@ -139,6 +140,7 @@ def download_uri(uri, outfile):
 
 
 def chunked_read(handle, size=64*1024):
+    """Return a generator to iterate over a file in chuncks of `size` bytes"""
     chunk = handle.read(size)
     while chunk:
         yield chunk
@@ -285,6 +287,8 @@ def check_git_hash(url, tag, sha, got_sha, nocheck):
 
 
 def deref_git_sha(sha):
+    """Return `sha`, or (if it's an annotated tag object) the hash of the
+       commit it refers to."""
     cmd = ["git", "rev-parse", "-q", "--verify", sha + "^{}"]
     output, rc = utils.sbacktick(cmd)
     if rc:
@@ -327,20 +331,26 @@ def get_auto_source_type(*args, **kw):
 
 
 def parse_source_line(line):
-    kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))
+    """Scan line and return positional_args, keyword_args"""
+    kv, args = dual_filter(_iskv, map(_kvmatch, line.split()))
     return [ a[1] for a in args ], dict(kv)
 
 
 def dual_filter(cond, seq):
+    """filter `seq` on `cond`; return two lists: (matches, non_matches)"""
     pos,neg = [],[]
     for x in seq:
         (pos if cond(x) else neg).append(x)
     return pos,neg
 
 
-def kvmatch(arg):
-    # return (key,val) for "key=val", else return (None, arg)
+def _kvmatch(arg):
+    # return (key,val) if arg has form "key=val", otherwise (None, arg)
     return re.search(r'^(?:(\w+)=)?(.*)', arg).groups()
+
+def _iskv(kv):
+    # is the `kv` returned by _kvmatch a (key,val) pair?
+    return kv[0] is not None
 
 
 def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):

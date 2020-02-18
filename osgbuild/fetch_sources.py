@@ -364,14 +364,14 @@ def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
 
     xtype = "type" if explicit_type else "implicit type"
     log.error("Error processing source line of %s '%s'" % (xtype, meta_type))
-    varnames = handler.__code__.co_varnames
-    fn_argcount = handler.__code__.co_argcount
-    minargs = fn_argcount - len(handler.__defaults__)
-    reqargs = varnames[:minargs]
-    maxargs = varnames.index('ops')
-    posargs = varnames[:maxargs]
-    posargs_provided = posargs[:len(args)]
-    dupe_args = set(posargs_provided) & set(kw)
+    varnames = handler.__code__.co_varnames     # arg names for handler func
+    fn_argcount = handler.__code__.co_argcount  # number of positional args
+    minargs = fn_argcount - len(handler.__defaults__)  # number of required args
+    reqargs = varnames[:minargs]     # names of required arguments
+    maxargs = varnames.index('ops')  # max number of positional args we allow
+    posargs = varnames[:maxargs]     # names of allowed positional args
+    posargs_provided = posargs[:len(args)]  # names of positional args provided
+    dupe_args = set(posargs_provided) & set(kw)  # find duplicate/missing args
     missing_args = set(reqargs) - set(posargs_provided) - set(kw.keys())
 
     if dupe_args or missing_args:

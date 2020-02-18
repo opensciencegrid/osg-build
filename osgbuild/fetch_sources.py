@@ -100,9 +100,11 @@ FetchOptions = collections.namedtuple('FetchOptions',
 #       **kw  # only list if extra args are intended (to pass to another fn)
 #   )
 
+
 def fetch_cached_source(relpath, sha1sum=None, ops=None):
     uri = os.path.join(ops.cache_prefix, relpath)
     return fetch_uri_source(uri, sha1sum, ops=ops)
+
 
 def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
     _almost_required(sha1sum, 'sha1sum')
@@ -117,7 +119,9 @@ def fetch_uri_source(uri, sha1sum=None, ops=None, filename=None):
 
     return [outfile]
 
+
 def download_uri(uri, outfile):
+    """Download uri to outfile, return sha1sum.  Frugal with memory usage."""
     log.info('Retrieving ' + uri)
     try:
         handle = urllib.request.urlopen(uri)
@@ -134,11 +138,14 @@ def download_uri(uri, outfile):
         raise Error("Unable to save downloaded file to %s\n%s" % (outfile, e))
     return sha.hexdigest()
 
+
 def chunked_read(handle, size=64*1024):
+    """Return a generator to iterate over a file in chuncks of `size` bytes"""
     chunk = handle.read(size)
     while chunk:
         yield chunk
         chunk = handle.read(size)
+
 
 def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
     efmt = "sha1 mismatch for '%s':\n    expected: %s\n         got: %s"
@@ -149,14 +156,17 @@ def check_file_checksum(path, sha1sum, got_sha1sum, nocheck):
         else:
             raise Error(msg)
 
+
 def _required(item, key):
     if item is None:
         raise Error("No '%s' specified" % key)
+
 
 def _almost_required(item, key):
     if item is None:
         log.warning("No '%s' specified; Note this field will be required"
                     " for official builds." % key)
+
 
 def _mk_prefix(name, tag, tarball):
     if tarball:
@@ -171,12 +181,14 @@ def _mk_prefix(name, tag, tarball):
         prefix = "%s-%s" % (name, tarball_version)
     return prefix
 
+
 def fetch_github_source(repo, tag, hash=None, ops=None, **kw):
     m = re.match(r"([^\s/]+)/([^\s/]+?)(?:.git)?$", repo)
     if not m:
         raise Error("'repo' syntax for type=github must be owner/project")
     url = "https://github.com/" + repo
     return fetch_git_source(url, tag, hash, ops=ops, **kw)
+
 
 def fetch_git_source(url, tag, hash=None, ops=None,
         name=None, spec=None, tarball=None, prefix=None):
@@ -191,6 +203,7 @@ def fetch_git_source(url, tag, hash=None, ops=None,
     return run_with_tmp_git_dir(ops.destdir, lambda:
         git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops))
 
+
 def run_with_tmp_git_dir(destdir, call):
     git_dir = tempfile.mkdtemp(dir=destdir)
     old_git_dir = update_env('GIT_DIR', git_dir)
@@ -200,6 +213,7 @@ def run_with_tmp_git_dir(destdir, call):
         shutil.rmtree(git_dir)
         update_env('GIT_DIR', old_git_dir)
 
+
 def update_env(key, val):
     oldval = os.environ.get(key)
     if val is None:
@@ -208,13 +222,16 @@ def update_env(key, val):
         os.environ[key] = val
     return oldval
 
+
 def checked_call2(*args, **kw):
     # combine output/stderr for failures, otherwise discard
     utils.checked_backtick(*args, err2out=True, **kw)
 
+
 def unchecked_call2(*args, **kw):
     # discard output/stderr, return True if returncode == 0
     return utils.sbacktick(*args, err2out=True, **kw)[1] == 0
+
 
 def git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops):
     log.info('Retrieving %s %s' % (url, tag))
@@ -246,6 +263,7 @@ def git_archive_remote_ref(url, tag, hash, prefix, tarball, spec, ops):
 
     return list(filter(None, [dest_tar_gz, spec]))
 
+
 def try_get_spec(destdir, tree_sha, spec):
     dest_spec = os.path.join(destdir, os.path.basename(spec))
     spec_rev = '%s:%s' % (tree_sha, spec)
@@ -257,6 +275,7 @@ def try_get_spec(destdir, tree_sha, spec):
         utils.checked_call(['git', 'show', spec_rev], stdout=specf)
     return dest_spec
 
+
 def check_git_hash(url, tag, sha, got_sha, nocheck):
     efmt = "Hash mismatch for %s tag %s\n    expected: %s\n    actual:   %s"
     if sha != got_sha and deref_git_sha(sha) != deref_git_sha(got_sha):
@@ -266,13 +285,17 @@ def check_git_hash(url, tag, sha, got_sha, nocheck):
         else:
             raise Error(msg)
 
+
 def deref_git_sha(sha):
+    """Return `sha`, or (if it's an annotated tag object) the hash of the
+       commit it refers to."""
     cmd = ["git", "rev-parse", "-q", "--verify", sha + "^{}"]
     output, rc = utils.sbacktick(cmd)
     if rc:
         log.error("Git failed to parse rev: '%s'" % sha)
         return sha
     return output
+
 
 def process_source_line(line, ops):
     args,kv = parse_source_line(line)
@@ -295,6 +318,7 @@ def process_source_line(line, ops):
         raise Error("Unrecognized type '%s' (valid types are: %s)"
                     % (meta_type, sorted(handlers)))
 
+
 def get_auto_source_type(*args, **kw):
     if not args:
         raise Error("No type specified and no default arg provided")
@@ -305,19 +329,29 @@ def get_auto_source_type(*args, **kw):
     else:
         return 'cached'
 
+
 def parse_source_line(line):
-    kv, args = dual_filter((lambda t: t[0]), map(kvmatch, line.split()))
+    """Scan line and return positional_args, keyword_args"""
+    kv, args = dual_filter(_iskv, map(_kvmatch, line.split()))
     return [ a[1] for a in args ], dict(kv)
 
+
 def dual_filter(cond, seq):
+    """filter `seq` on `cond`; return two lists: (matches, non_matches)"""
     pos,neg = [],[]
     for x in seq:
         (pos if cond(x) else neg).append(x)
     return pos,neg
 
-def kvmatch(arg):
-    # return (key,val) for "key=val", else return (None, arg)
+
+def _kvmatch(arg):
+    # return (key,val) if arg has form "key=val", otherwise (None, arg)
     return re.search(r'^(?:(\w+)=)?(.*)', arg).groups()
+
+def _iskv(kv):
+    # is the `kv` returned by _kvmatch a (key,val) pair?
+    return kv[0] is not None
+
 
 def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
     # A TypeError is thrown if, eg, a source line does not have all the
@@ -330,14 +364,14 @@ def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
 
     xtype = "type" if explicit_type else "implicit type"
     log.error("Error processing source line of %s '%s'" % (xtype, meta_type))
-    varnames = handler.__code__.co_varnames
-    fn_argcount = handler.__code__.co_argcount
-    minargs = fn_argcount - len(handler.__defaults__)
-    reqargs = varnames[:minargs]
-    maxargs = varnames.index('ops')
-    posargs = varnames[:maxargs]
-    posargs_provided = posargs[:len(args)]
-    dupe_args = set(posargs_provided) & set(kw)
+    varnames = handler.__code__.co_varnames  # func vars, beginning with args
+    fn_argcount = handler.__code__.co_argcount  # number of positional args
+    minargs = fn_argcount - len(handler.__defaults__)  # number of required args
+    reqargs = varnames[:minargs]     # names of required arguments
+    maxargs = varnames.index('ops')  # max number of positional args we allow
+    posargs = varnames[:maxargs]     # names of allowed positional args
+    posargs_provided = posargs[:len(args)]  # names of positional args provided
+    dupe_args = set(posargs_provided) & set(kw)  # find duplicate/missing args
     missing_args = set(reqargs) - set(posargs_provided) - set(kw.keys())
 
     if dupe_args or missing_args:
@@ -352,6 +386,7 @@ def fancy_source_error(meta_type, explicit_type, handler, args, kw, e):
     else:
         log.error(e)
     raise Error("Invalid parameters for %s=%s source line" % (xtype,meta_type))
+
 
 def process_dot_source(cache_prefix, sfilename, destdir, nocheck, want_spec):
     """Read a .source file, fetch any sources specified in it."""

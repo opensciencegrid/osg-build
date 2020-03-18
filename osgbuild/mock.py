@@ -38,9 +38,9 @@ class Mock(object):
         cfg_path = self._init_get_cfg_path()
         self.mock_cmd = ['mock']
         mock_version_str = utils.backtick(self.mock_cmd + ["--version"]).strip()
-        m = re.match(r"(\d+)\.(\d+)\.(\d+)", mock_version_str)
-        if m:
-            self.mock_version = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        mm = re.match(r"\d+(?:\.\d+)*", mock_version_str)
+        if mm:
+            self.mock_version = tuple(int(it) for it in mm.group(0).split("."))
         else:
             raise MockError("mock --version returned unexpected output: %s" % mock_version_str)
 

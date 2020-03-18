@@ -40,11 +40,7 @@ class Mock(object):
         mock_version_str = utils.backtick(self.mock_cmd + ["--version"]).strip()
         mm = re.match(r"\d+(?:\.\d+)*", mock_version_str)
         if mm:
-            try:
-                self.mock_version = tuple(int(it) for it in mm.group(0).split("."))
-            except TypeError:
-                # this shouldn't happen
-                raise MockError("mock --version returned unexpected output: %s" % mock_version_str)
+            self.mock_version = tuple(int(it) for it in mm.group(0).split("."))
         else:
             raise MockError("mock --version returned unexpected output: %s" % mock_version_str)
 

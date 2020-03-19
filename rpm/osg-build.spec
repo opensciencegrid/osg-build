@@ -1,5 +1,5 @@
 #global betatag .pre
-%global _release 1
+%global _release 2
 
 Name:           osg-build
 Version:        1.15.1
@@ -45,7 +45,9 @@ osg-build-koji is required to use the koji task.
 
 %package mock
 Requires:       %{name}-base = %{version}
-Requires:       mock >= 1.0.0
+# mock 2.0 attempts to build with dnf inside the chroot which fails miserably.
+# Until that's fixed, forbid that version.
+Requires:       mock >= 1.0.0, mock < 2.0
 Summary:        OSG-Build Mock plugin, allows builds with mock
 
 %description mock
@@ -143,6 +145,7 @@ fi
 %changelog
 * Thu Oct 03 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.1-1
 - Fix mock version detection
+- Require mock < 2.0 to avoid build errors related to (attempted) use of DNF.
 
 * Wed Oct 02 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.0-1
 - Make missing sha1sums an error (SOFTWARE-3787)

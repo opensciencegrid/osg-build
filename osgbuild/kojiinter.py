@@ -50,6 +50,7 @@ try:
     # load koji cli (as kojicli) from either somewhere in $PATH or CSL_KOJI_DIR/cli/koji
     # I can't use imp.find_module here to get the values I need because
     # /usr/bin/koji doesn't end in .py
+    sys.path.append(os.path.dirname(os.path.abspath(kojicli_filename)))
     kojicli_filehandle = open(kojicli_filename)
     kojicli_desc = ('', kojicli_filehandle.mode, imp.PY_SOURCE)
     kojicli = imp.load_module('kojicli',

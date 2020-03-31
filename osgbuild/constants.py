@@ -52,7 +52,7 @@ GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned',
     r'^(\w*/)?condor-(el\d+)'              : 'condor'}
 
-CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.11.0"
+CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.15.3"
 
 OSG_REMOTE = 'https://github.com/opensciencegrid/Software-Redhat.git'
 OSG_AUTH_REMOTE = 'git@github.com:opensciencegrid/Software-Redhat.git'

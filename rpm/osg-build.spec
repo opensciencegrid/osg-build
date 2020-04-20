@@ -1,5 +1,5 @@
 #global betatag .pre
-%global _release 2
+%global _release 3
 
 Name:           osg-build
 Version:        1.15.1
@@ -24,15 +24,21 @@ See %{url} for details.
 
 
 %package base
+%if 0%{?rhel} < 8
 Requires:       git
+%else
+Requires:       git-core
+%endif
 Requires:       rpm-build
 Requires:       quilt
 Requires:       rpmlint
 Requires:       subversion
 Requires:       wget
-Requires:       python >= 2.6
 Requires:       epel-rpm-macros
+%if 0%{?rhel} < 8
+Requires:       python >= 2.6
 Requires:       python-six
+%endif
 Summary:        OSG-Build base package, not containing mock or koji modules or koji-based tools
 
 %description base
@@ -46,8 +52,12 @@ osg-build-koji is required to use the koji task.
 %package mock
 Requires:       %{name}-base = %{version}
 # mock 2.0 attempts to build with dnf inside the chroot which fails miserably.
-# Until that's fixed, forbid that version.
+# Fixed in 2.1.  EL 7 doesn't have that though.
+%if 0%{?rhel} >= 8
+Requires:       mock >= 2.1
+%else
 Requires:       mock >= 1.0.0, mock < 2.0
+%endif
 Summary:        OSG-Build Mock plugin, allows builds with mock
 
 %description mock
@@ -86,10 +96,20 @@ Summary:        OSG-Build tests
 %setup -q -n %{name}-%{version}
 
 %install
+%if 0%{?el6}
 find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/bin/python,' '{}' +
+%else
+%if 0%{?el8}
+find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/libexec/platform-python,' '{}' +
+%else
+find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/bin/python2,' '{}' +
+%endif
+%endif
 make install DESTDIR=$RPM_BUILD_ROOT
+%if 0%{?rhel} < 8
 rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 # ^ don't bundle "six" in the RPM; it's a dependency instead
+%endif
 
 %check
 SW_VERSION=$(python -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
@@ -143,6 +163,11 @@ fi
 
 
 %changelog
+* Mon Apr 20 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.1-3
+- Various RHEL 8 compat fixes; most notably, use platform-python since we can't
+  depend on any version of Python to be installed except as a module and can't
+  bring in modular dependencies.
+
 * Thu Oct 03 2019 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.1-1
 - Fix mock version detection
 - Require mock < 2.0 to avoid build errors related to (attempted) use of DNF.

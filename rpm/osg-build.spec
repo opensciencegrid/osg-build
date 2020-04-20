@@ -127,6 +127,9 @@ fi
 %{_bindir}/osg-build-test
 %dir %{python_sitelib}/osgbuild/test
 %{python_sitelib}/osgbuild/test/*.py*
+%if 0%{?rhel} > 8 || 0%{?fedora} > 29
+%{python_sitelib}/osgbuild/test/__pycache__
+%endif
 
 %files base
 %{_bindir}/%{name}
@@ -144,6 +147,9 @@ fi
 %{python_sitelib}/osgbuild/utils.py*
 %{python_sitelib}/osgbuild/version.py*
 %{_datadir}/%{name}/rpmlint.cfg
+%if 0%{?rhel} > 8 || 0%{?fedora} > 29
+%python_sitelib/osgbuild/__pycache__
+%endif
 
 %files mock
 %{python_sitelib}/osgbuild/mock.py*

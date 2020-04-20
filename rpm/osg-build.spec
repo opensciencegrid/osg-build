@@ -119,7 +119,7 @@ rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 %endif
 
 %check
-SW_VERSION=$(%{python} -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
+SW_VERSION=$(%{__python} -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
 if [[ $SW_VERSION != %{version} ]]; then
     echo "Version mismatch between RPM version (%{version}) and software version ($SW_VERSION)"
     echo "Edit osgbuild/version.py"

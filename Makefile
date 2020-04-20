@@ -1,6 +1,7 @@
 # version now specified in osgbuild/version.py
-VERSION = $(shell python -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
-HASH = $(shell git rev-parse HEAD)
+PYTHON = python
+VERSION := $(shell $(PYTHON) -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
+HASH := $(shell git rev-parse HEAD)
 NAME = osg-build
 NAME_VERSION = $(NAME)-$(VERSION)
 PYDIR = osgbuild
@@ -10,7 +11,7 @@ MAIN_SCRIPT = $(NAME)
 EXTRA_SCRIPTS = koji-tag-diff osg-import-srpm osg-koji osg-promote koji-blame
 MAIN_TEST_SYMLINK = osg-build-test
 MAIN_TEST = $(TESTDIR)/test_osgbuild.py
-PYTHON_SITELIB = $(shell python -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
+PYTHON_SITELIB := $(shell $(PYTHON) -c "from distutils.sysconfig import get_python_lib; import sys; sys.stdout.write(get_python_lib())")
 BINDIR = /usr/bin
 DATADIR = /usr/share/$(NAME)
 AFS_SOFTWARE_DIR = /p/vdt/public/html/upstream/$(NAME)
@@ -48,13 +49,13 @@ check:
 	pylint -E osg-build osg-promote osg-koji $(PYDIR)/*.py $(TESTDIR)/*.py
 test:
 	pylint -E osg-build osg-promote osg-koji $(PYDIR)/*.py $(TESTDIR)/*.py
-	python $(MAIN_TEST) -v TestSuiteAll
-	python $(TESTDIR)/test_osgpromote.py
+	$(PYTHON) $(MAIN_TEST) -v TestSuiteAll
+	$(PYTHON) $(TESTDIR)/test_osgpromote.py
 
 shorttest:
 	pylint -E osg-build osg-promote osg-koji $(PYDIR)/*.py $(TESTDIR)/*.py
-	python $(MAIN_TEST) -v TestSuiteShort
-	python $(TESTDIR)/test_osgpromote.py
+	$(PYTHON) $(MAIN_TEST) -v TestSuiteShort
+	$(PYTHON) $(TESTDIR)/test_osgpromote.py
 
 lint:
 	-pylint --rcfile=pylintrc osg-build osg-promote osg-koji $(PYDIR)/*.py $(TESTDIR)/*.py

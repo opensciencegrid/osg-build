@@ -107,7 +107,7 @@ Summary:        OSG-Build tests
 
 %install
 find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!%{__python},' '{}' +
-make install DESTDIR=$RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT PYTHON=%{__python}
 %if 0%{?rhel} < 8
 rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 # ^ don't bundle "six" in the RPM; it's a dependency instead

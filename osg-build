@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 "Load and run the main osg-build script"
 # pylint: disable=C0103
 from __future__ import print_function

@@ -92,26 +92,21 @@ Summary:        OSG-Build tests
 %{summary}
 
 
-%if 0%{?rhel} >= 8 || 0%{?fedora} >= 29
+%if 0%{?rhel} >= 8
+%define __python /usr/libexec/platform-python
+%else
+%if 0%{?fedora} >= 29
 %define __python /usr/bin/python3
 %else
 %define __python /usr/bin/python2
 %endif
-
+%endif
 
 %prep
 %setup -q -n %{name}-%{version}
 
 %install
-%if 0%{?el6}
-find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/bin/python,' '{}' +
-%else
-%if 0%{?el8}
-find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/libexec/platform-python,' '{}' +
-%else
-find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!/usr/bin/python2,' '{}' +
-%endif
-%endif
+find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!%{__python},' '{}' +
 make install DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?rhel} < 8
 rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*

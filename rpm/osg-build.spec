@@ -92,9 +92,12 @@ Summary:        OSG-Build tests
 %{summary}
 
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 29
 %define __python /usr/bin/python3
+%else
+%define __python /usr/bin/python2
 %endif
+
 
 %prep
 %setup -q -n %{name}-%{version}

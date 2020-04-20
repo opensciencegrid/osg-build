@@ -95,7 +95,7 @@ Summary:        OSG-Build tests
 %if 0%{?rhel} >= 8
 %define __python /usr/libexec/platform-python
 %else
-%if 0%{?fedora} >= 29
+%if 0%{?fedora} >= 31
 %define __python /usr/bin/python3
 %else
 %define __python /usr/bin/python2
@@ -129,7 +129,7 @@ fi
 %{_bindir}/osg-build-test
 %dir %{python_sitelib}/osgbuild/test
 %{python_sitelib}/osgbuild/test/*.py*
-%if 0%{?rhel} > 8 || 0%{?fedora} > 29
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 %{python_sitelib}/osgbuild/test/__pycache__
 %endif
 
@@ -149,7 +149,7 @@ fi
 %{python_sitelib}/osgbuild/utils.py*
 %{python_sitelib}/osgbuild/version.py*
 %{_datadir}/%{name}/rpmlint.cfg
-%if 0%{?rhel} > 8 || 0%{?fedora} > 29
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 %python_sitelib/osgbuild/__pycache__
 %endif
 

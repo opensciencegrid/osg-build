@@ -152,6 +152,9 @@ fi
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 %python_sitelib/osgbuild/__pycache__
 %endif
+%if 0%{?rhel} >= 8
+%{python_sitelib}/osgbuild/six.py*
+%endif
 
 %files mock
 %{python_sitelib}/osgbuild/mock.py*

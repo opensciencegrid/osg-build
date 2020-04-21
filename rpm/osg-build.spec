@@ -17,6 +17,12 @@ Requires:       %{name}-base = %{version}
 Requires:       %{name}-mock = %{version}
 Requires:       %{name}-koji = %{version}
 
+%if 0%{?rhel} < 8
+BuildRequires:       git
+%else
+BuildRequires:       git-core
+%endif
+
 
 %description
 %{summary}

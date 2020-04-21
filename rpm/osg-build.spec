@@ -85,7 +85,7 @@ the following tools:
 
 %package tests
 Requires:       %{name} = %{version}
-Provides:       %{name}-test
+Provides:       %{name}-test = %{version}
 Summary:        OSG-Build tests
 
 %description tests
@@ -93,13 +93,13 @@ Summary:        OSG-Build tests
 
 
 %if 0%{?rhel} >= 8
-%define __python /usr/libexec/platform-python
+  %define __python /usr/libexec/platform-python
 %else
-%if 0%{?fedora} >= 31
-%define __python /usr/bin/python3
-%else
-%define __python /usr/bin/python2
-%endif
+  %if 0%{?fedora} >= 31
+    %define __python /usr/bin/python3
+  %else
+    %define __python /usr/bin/python2
+  %endif
 %endif
 
 %prep

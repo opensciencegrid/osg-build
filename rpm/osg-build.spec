@@ -1,8 +1,8 @@
 #global betatag .pre
-%global _release 3
+%global _release 1
 
 Name:           osg-build
-Version:        1.15.1
+Version:        1.16.0
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -180,6 +180,9 @@ fi
 
 
 %changelog
+* Thu Apr 23 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.16.0-1
+- Add EL8 support to osg-promote
+
 * Mon Apr 20 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.15.1-3
 - Various RHEL 8 compat fixes; most notably, use platform-python since we can't
   depend on any version of Python to be installed except as a module and can't

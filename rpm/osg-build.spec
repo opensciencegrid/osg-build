@@ -58,8 +58,8 @@ osg-build-koji is required to use the koji task.
 %package mock
 Requires:       %{name}-base = %{version}
 # mock 2.0 attempts to build with dnf inside the chroot which fails miserably.
-# Fixed in 2.1.  EL 7 doesn't have that though.
-%if 0%{?rhel} >= 8
+# Fixed in 2.1 but EL 7/8 don't have that yet.
+%if 0%{?fedora} >= 31
 Requires:       mock >= 2.1
 %else
 Requires:       mock >= 1.0.0, mock < 2.0

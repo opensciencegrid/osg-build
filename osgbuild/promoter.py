@@ -615,12 +615,12 @@ def parse_cmdline_args(configuration, argv):
     parser.add_option("-y", "--assume-yes", action="store_true", default=False,
                       help="Do not prompt before promotion")
     for dver in all_dvers:
-        parser.add_option("--%s-only" % dver, action="store_const", dest="only_dver", const=dver, default=None,
-                          help="Promote only %s builds" % dver)
-        parser.add_option("--no-%s" % dver, "--no%s" % dver, dest="no_dvers", action="append_const", default=[],
-                          help="Do not promote %s builds, even if they are default for the route(s)" % dver)
-        parser.add_option("--%s" % dver, dest="extra_dvers", action="append_const", default=[],
-                          help="Promote %s builds if the route(s) support them" % dver)
+        parser.add_option("--%s-only" % dver,                action="store_const",  dest="only_dver",   const=dver,
+                          default=None, help="Promote only %s builds" % dver)
+        parser.add_option("--no-%s" % dver, "--no%s" % dver, action="append_const", dest="no_dvers",    const=dver,
+                          default=[],   help="Do not promote %s builds, even if they are default for the route(s)" % dver)
+        parser.add_option("--%s" % dver,                     action="append_const", dest="extra_dvers", const=dver,
+                          default=[],   help="Promote %s builds if the route(s) support them" % dver)
 
     if len(argv) < 2:
         parser.print_help()

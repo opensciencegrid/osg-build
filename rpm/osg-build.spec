@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.16.0
+Version:        1.16.1
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -179,6 +179,8 @@ fi
 
 
 %changelog
+* Fri May 29 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.16.1-1
+- Drop server CA bundle and use the OS CA bundle instead (SOFTWARE-4099)
 - Drop mock version constraint; EL7 now has mock 2.2.
 
 * Thu Apr 23 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.16.0-1

@@ -58,8 +58,8 @@ osg-build-koji is required to use the koji task.
 %package mock
 Requires:       %{name}-base = %{version}
 # mock 2.0 attempts to build with dnf inside the chroot which fails miserably.
-# Fixed in 2.1 but EL 7/8 don't have that yet.
-%if 0%{?fedora} >= 31
+# Fixed in 2.1 but EL 6 doesn't have that.
+%if 0%{?fedora} >= 31 || 0%{?rhel} > 6
 Requires:       mock >= 2.1
 %else
 Requires:       mock >= 1.0.0, mock < 2.0
@@ -180,6 +180,8 @@ fi
 
 
 %changelog
+- Drop mock version constraint; EL7 now has mock 2.2.
+
 * Thu Apr 23 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.16.0-1
 - Add EL8 support to osg-promote
 

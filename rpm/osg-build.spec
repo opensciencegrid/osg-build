@@ -176,7 +176,6 @@ fi
 %{_datadir}/%{name}/osg-koji-site.conf
 %{_datadir}/%{name}/osg-koji-home.conf
 %{_datadir}/%{name}/promoter.ini
-%{_datadir}/%{name}/osg-ca-bundle.crt
 
 
 %changelog

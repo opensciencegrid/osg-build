@@ -25,7 +25,6 @@ OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
 GLOBUS_DIR = os.path.expanduser("~/.globus")
 KOJI_CONFIG_FILE = "config"
 CLIENT_CERT_FILE = "client.crt"
-SERVER_CERT_FILE = "osg-ca-bundle.crt"
 
 PROGRAM_NAME = os.path.basename(sys.argv[0])
 
@@ -161,14 +160,6 @@ you should say yes.
                     new_koji_config_path)
 
 
-def setup_koji_server_cert():
-    """Create the koji server cert file."""
-    new_server_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
-                                        SERVER_CERT_FILE)
-    safe_make_backup(new_server_cert_path)
-    shutil.copy(find_file(SERVER_CERT_FILE, DATA_FILE_SEARCH_PATH), new_server_cert_path)
-
-
 def with_safe_umask(function_to_wrap):
     """decorator to set the umask to 0077 and restore it when we're done"""
     def wrapped_function(*args, **kwargs):  # pylint: disable=missing-docstring
@@ -289,9 +280,6 @@ def run_setup(options):
     user_cert, user_key = options.user_cert, options.user_key
     safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
     setup_koji_config_file(options.write_client_conf)
-    if not os.path.exists(os.path.join(OSG_KOJI_USER_CONFIG_DIR, SERVER_CERT_FILE)) or \
-            options.server_cert:
-        setup_koji_server_cert()
     setup_koji_client_cert(user_cert, user_key, options.proxy)
 
     if not os.path.exists(KOJI_USER_CONFIG_DIR):
@@ -310,8 +298,7 @@ def verify_koji_dir(config_dir):
     """
     for path, descr in [
             (KOJI_CONFIG_FILE, "Koji configuration file"),
-            (CLIENT_CERT_FILE, "User certificate file (client cert)"),
-            (SERVER_CERT_FILE, "Server certificate file (CA bundle)")]:
+            (CLIENT_CERT_FILE, "User certificate file (client cert)")]:
 
         fullpath = os.path.join(config_dir, path)
         if os.path.exists(fullpath):

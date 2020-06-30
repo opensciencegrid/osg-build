@@ -143,7 +143,7 @@ You might need to log out and log in for the changes to take effect""")
         if self.mock_version >= (1,4,0):
             # systemd-nspawn is often broken; don't use it. network is required for maven builds :(
             rebuild_cmd += ['--enable-network', '--config-opts=use_nspawn=False']
-            if int(self.buildopts["redhat_release"]) >= 8 and utils.get_local_machine_dver() < "el8":
+            if int(self.buildopts["redhat_release"]) >= 8 and utils.get_local_machine_release() < 8:
                 rebuild_cmd += ["--bootstrap-chroot"]
         else:
             # ccache on old versions tries to install the el5 package for ccache and dies

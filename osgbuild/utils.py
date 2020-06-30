@@ -483,3 +483,14 @@ def get_local_machine_dver():
     if match:
         return "fc" + match.group(1)
     return ""
+
+
+def get_local_machine_release():
+    # type: () -> int
+    """Return the distro version (e.g. 6, 7) of the local machine
+    or 0 if we can't figure it out."""
+    dver = get_local_machine_dver()
+    try:
+        return int(re.search(r"\d+", dver).group(0))
+    except AttributeError:  # no match
+        return 0

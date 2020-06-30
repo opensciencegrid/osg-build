@@ -462,16 +462,35 @@ def popd():
 
 
 def get_local_machine_dver():
-    "Return the distro version (e.g. 'el6', 'el7') of the local machine or None"
+    # type: () -> str
+    """Return the distro version (e.g. 'el6', 'el7') of the local machine
+    or the empty string if we can't figure it out."""
     try:
         redhat_release_contents = slurp("/etc/redhat-release")
-    except EnvironmentError: # some error reading the file
-        return
+        if not redhat_release_contents:
+            return ""  # empty file?
+    except EnvironmentError:  # some error reading the file
+        return ""
 
     for rhellike in ["Scientific", "Red Hat Enterprise", "CentOS"]:
-        try:
-            if rhellike in redhat_release_contents:
-                match = re.search(r"release (\d+)", redhat_release_contents)
+        if rhellike in redhat_release_contents:
+            match = re.search(r"release (\d+)", redhat_release_contents)
+            if match:
                 return "el" + match.group(1)
-        except (TypeError, AttributeError): # empty file or no match
-            return
+            else:
+                return ""
+    match = re.search(r"Fedora release (\d+)", redhat_release_contents)
+    if match:
+        return "fc" + match.group(1)
+    return ""
+
+
+def get_local_machine_release():
+    # type: () -> int
+    """Return the distro version (e.g. 6, 7) of the local machine
+    or 0 if we can't figure it out."""
+    dver = get_local_machine_dver()
+    try:
+        return int(re.search(r"\d+", dver).group(0))
+    except AttributeError:  # no match
+        return 0

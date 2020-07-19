@@ -99,6 +99,7 @@ for dver in DVERS:
         koji_target=None,
         redhat_release=dver[2:]
     )
+DEFAULT_BUILDOPTS_BY_DVER['el7']['_binary_payload'] = 'w2.xzdio'
 
 # If the dver on the current machine can't be detected for some reason, or
 # isn't EL, use this.

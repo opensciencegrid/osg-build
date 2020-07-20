@@ -85,6 +85,8 @@ class SRPMBuild(object):
             "dist ." + self.buildopts.get('distro_tag', 'osg.el' + rhel),
             "osg 1",
         ]
+        if '_binary_payload' in self.buildopts:
+            defines.append("_binary_payload %s" % self.buildopts['_binary_payload'])
         for dver in DVERS:
             if dver == 'el' + rhel:
                 defines.append("%s 1" % dver)

@@ -29,43 +29,14 @@ log = logging.getLogger(__name__)
 
 HAVE_KOJILIB = None
 try:
-    # Hack to load koji modules
-    # This loads the koji libraries (koji/__init__.py) as kojilib, and the
-    # script that is the koji cli (cli/koji or /usr/bin/koji) as kojicli
-    import imp
-    # UW CSL hack
     if os.path.isdir(CSL_KOJI_DIR):
-        # explicitly import koji (as kojilib) from CSL_KOJI_DIR
-        kojilib_filehandle, kojilib_filename, kojilib_desc = (
-            imp.find_module('koji', [CSL_KOJI_DIR]))
-        kojilib = imp.load_module('koji',
-                                  kojilib_filehandle,
-                                  kojilib_filename,
-                                  kojilib_desc)
-        # HAAACK
-        kojicli_filename = os.path.join(CSL_KOJI_DIR, "cli", "koji")
-    else:
-        import koji as kojilib # pylint: disable=F0401
-        kojicli_filename = utils.which("koji")
-    # load koji cli (as kojicli) from either somewhere in $PATH or CSL_KOJI_DIR/cli/koji
-    # I can't use imp.find_module here to get the values I need because
-    # /usr/bin/koji doesn't end in .py
-    sys.path.append(os.path.dirname(os.path.abspath(kojicli_filename)))
-    kojicli_filehandle = open(kojicli_filename)
-    kojicli_desc = ('', kojicli_filehandle.mode, imp.PY_SOURCE)
-    kojicli = imp.load_module('kojicli',
-                              kojicli_filehandle,
-                              kojicli_filename,
-                              kojicli_desc)
-    if kojilib.BR_STATES and kojilib.BUILD_STATES and kojilib.REPO_STATES and kojilib.TASK_STATES:
-        HAVE_KOJILIB = True
-    else:
-        HAVE_KOJILIB = False
-except ImportError:
+        sys.path.append(CSL_KOJI_DIR)
+        sys.path.append(CSL_KOJI_DIR + "/cli")
+    import koji as kojilib
+    from koji_cli import lib as kojicli
+    HAVE_KOJILIB = True
+except (ImportError, AttributeError):
     HAVE_KOJILIB = False
-except AttributeError:
-    HAVE_KOJILIB = False
-
 
 
 def get_koji_cmd(use_osg_koji):

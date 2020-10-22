@@ -74,6 +74,7 @@ Summary:        OSG-Build Mock plugin, allows builds with mock
 Requires:       %{name}-base = %{version}
 Requires:       openssl
 Requires:       koji >= 1.13.0
+Requires:       voms-clients-cpp
 %if 0%{?rhel} < 7
 Requires:       python-argparse
 %endif

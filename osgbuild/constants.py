@@ -104,18 +104,18 @@ DEFAULT_BUILDOPTS_BY_DVER['el7']['_binary_payload'] = 'w2.xzdio'
 # If the dver on the current machine can't be detected for some reason, or
 # isn't EL, use this.
 FALLBACK_DVER = 'el7'
-DEFAULT_DVERS = ['el7']
+DEFAULT_DVERS = ['el7', 'el8']
 DEFAULT_DVERS_BY_REPO = {
     '3.3': ['el6', 'el7'],
     'osg-3.3': ['el6', 'el7'],
     '3.4': ['el6', 'el7'],
     'osg-3.4': ['el6', 'el7'],
-    '3.5': ['el7'],
-    'osg-3.5': ['el7'],
+    '3.5': ['el7', 'el8'],
+    'osg-3.5': ['el7', 'el8'],
     'internal': ['el6', 'el7'],
     'condor': ['el6', 'el7'],
-    'devops': ['el7'],
-    'upcoming': ['el7'],
+    'devops': ['el7', 'el8'],
+    'upcoming': ['el7', 'el8'],
 }
 assert FALLBACK_DVER in DVERS
 for d in DEFAULT_DVERS:

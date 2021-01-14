@@ -52,6 +52,7 @@ class Mock(object):
                 raise MockError("Couldn't find mock config file at " + cfg_abspath)
 
             # The cfg file passed to mock is always relative to /etc/mock
+            # TODO the manpage says if it ends in .cfg, it is interpreted as a full path so this is no longer needed
             self.mock_cmd += ['-r', "../../" + cfg_abspath_no_ext]
 
         self.target_arch = buildopts['target_arch']
@@ -99,6 +100,7 @@ You might need to log out and log in for the changes to take effect""")
             # the way mock does it. Figure out which the user
             # meant (by seeing which interpretation exists) and
             # translate it to what mock wants.
+            # TODO no longer true, see above
             if not mock_config.endswith(".cfg"):
                 given_cfg_path = mock_config + ".cfg"
             else:

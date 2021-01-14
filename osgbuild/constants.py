@@ -9,7 +9,7 @@ WD_UNPACKED_TARBALL = '_upstream_tarball_contents'
 WD_QUILT = '_quilt'
 AFS_CACHE_PATH = '/p/vdt/public/html/upstream'
 AFS_CACHE_PREFIX = 'file://' + AFS_CACHE_PATH
-WEB_CACHE_PREFIX = 'http://vdt.cs.wisc.edu/upstream'
+WEB_CACHE_PREFIX = 'https://vdt.cs.wisc.edu/upstream'
 
 KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.koji")
 OSG_KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")
@@ -19,7 +19,7 @@ KOJI_CONF = "osg-koji-site.conf"
 OLD_KOJI_CONF = "osg-koji.conf"
 DATA_DIR = "/usr/share/osg-build"
 
-KOJI_HUB = "http://koji.opensciencegrid.org"
+KOJI_HUB = "https://koji.opensciencegrid.org"
 KOJI_WEB = "https://koji.opensciencegrid.org"
 
 DATA_FILE_SEARCH_PATH = [os.path.abspath(os.path.dirname(__file__) + "/../data")]

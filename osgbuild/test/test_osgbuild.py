@@ -13,7 +13,7 @@ import shutil
 import tempfile
 import tarfile
 import unittest
-from unittest import makeSuite
+from unittest import makeSuite, TestCase
 import sys
 
 import osgbuild.constants as C
@@ -88,41 +88,7 @@ def regex_in_list(pattern, listing):
     return [x for x in listing if re.match(pattern, x)]
 
 
-class XTestCase(unittest.TestCase):
-    """XTestCase (extended test case) adds some useful assertions to
-    unittest.TestCase
-
-    """
-    # unittest.TestCase does not have a failureException in 2.4
-    failureException = getattr(super, 'failureException', AssertionError)
-
-    # Code from unittest in Python 2.7 (c) Python Software Foundation
-    def assertRegexpMatches(self, text, regexp, msg=None):
-        """Fail if 'text' does not match 'regexp'"""
-        if isinstance(regexp, re._pattern_type):
-            re_pattern = regexp
-        else:
-            re_pattern = re.compile(regexp)
-        if not re_pattern.search(text):
-            msg = msg or "Regexp didn't match"
-            msg = '%s: %r not found in %r' % (msg, re_pattern.pattern, text)
-            raise self.failureException(msg)
-
-    # Code from unittest in Python 2.7 (c) Python Software Foundation
-    def assertNotRegexpMatches(self, text, regexp, msg=None):
-        """Fail if 'text' matches 'regex'"""
-        if isinstance(regexp, re._pattern_type):
-            re_pattern = regexp
-        else:
-            re_pattern = re.compile(regexp)
-        match = re_pattern.search(text)
-        if match:
-            msg = msg or "Regexp matched"
-            msg = '%s: %r matches %r in %r' % (msg, text[match.start():match.end()], re_pattern.pattern, text)
-            raise self.failureException(msg)
-
-
-class TestLint(XTestCase):
+class TestLint(TestCase):
     """Tests for 'lint' task"""
 
     def setUp(self):
@@ -144,7 +110,7 @@ class TestLint(XTestCase):
             raise
 
 
-class TestRpmbuild(XTestCase):
+class TestRpmbuild(TestCase):
     """Tests for 'rpmbuild' task"""
 
     def setUp(self):
@@ -163,7 +129,7 @@ class TestRpmbuild(XTestCase):
             raise
 
 
-class TestPrebuild(XTestCase):
+class TestPrebuild(TestCase):
     """Tests for 'prebuild' task"""
 
     def test_prebuild(self):
@@ -234,7 +200,7 @@ class TestPrebuild(XTestCase):
 # end of TestPrebuild
 
 
-class TestPrepare(XTestCase):
+class TestPrepare(TestCase):
     """Tests for 'prepare' task"""
 
     def setUp(self):
@@ -251,7 +217,7 @@ class TestPrepare(XTestCase):
             self.fail("Patches not applied")
 
 
-class TestFetch(XTestCase):
+class TestFetch(TestCase):
     """Tests for fetch-sources"""
     @staticmethod
     def fetch_sources(pdir, nocheck=False):
@@ -279,14 +245,14 @@ class TestFetch(XTestCase):
             "Spec file not overridden")
 
     def test_git_fetch(self):
-        common_setUp(opj(DEVOPS, "osg-build"), "{2019-10-01}")
+        common_setUp(opj(DEVOPS, "osg-build"), "{2020-07-01}")
         contents = self.fetch_sources("osg-build")
 
         self.assertTrue(
             "osg-build.spec" in contents,
             "spec file not found")
         self.assertTrue(
-            "osg-build-1.14.2.tar.gz" in contents,
+            "osg-build-1.16.2.tar.gz" in contents,
             "source tarball not found")
 
     def test_git_fetch_with_release(self):
@@ -359,12 +325,12 @@ class TestFetch(XTestCase):
 
 
 
-class TestMock(XTestCase):
+class TestMock(TestCase):
     """Tests for mock"""
 
     def setUp(self):
         self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
-                                    "{2019-10-01}")
+                                    "{2021-01-27}")
 
     def check_for_mock_group(self):
         username = pwd.getpwuid(os.getuid()).pw_name
@@ -383,29 +349,28 @@ class TestMock(XTestCase):
 
     def test_mock_koji_cfg(self):
         if self.check_for_mock_group():
-            checked_osg_build(["mock", self.pkg_dir, "--el7", "--mock-config-from-koji=osg-3.4-el7-build"])
+            checked_osg_build(["mock", self.pkg_dir, "--el7", "--mock-config-from-koji=osg-3.6-el7-build"])
 
 
-class TestKoji(XTestCase):
+class TestKoji(TestCase):
     """Tests for koji"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
-                                    "{2012-01-25}")
+        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
+                                    "{2021-01-27}")
 
     kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
     kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
-    # TODO: Many of these tests were commented out because `osg-el6` no longer
-    # exists.  Update and re-enable them when we create `osg-el8`.
+
     def test_koji_shell_args1(self):
         output = backtick_osg_build(self.kdr_shell + ["--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(
             regex_in_list(r"(osg-)?koji .*build osg-el7", out_list),
             "not building for el7")
-        #self.assertTrue(
-        #    regex_in_list(r"(osg-)?koji .*build osg-el6", out_list),
-        #    "not building for el6")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji .*build osg-el8", out_list),
+            "not building for el8")
 
     def test_koji_shell_args2(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--scratch", self.pkg_dir])
@@ -413,20 +378,19 @@ class TestKoji(XTestCase):
         self.assertTrue(
             regex_in_list(r"(osg-)?koji .*build osg-el7", out_list),
             "not building for el7")
-        #self.assertFalse(
-        #    regex_in_list(r"(osg-)?koji .*build osg-el6", out_list),
-        #    "falsely building for el6")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji .*build osg-el8", out_list),
+            "falsely building for el6")
 
     def test_koji_shell_args3(self):
-        return  # skip until el8
-        #output = backtick_osg_build(self.kdr_shell + ["--ktt", "osg-el6", "--scratch", self.pkg_dir])
-        #out_list = output.split("\n")
-        #self.assertFalse(
-        #    regex_in_list(r"(osg-)?koji .*build osg-el7", out_list),
-        #    "falsely building for el7")
-        #self.assertTrue(
-        #    regex_in_list(r"(osg-)?koji .*build osg-el6", out_list),
-        #    "not building for el6 for the right target")
+        output = backtick_osg_build(self.kdr_shell + ["--ktt", "osg-el8", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji .*build osg-el7", out_list),
+            "falsely building for el7")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji .*build osg-el8", out_list),
+            "not building for el8 for the right target")
 
     def test_koji_shell_args4(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--koji-target", "osg-el7", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
@@ -445,13 +409,13 @@ class TestKoji(XTestCase):
         output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el7'", out_list))
-        #self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el6'", out_list))
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el8'", out_list))
 
     def test_koji_lib_upcoming2(self):
         output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", "--el7", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el7'", out_list))
-        #self.assertFalse(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el6'", out_list))
+        self.assertFalse(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el8'", out_list))
 
     def test_koji_shell_upcoming(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--upcoming", "--scratch", self.pkg_dir])
@@ -459,9 +423,9 @@ class TestKoji(XTestCase):
         self.assertTrue(
             regex_in_list(r"(osg-)?koji .*build osg-upcoming-el7", out_list),
             "not building for el7-upcoming")
-        #self.assertFalse(
-        #    regex_in_list(r"(osg-)?koji .*build osg-upcoming-el6", out_list),
-        #    "falsely building for el6-upcoming")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji .*build osg-upcoming-el8", out_list),
+            "falsely building for el8-upcoming")
 
     def test_verify_correct_branch(self):
         try:
@@ -475,18 +439,16 @@ class TestKoji(XTestCase):
         self.fail("did not detect attempt to build for wrong branch (no error message)")
 
 
-class TestKojiLong(XTestCase):
+class TestKojiLong(TestCase):
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "koji"),
-                                    "{2012-01-25}")
-        self.arch_pkg_dir = common_setUp(opj(TRUNK, "osg-ce"),
-                                    "{2014-12-17}")
+        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
+                                    "{2021-01-27}")
 
     def test_koji_build(self):
         checked_osg_build(["koji", "--el7", "--scratch", self.pkg_dir, "--wait"])
 
 
-class TestMisc(XTestCase):
+class TestMisc(TestCase):
     """Other tests"""
 
     def test_cmdline_scratch_svn(self):
@@ -504,7 +466,7 @@ class TestMisc(XTestCase):
         buildopts_el = dict()
         build_el = dict()
         defines_el = dict()
-        for dver in ['el6', 'el7']:
+        for dver in ['el8', 'el7']:
             rhel = dver[2:]
             buildopts_el[dver] = C.DEFAULT_BUILDOPTS_COMMON.copy()
             buildopts_el[dver]['redhat_release'] = dver
@@ -514,15 +476,15 @@ class TestMisc(XTestCase):
             self.assertTrue("--define=rhel %s" % rhel in defines_el[dver],
                             "%%rhel not set correctly for %s build" % dver)
 
-        self.assertTrue('--define=el6 0' in defines_el['el7'],
-                        "%el6 not unset for el7 build")
+        self.assertTrue('--define=el8 0' in defines_el['el7'],
+                        "%el8 not unset for el7 build")
         self.assertTrue('--define=el7 1' in defines_el['el7'],
                         "%el7 not set for el7 build")
 
-        self.assertTrue('--define=el6 1' in defines_el['el6'],
-                        "%el6 not set for el6 build")
-        self.assertTrue('--define=el7 0' in defines_el['el6'],
-                        "%el7 not unset for el6 build")
+        self.assertTrue('--define=el8 1' in defines_el['el8'],
+                        "%el8 not set for el8 build")
+        self.assertTrue('--define=el7 0' in defines_el['el8'],
+                        "%el7 not unset for el8 build")
 
     def test_version(self):
         try:

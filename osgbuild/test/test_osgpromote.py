@@ -5,7 +5,7 @@ import sys
 import logging
 import unittest
 try:
-    import StringIO
+    from StringIO import StringIO
 except ImportError:
     from io import StringIO
 
@@ -196,7 +196,23 @@ class FakeKojiHelper(promoter.KojiHelper):
                 {'nvr': 'reject-distinct-dvers-2-1.osgup.el8', 'latest': True},
                 {'nvr': 'partially-overlapping-dvers-in-repo-1-1.osgup.el8', 'latest': True},
                 ],
-            }
+            'osg-3.5-upcoming-el7-development': [
+                {'nvr': 'goodpkg-2000-1.osg35.el7', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg35.el7', 'latest': True},
+            ],
+            'osg-3.5-upcoming-el8-development': [
+                {'nvr': 'goodpkg-2000-1.osg35.el8', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg35.el8', 'latest': True},
+            ],
+            'osg-3.6-upcoming-el7-development': [
+                {'nvr': 'goodpkg-2000-1.osg35.el7', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg35.el7', 'latest': True},
+            ],
+            'osg-3.6-upcoming-el8-development': [
+                {'nvr': 'goodpkg-2000-1.osg35.el8', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg35.el8', 'latest': True},
+            ],
+    }
 
     want_success = True
 
@@ -280,9 +296,19 @@ class TestRouteLoader(unittest.TestCase):
         self.assertEqual(['el6', 'el7'], self.routes['hcc'].dvers)
 
     def test_osg_route(self):
+        self.assertEqual('osg-3.5-%s-development', self.routes['3.5-testing'].from_tag_hint)
+        self.assertEqual('osg-3.5-%s-testing', self.routes['3.5-testing'].to_tag_hint)
+        self.assertEqual('osg35', self.routes['3.5-testing'].repo)
+        self.assertEqual('osg-3.5-upcoming-%s-development', self.routes['3.5-upcoming'].from_tag_hint)
+        self.assertEqual('osg-3.5-upcoming-%s-testing', self.routes['3.5-upcoming'].to_tag_hint)
+        self.assertEqual('osg35up', self.routes['3.5-upcoming'].repo)
+
         self.assertEqual('osg-3.6-%s-development', self.routes['3.6-testing'].from_tag_hint)
         self.assertEqual('osg-3.6-%s-testing', self.routes['3.6-testing'].to_tag_hint)
         self.assertEqual('osg36', self.routes['3.6-testing'].repo)
+        self.assertEqual('osg-3.6-upcoming-%s-development', self.routes['3.6-upcoming'].from_tag_hint)
+        self.assertEqual('osg-3.6-upcoming-%s-testing', self.routes['3.6-upcoming'].to_tag_hint)
+        self.assertEqual('osg36up', self.routes['3.6-upcoming'].repo)
 
     def test_route_alias(self):
         for key in 'from_tag_hint', 'to_tag_hint', 'repo':
@@ -414,7 +440,7 @@ class TestPromoter(unittest.TestCase):
     #     self.assertEqual(4, len(promoted_builds))
 
     def _test_write_jira(self, real_promotions):
-        out = StringIO.StringIO()
+        out = StringIO()
         promoted_builds = {}
         if real_promotions:
             prom = self._make_promoter(self.multi_routes)
@@ -422,7 +448,7 @@ class TestPromoter(unittest.TestCase):
             promoted_builds = prom.do_promotions()
         expected_lines = [
             "*Promotions*",
-            "Promoted goodpkg-2000-1 to osg-3.6-el*-testing, osg-3.6-el*-testing",
+            "Promoted goodpkg-2000-1 to osg-3.5-el*-testing, osg-3.6-el*-testing",
             "|| Build || Tag ||"]
         for osgver in ['3.5', '3.6']:
             for dver in ['el7', 'el8']:

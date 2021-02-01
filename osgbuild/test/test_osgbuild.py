@@ -417,8 +417,24 @@ class TestKoji(TestCase):
         self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el7'", out_list))
         self.assertFalse(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el8'", out_list))
 
+    def test_koji_lib_upcoming3(self):
+        output = backtick_osg_build(self.kdr_lib + ["--repo", "upcoming", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el7'", out_list))
+        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el8'", out_list))
+
     def test_koji_shell_upcoming(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--upcoming", "--scratch", self.pkg_dir])
+        out_list = output.split("\n")
+        self.assertTrue(
+            regex_in_list(r"(osg-)?koji .*build osg-upcoming-el7", out_list),
+            "not building for el7-upcoming")
+        self.assertFalse(
+            regex_in_list(r"(osg-)?koji .*build osg-upcoming-el8", out_list),
+            "falsely building for el8-upcoming")
+
+    def test_koji_shell_upcoming2(self):
+        output = backtick_osg_build(self.kdr_shell + ["--el7", "--repo", "upcoming", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(
             regex_in_list(r"(osg-)?koji .*build osg-upcoming-el7", out_list),

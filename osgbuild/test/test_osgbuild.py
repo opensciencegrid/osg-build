@@ -362,34 +362,34 @@ class TestKoji(TestCase):
     kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
     kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
 
+    build_target_lib_regex = r"^.*kojisession.build\([^,]+?, '%s'"
+    build_target_shell_regex = r"(osg-)?koji .*build %s"
+
+    def is_building_for(self, target, output):
+        return (re.search(self.build_target_lib_regex % target, output, re.MULTILINE) or
+                re.search(self.build_target_shell_regex % target, output, re.MULTILINE))
+
     def test_koji_shell_args1(self):
         output = backtick_osg_build(self.kdr_shell + ["--scratch", self.pkg_dir])
-        out_list = output.split("\n")
-        self.assertTrue(
-            regex_in_list(r"(osg-)?koji .*build osg-el7", out_list),
-            "not building for el7")
-        self.assertTrue(
-            regex_in_list(r"(osg-)?koji .*build osg-el8", out_list),
-            "not building for el8")
+        self.assertTrue(self.is_building_for("osg-el7", output),
+                        "not building for el7")
+        self.assertTrue(self.is_building_for("osg-el8", output),
+                        "not building for el8")
 
     def test_koji_shell_args2(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--scratch", self.pkg_dir])
-        out_list = output.split("\n")
-        self.assertTrue(
-            regex_in_list(r"(osg-)?koji .*build osg-el7", out_list),
-            "not building for el7")
-        self.assertFalse(
-            regex_in_list(r"(osg-)?koji .*build osg-el8", out_list),
-            "falsely building for el6")
+        self.assertTrue(self.is_building_for("osg-el7", output),
+                        "not building for el7")
+        self.assertFalse(self.is_building_for("osg-el8", output),
+                         "falsely building for el8")
 
     def test_koji_shell_args3(self):
         output = backtick_osg_build(self.kdr_shell + ["--ktt", "osg-el8", "--scratch", self.pkg_dir])
-        out_list = output.split("\n")
         self.assertFalse(
-            regex_in_list(r"(osg-)?koji .*build osg-el7", out_list),
+            self.is_building_for("osg-el7", output),
             "falsely building for el7")
         self.assertTrue(
-            regex_in_list(r"(osg-)?koji .*build osg-el8", out_list),
+            self.is_building_for("osg-el8", output),
             "not building for el8 for the right target")
 
     def test_koji_shell_args4(self):
@@ -403,44 +403,39 @@ class TestKoji(TestCase):
         output = backtick_osg_build(self.kdr_lib + ["--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(
-            regex_in_list(r".*kojisession.build\([^,]+?, 'osg-el[76]', " + re.escape("{'scratch': True}") + r", None\)", out_list))
+            regex_in_list(r".*kojisession.build\([^,]+?, 'osg-el[78]', " + re.escape("{'scratch': True}") + r", None\)", out_list))
 
-    def test_koji_lib_upcoming(self):
+    def test_koji_lib_old_upcoming(self):
         output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", self.pkg_dir])
-        out_list = output.split("\n")
-        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el7'", out_list))
-        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el8'", out_list))
+        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-upcoming-el8", output))
 
-    def test_koji_lib_upcoming2(self):
+    def test_koji_lib_old_upcoming2(self):
         output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", "--el7", self.pkg_dir])
-        out_list = output.split("\n")
-        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el7'", out_list))
-        self.assertFalse(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el8'", out_list))
+        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
+        self.assertFalse(self.is_building_for("osg-upcoming-el8", output))
 
-    def test_koji_lib_upcoming3(self):
+    def test_koji_lib_old_upcoming3(self):
         output = backtick_osg_build(self.kdr_lib + ["--repo", "upcoming", "--scratch", self.pkg_dir])
-        out_list = output.split("\n")
-        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el7'", out_list))
-        self.assertTrue(regex_in_list(r".*kojisession.build\([^,]+?, 'osg-upcoming-el8'", out_list))
+        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-upcoming-el8", output))
 
-    def test_koji_shell_upcoming(self):
+    def test_koji_shell_old_upcoming(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--upcoming", "--scratch", self.pkg_dir])
-        out_list = output.split("\n")
         self.assertTrue(
-            regex_in_list(r"(osg-)?koji .*build osg-upcoming-el7", out_list),
+            self.is_building_for("osg-upcoming-el7", output),
             "not building for el7-upcoming")
         self.assertFalse(
-            regex_in_list(r"(osg-)?koji .*build osg-upcoming-el8", out_list),
+            self.is_building_for("osg-upcoming-el8", output),
             "falsely building for el8-upcoming")
 
-    def test_koji_shell_upcoming2(self):
+    def test_koji_shell_old_upcoming2(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--repo", "upcoming", "--scratch", self.pkg_dir])
-        out_list = output.split("\n")
         self.assertTrue(
-            regex_in_list(r"(osg-)?koji .*build osg-upcoming-el7", out_list),
+            self.is_building_for("osg-upcoming-el7", output),
             "not building for el7-upcoming")
         self.assertFalse(
-            regex_in_list(r"(osg-)?koji .*build osg-upcoming-el8", out_list),
+            self.is_building_for("osg-upcoming-el8", output),
             "falsely building for el8-upcoming")
 
     def test_verify_correct_branch(self):
@@ -512,7 +507,7 @@ class TestMisc(TestCase):
 short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc, TestKoji)
 TestSuiteShort = unittest.TestSuite()
 TestSuiteShort.addTests([makeSuite(t) for t in short_test_cases])
-# Make sure TestKoji comes first since it requires user interaction.
+# Make sure TestKojiLong comes first since it requires user interaction.
 TestSuiteAll = unittest.TestSuite((makeSuite(TestKojiLong), TestSuiteShort, makeSuite(TestMock)))
 
 if __name__ == '__main__':

@@ -470,8 +470,18 @@ class TestKojiNewUpcoming(TestCase):
         self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
         self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
 
+    def test_koji_lib_35upcoming_shorthand(self):
+        output = backtick_osg_build(self.kdr_lib + ["--3.5-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
+
     def test_koji_lib_36upcoming(self):
         output = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
+
+    def test_koji_lib_36upcoming_shorthand(self):
+        output = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--scratch", self.pkg_dir])
         self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
         self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
 

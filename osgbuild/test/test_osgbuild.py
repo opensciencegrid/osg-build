@@ -420,16 +420,6 @@ class TestKoji(TestCase):
         self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
         self.assertTrue(self.is_building_for("osg-upcoming-el8", output))
 
-    def test_koji_lib_35upcoming(self):
-        output = backtick_osg_build(self.kdr_lib + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
-
-    def test_koji_lib_36upcoming(self):
-        output = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
-
     def test_koji_shell_old_upcoming(self):
         output = backtick_osg_build(self.kdr_shell + ["--el7", "--upcoming", "--scratch", self.pkg_dir])
         self.assertTrue(
@@ -448,16 +438,6 @@ class TestKoji(TestCase):
             self.is_building_for("osg-upcoming-el8", output),
             "falsely building for el8-upcoming")
 
-    def test_koji_shell_35upcoming(self):
-        output = backtick_osg_build(self.kdr_shell + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
-
-    def test_koji_shell_36upcoming(self):
-        output = backtick_osg_build(self.kdr_shell + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
-
     def test_verify_correct_branch(self):
         try:
             _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(C.SVN_ROOT, DEVOPS, "koji")])
@@ -468,6 +448,42 @@ class TestKoji(TestCase):
                 "did not detect attempt to build for wrong branch (wrong error message)")
             return
         self.fail("did not detect attempt to build for wrong branch (no error message)")
+
+
+class TestKojiNewUpcoming(TestCase):
+    def setUp(self):
+        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
+                                    "{2021-01-27}")
+
+    kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
+    kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
+
+    build_target_lib_regex = r"^.*kojisession.build\([^,]+?, '%s'"
+    build_target_shell_regex = r"(osg-)?koji .*build %s"
+
+    def is_building_for(self, target, output):
+        return (re.search(self.build_target_lib_regex % target, output, re.MULTILINE) or
+                re.search(self.build_target_shell_regex % target, output, re.MULTILINE))
+
+    def test_koji_lib_35upcoming(self):
+        output = backtick_osg_build(self.kdr_lib + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
+
+    def test_koji_lib_36upcoming(self):
+        output = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
+
+    def test_koji_shell_35upcoming(self):
+        output = backtick_osg_build(self.kdr_shell + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
+
+    def test_koji_shell_36upcoming(self):
+        output = backtick_osg_build(self.kdr_shell + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
 
 
 class TestKojiLong(TestCase):
@@ -524,7 +540,7 @@ class TestMisc(TestCase):
             self.fail("osg-build --version failed")
 
 
-short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc, TestKoji)
+short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc, TestKoji, TestKojiNewUpcoming)
 TestSuiteShort = unittest.TestSuite()
 TestSuiteShort.addTests([makeSuite(t) for t in short_test_cases])
 # Make sure TestKojiLong comes first since it requires user interaction.

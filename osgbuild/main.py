@@ -485,7 +485,18 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "--upcoming", action="callback",
             callback=parser_targetopts_callback,
             type=None,
-            help="Target build for the 'upcoming' osg repos")
+            help="Target build for the 3.5-upcoming osg repos. "
+            "Deprecated: use --3.5-upcoming instead.")
+        koji_group.add_option(
+            "--3.5-upcoming", action="callback",
+            callback=parser_targetopts_callback,
+            type=None,
+            help="Target build for the 3.5-upcoming osg repos.")
+        koji_group.add_option(
+            "--3.6-upcoming", action="callback",
+            callback=parser_targetopts_callback,
+            type=None,
+            help="Target build for the 3.6-upcoming osg repos.")
         koji_group.add_option(
             "--repo", action="callback",
             callback=parser_targetopts_callback,
@@ -574,12 +585,13 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
         assert kojiinter  # shouldn't get here without kojiinter
         for dver in targetopts_by_dver:
             targetopts_by_dver[dver]['koji_tag'] = 'TARGET'
-    elif opt_str == '--upcoming':
+    elif opt_str.endswith('upcoming'):
         assert kojiinter  # shouldn't get here without kojiinter
-        parser.values.repo = 'upcoming'
+        repo = opt_str[2:]
+        parser.values.repo = repo
         for dver in DVERS:
-            targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint('upcoming', dver)
-            targetopts_by_dver[dver]['koji_tag'] = tag_for_repo_hint('upcoming', dver)
+            targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint(repo, dver)
+            targetopts_by_dver[dver]['koji_tag'] = tag_for_repo_hint(repo, dver)
     elif opt_str == '--repo':
         assert kojiinter  # shouldn't get here without kojiinter
         parser.values.repo = value

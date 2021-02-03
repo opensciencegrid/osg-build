@@ -252,9 +252,13 @@ def repo_hints(targets):
         if targets:
             for target in targets:
                 osg_match = re.match(r'osg-(\d+\.\d+)-el\d+', target)
+                osg_upcoming_match = re.match(r'osg-(\d+\.\d+)-upcoming-el\d+', target)
                 if osg_match:
                     osgver = osg_match.group(1)
                     __repo_hints_cache[osgver] = __repo_hints_cache['osg-%s' % osgver] = {'target': 'osg-%s-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
+                elif osg_upcoming_match:
+                    osgver = osg_upcoming_match.group(1)
+                    __repo_hints_cache["%s-upcoming" % osgver] = {'target': 'osg-%s-upcoming-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
 
     return __repo_hints_cache
 

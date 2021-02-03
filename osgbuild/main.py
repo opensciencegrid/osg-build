@@ -342,7 +342,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         dest="redhat_release",
         type="string",
         help="The version of the distribution to build the package for. "
-        "Valid values are: 6 or 7 (for EL 6 or 7 respectively). "
+        "Valid values are: 7 or 8 (for EL 7 or 8 respectively). "
         "Default: build for all releases (koji task) current platform "
         "(other tasks)")
     parser.add_option(
@@ -374,7 +374,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     rpmbuild_mock_group.add_option(
         "--distro-tag",
         help="The distribution tag to append to the end of the release. "
-        "Default: osg.el6, or osg.el7 for EL 6 or 7 respectively")
+        "Default: osg.el7, or osg.el8 for EL 7 or 8 respectively")
     parser.add_option_group(rpmbuild_mock_group)
 
     if mock:
@@ -424,7 +424,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             type="string",
             help="The koji target to use for building. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available. Default: osg-el6 or osg-el7 for EL 6/7 "
+            "desired repo is available. Default: osg-el7 or osg-el8 for EL 7/8 "
             "respectively")
         koji_group.add_option(
             "--koji-tag",
@@ -434,7 +434,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="The koji tag to add packages to. The special value TARGET "
             "uses the destination tag defined in the koji target. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available. Default: osg-el6 or osg-el7 for EL 6/7 "
+            "desired repo is available. Default: osg-el7 or osg-el8 for EL 7/8 "
             "respectively")
         koji_group.add_option(
             "--koji-target-and-tag", "--ktt",

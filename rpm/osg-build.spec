@@ -99,7 +99,7 @@ Summary:        OSG-Build tests
 %{summary}
 
 
-%if 0%{?rhel} >= 8
+%if 0%{?rhel} == 8
   %define __python /usr/libexec/platform-python
 %else
   %if 0%{?fedora} >= 31

@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.17.0
+Version:        1.18.0
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -180,6 +180,9 @@ fi
 
 
 %changelog
+* Thu Feb 04 2021 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.18.0-1
+- Add support for 3.5-upcoming and 3.6-upcoming repos  (SOFTWARE-4424)
+
 * Thu Oct 29 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.17.0-1
 - Add voms-clients-cpp dependency to osg-build-koji  (SOFTWARE-4060)
 - Build/promote for both el7 and el8 by default  (SOFTWARE-4277)

@@ -59,11 +59,7 @@ osg-build-koji is required to use the koji task.
 Requires:       %{name}-base = %{version}
 # mock 2.0 attempts to build with dnf inside the chroot which fails miserably.
 # Fixed in 2.1 but EL 6 doesn't have that.
-%if 0%{?fedora} >= 31 || 0%{?rhel} > 6
 Requires:       mock >= 2.1
-%else
-Requires:       mock >= 1.0.0, mock < 2.0
-%endif
 Summary:        OSG-Build Mock plugin, allows builds with mock
 
 %description mock
@@ -75,9 +71,6 @@ Requires:       %{name}-base = %{version}
 Requires:       openssl
 Requires:       koji >= 1.13.0
 Requires:       voms-clients-cpp
-%if 0%{?rhel} < 7
-Requires:       python-argparse
-%endif
 Summary:        OSG-Build Koji plugin and Koji-based tools
 
 %description koji
@@ -99,14 +92,10 @@ Summary:        OSG-Build tests
 %{summary}
 
 
-%if 0%{?rhel} == 8
-  %define __python /usr/libexec/platform-python
-%else
-  %if 0%{?fedora} >= 31
+%if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
     %define __python /usr/bin/python3
-  %else
+%else
     %define __python /usr/bin/python2
-  %endif
 %endif
 
 %prep
@@ -182,6 +171,8 @@ fi
 %changelog
 * Thu Feb 04 2021 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.18.0-1
 - Add support for 3.5-upcoming and 3.6-upcoming repos  (SOFTWARE-4424)
+- Use real python 3 for el8 (instead of platform-python)
+- Drop packaging for el6
 
 * Thu Oct 29 2020 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.17.0-1
 - Add voms-clients-cpp dependency to osg-build-koji  (SOFTWARE-4060)

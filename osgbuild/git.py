@@ -310,9 +310,9 @@ Try adding "--repo=hcc" to the command line.""")
             if "upcoming" in branch:
                 raise Error("""\
 Error: Incorrect branch for koji build
-Only allowed to build packages from the upcoming branch
+Only allowed to build packages from one of the upcoming branches
 into the upcoming targets.  Either switch the branch to master,
- or pass the --upcoming flag.""")
+ or pass the appropriate --upcoming or --3.X-upcoming flag.""")
 
 
 def koji(package_dir, koji_obj, buildopts):

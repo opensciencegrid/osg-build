@@ -21,6 +21,7 @@ Requires:       %{name}-koji = %{version}
 BuildRequires:       git
 %else
 BuildRequires:       git-core
+BuildRequires:       python3
 %endif
 
 

@@ -17,11 +17,18 @@ Requires:       %{name}-base = %{version}
 Requires:       %{name}-mock = %{version}
 Requires:       %{name}-koji = %{version}
 
+%if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
+BuildRequires: python3
+%define __python /usr/bin/python3
+%else
+BuildRequires: python2
+%define __python /usr/bin/python2
+%endif
+
 %if 0%{?rhel} < 8
 BuildRequires:       git
 %else
 BuildRequires:       git-core
-BuildRequires:       python3
 %endif
 
 
@@ -92,12 +99,6 @@ Summary:        OSG-Build tests
 %description tests
 %{summary}
 
-
-%if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
-    %define __python /usr/bin/python3
-%else
-    %define __python /usr/bin/python2
-%endif
 
 %prep
 %setup -q -n %{name}-%{version}

@@ -290,7 +290,7 @@ master branch!  You must switch branches.""")
                 raise Error("""\
 Error: You must build into the HCC repo when building from
 a HCC git checkout.  You must switch git repos or build targets.""")
-        elif target.endswith('osg-upcoming'):
+        elif re.search(r"osg(?:-\d+\.\d+)?-upcoming$", target):
             if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
                 raise Error("""\
 Error: You may not build into the OSG repo when building from
@@ -310,9 +310,9 @@ Try adding "--repo=hcc" to the command line.""")
             if "upcoming" in branch:
                 raise Error("""\
 Error: Incorrect branch for koji build
-Only allowed to build packages from the upcoming branch
+Only allowed to build packages from one of the upcoming branches
 into the upcoming targets.  Either switch the branch to master,
- or pass the --upcoming flag.""")
+ or pass the appropriate --upcoming or --3.X-upcoming flag.""")
 
 
 def koji(package_dir, koji_obj, buildopts):

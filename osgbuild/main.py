@@ -252,9 +252,13 @@ def repo_hints(targets):
         if targets:
             for target in targets:
                 osg_match = re.match(r'osg-(\d+\.\d+)-el\d+', target)
+                osg_upcoming_match = re.match(r'osg-(\d+\.\d+)-upcoming-el\d+', target)
                 if osg_match:
                     osgver = osg_match.group(1)
                     __repo_hints_cache[osgver] = __repo_hints_cache['osg-%s' % osgver] = {'target': 'osg-%s-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
+                elif osg_upcoming_match:
+                    osgver = osg_upcoming_match.group(1)
+                    __repo_hints_cache["%s-upcoming" % osgver] = {'target': 'osg-%s-upcoming-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
 
     return __repo_hints_cache
 
@@ -338,7 +342,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
         dest="redhat_release",
         type="string",
         help="The version of the distribution to build the package for. "
-        "Valid values are: 6 or 7 (for EL 6 or 7 respectively). "
+        "Valid values are: 7 or 8 (for EL 7 or 8 respectively). "
         "Default: build for all releases (koji task) current platform "
         "(other tasks)")
     parser.add_option(
@@ -370,7 +374,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     rpmbuild_mock_group.add_option(
         "--distro-tag",
         help="The distribution tag to append to the end of the release. "
-        "Default: osg.el6, or osg.el7 for EL 6 or 7 respectively")
+        "Default: osg.el7, or osg.el8 for EL 7 or 8 respectively")
     parser.add_option_group(rpmbuild_mock_group)
 
     if mock:
@@ -420,7 +424,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             type="string",
             help="The koji target to use for building. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available. Default: osg-el6 or osg-el7 for EL 6/7 "
+            "desired repo is available. Default: osg-el7 or osg-el8 for EL 7/8 "
             "respectively")
         koji_group.add_option(
             "--koji-tag",
@@ -430,7 +434,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="The koji tag to add packages to. The special value TARGET "
             "uses the destination tag defined in the koji target. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available. Default: osg-el6 or osg-el7 for EL 6/7 "
+            "desired repo is available. Default: osg-el7 or osg-el8 for EL 7/8 "
             "respectively")
         koji_group.add_option(
             "--koji-target-and-tag", "--ktt",
@@ -481,7 +485,18 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "--upcoming", action="callback",
             callback=parser_targetopts_callback,
             type=None,
-            help="Target build for the 'upcoming' osg repos")
+            help="Target build for the 3.5-upcoming osg repos. "
+            "Deprecated: use --3.5-upcoming instead.")
+        koji_group.add_option(
+            "--3.5-upcoming", action="callback",
+            callback=parser_targetopts_callback,
+            type=None,
+            help="Target build for the 3.5-upcoming osg repos.")
+        koji_group.add_option(
+            "--3.6-upcoming", action="callback",
+            callback=parser_targetopts_callback,
+            type=None,
+            help="Target build for the 3.6-upcoming osg repos.")
         koji_group.add_option(
             "--repo", action="callback",
             callback=parser_targetopts_callback,
@@ -570,12 +585,13 @@ def parser_targetopts_callback(option, opt_str, value, parser, *args, **kwargs):
         assert kojiinter  # shouldn't get here without kojiinter
         for dver in targetopts_by_dver:
             targetopts_by_dver[dver]['koji_tag'] = 'TARGET'
-    elif opt_str == '--upcoming':
+    elif opt_str.endswith('upcoming'):
         assert kojiinter  # shouldn't get here without kojiinter
-        parser.values.repo = 'upcoming'
+        repo = opt_str[2:]
+        parser.values.repo = repo
         for dver in DVERS:
-            targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint('upcoming', dver)
-            targetopts_by_dver[dver]['koji_tag'] = tag_for_repo_hint('upcoming', dver)
+            targetopts_by_dver[dver]['koji_target'] = target_for_repo_hint(repo, dver)
+            targetopts_by_dver[dver]['koji_tag'] = tag_for_repo_hint(repo, dver)
     elif opt_str == '--repo':
         assert kojiinter  # shouldn't get here without kojiinter
         parser.values.repo = value

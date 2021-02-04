@@ -155,8 +155,10 @@ def restricted_branch_matches_target(branch, target):
     """Return True if the pattern that matches 'branch' is associated with the
     same name (e.g. 'main', 'upcoming', 'versioned') as the pattern that
     matches 'target'; False otherwise.
-    Special case: if the name is 'versioned' (e.g. we're building from
-    branches/osg-3.1) then the versions also have to match.
+    Special cases:
+    - if the name is 'versioned' (e.g. we're building from branches/osg-3.1) then the versions also have to match.
+    - if the name is 'upcoming' (e.g. building from branches/3.6-upcoming) then the versions also have to match
+        (treat a missing version ("branches/upcoming") as "3.5")
 
     Precondition: is_restricted_branch(branch) and is_restricted_target(target)
     are True.
@@ -168,9 +170,12 @@ def restricted_branch_matches_target(branch, target):
             target_match = re.search(target_pattern, target)
 
             if branch_match and target_match and branch_name == target_name:
-                if branch_name != 'versioned':
-                    return True
-                elif branch_match.group('osgver') == target_match.group('osgver'):
+                if branch_name == "versioned":
+                    return branch_match.group("osgver") == target_match.group("osgver")
+                elif branch_name == "upcoming":
+                    return ((branch_match.group("osgver") or "3.5") ==
+                            (target_match.group("osgver") or "3.5"))
+                else:
                     return True
 
     return False

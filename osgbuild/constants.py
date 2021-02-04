@@ -32,21 +32,21 @@ SVN_REDHAT_PATH = "/native/redhat"
 
 SVN_RESTRICTED_BRANCHES = {
     r'^trunk$'                             : 'main',
-    r'^branches/upcoming$'                 : 'upcoming',
+    r'^branches/(?P<osgver>\d+\.\d+)?-?upcoming$': 'upcoming',
     r'^branches/osg-internal$'             : 'internal',
     r'^branches/devops$'                   : 'devops',
     r'^branches/osg-(?P<osgver>\d+\.\d+)$' : 'versioned',
     r'^branches/condor'                    : 'condor'}
 KOJI_RESTRICTED_TARGETS = {
     r'^osg-(el\d+)$'                       : 'main',
-    r'^osg-upcoming-(el\d+)$'              : 'upcoming',
+    r'^osg-(?P<osgver>\d+\.\d+)?-?upcoming-(el\d+)$': 'upcoming',
     r'^devops-(el\d+)$'                    : 'devops',
     r'^osg-(el\d+)-internal$'              : 'internal',
     r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'  : 'versioned',
     r'^condor-(el\d+)$'                    : 'condor'}
 GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?master$'                     : 'main',
-    r'^(\w*/)?upcoming$'                   : 'upcoming',
+    r'^(\w*/)?(?P<osgver>\d+\.\d+)?-?upcoming$': 'upcoming',
     r'^(\w*/)?internal$'                   : 'internal',
     r'^(\w*/)?devops$'                     : 'devops',
     r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned',
@@ -112,6 +112,10 @@ DEFAULT_DVERS_BY_REPO = {
     'osg-3.4': ['el6', 'el7'],
     '3.5': ['el7', 'el8'],
     'osg-3.5': ['el7', 'el8'],
+    '3.5-upcoming': ['el7', 'el8'],
+    '3.6': ['el7', 'el8'],
+    'osg-3.6': ['el7', 'el8'],
+    '3.6-upcoming': ['el7', 'el8'],
     'internal': ['el6', 'el7'],
     'condor': ['el6', 'el7'],
     'devops': ['el7', 'el8'],

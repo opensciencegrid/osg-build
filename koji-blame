@@ -40,6 +40,7 @@ def is_package(maybe_package):
         raise Error("koji list-pkgs returned unexpected result. Return: %d Output: %s" % (ret, out))
     return "No such entry" not in out
 
+# TODO: koji list-history can take --before and --after arguments... try using those instead of re-implementing them
 def run_list_history(item):
     cmd = ["osg-koji", "list-history"]
     if is_package(item):

@@ -82,6 +82,9 @@ class Reject(object):
     def __str__(self):
         return self.reason % {'pkg_or_build': self.pkg_or_build, 'dist': self.dist}
 
+    def __lt__(self, other):
+        return (self.pkg_or_build, self.dist, self.reason) < (other.pkg_or_build, other.dist, other.reason)
+
     __repr__ = __str__
 
 

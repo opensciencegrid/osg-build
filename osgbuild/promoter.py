@@ -536,8 +536,8 @@ class KojiHelper(kojiinter.KojiLibInter):
 #
 
 
-def write_jira(kojihelper, promoted_builds, routes, out=None):
-    """Write input suitable for embedding into a JIRA ticket.
+def write_old_jira(kojihelper, promoted_builds, routes, out=None):
+    """Write input suitable for embedding into a JIRA ticket (old syntax)
     """
     # Format
     # | build-1.2.osg31.el5 | TAG |
@@ -552,6 +552,27 @@ def write_jira(kojihelper, promoted_builds, routes, out=None):
     for build, tag in build_tag_table:
         uri = kojihelper.get_build_uri(build.nvr)
         table_str += "| [%s|%s] | %s |\n" % (build.nvr, uri, tag)
+        nvrs_no_dist.add(build.nvr_no_dist)
+
+    out.write("Promoted %s to %s\n" % (", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
+    out.write(table_str)
+
+
+def write_jira(kojihelper, promoted_builds, routes, out=None):
+    """Write input suitable for pasting into a JIRA comment.
+    """
+    out = out or sys.stdout
+    out.write("**Promotions**\n")
+
+    build_tag_table = [[build, tag] for tag in promoted_builds for build in promoted_builds[tag]]
+    build_tag_table.sort(key=lambda x: x[0].nvr)
+
+    nvrs_no_dist = set()
+    table_str = "**Build** | **Tag**\n"
+    table_str += "--- | ---\n"
+    for build, tag in build_tag_table:
+        uri = kojihelper.get_build_uri(build.nvr)
+        table_str += " [%s](%s) | %s\n" % (build.nvr, uri, tag)
         nvrs_no_dist.add(build.nvr_no_dist)
 
     out.write("Promoted %s to %s\n" % (", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
@@ -729,7 +750,9 @@ def main(argv=None):
     if proceed:
         promoted_builds = promoter.do_promotions(options.dry_run, options.regen)
         if not options.dry_run:
-            printf("\nJIRA code for this set of promotions:\n")
+            printf("\nJIRA code for this set of promotions (old syntax):\n")
+            write_old_jira(kojihelper, promoted_builds, [x[0] for x in route_dvers_pairs])
+            printf("\nJIRA code for this set of promotions (new syntax):\n")
             write_jira(kojihelper, promoted_builds, [x[0] for x in route_dvers_pairs])
     else:
         printf("Not proceeding.")

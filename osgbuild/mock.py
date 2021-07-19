@@ -52,6 +52,7 @@ class Mock(object):
                 raise MockError("Couldn't find mock config file at " + cfg_abspath)
 
             # The cfg file passed to mock is always relative to /etc/mock
+            # TODO the manpage says if it ends in .cfg, it is interpreted as a full path so this is no longer needed
             self.mock_cmd += ['-r', "../../" + cfg_abspath_no_ext]
 
         self.target_arch = buildopts['target_arch']
@@ -99,6 +100,7 @@ You might need to log out and log in for the changes to take effect""")
             # the way mock does it. Figure out which the user
             # meant (by seeing which interpretation exists) and
             # translate it to what mock wants.
+            # TODO no longer true, see above
             if not mock_config.endswith(".cfg"):
                 given_cfg_path = mock_config + ".cfg"
             else:
@@ -124,6 +126,23 @@ You might need to log out and log in for the changes to take effect""")
                 os.path.join(cfg_dir,"mock-koji-%s-%s.%d.cfg" % (mock_config_from_koji, arch, os.getuid())),
                 mock_config_from_koji,
                 distro_tag)
+            # Can't really do this via the command line so hack up the mock config.
+            # This is not very safe -- the mock config is actually a Python script.
+            # TODO Probably better fixed as a Koji patch
+            cfg_path_orig = cfg_path + ".orig"
+            shutil.copy(cfg_path, cfg_path_orig)
+            with open(cfg_path_orig, "r") as cfg_in, open(cfg_path, "w") as cfg_out:
+                for line in cfg_in:
+                    # change the line
+                    #  config_opts['yum.conf'] = '...[build]\n...\n'
+                    # to
+                    #  config_opts['yum.conf'] = '...[build]\n...\nmodule_hotfixes=1\n'
+                    if line.startswith("config_opts['yum.conf']") and "[build]" in line and "module_hotfixes" not in line:
+                        new_line = re.sub(r"\\n'$", r"\\nmodule_hotfixes=1\\n'", line)
+                        cfg_out.write(new_line)
+                    else:
+                        cfg_out.write(line)
+
         else:
             cfg_path = None
         # end if

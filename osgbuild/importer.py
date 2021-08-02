@@ -30,7 +30,8 @@ PROVIDER_PATTERNS = [
     (r'fedoraproject\.org/pub/epel/'   , 'epel')   ,
     (r'fedoraproject\.org/pub/fedora/' , 'fedora') ,
     (r'globus\.org'                    , 'globus') ,
-    (r'koji\.fedoraproject\.org/'      , 'fedora') ]
+    (r'koji\.fedoraproject\.org/'      , 'fedora') ,
+    (r'xrootd\.web\.cern\.ch/'         , 'xrootd') ]
 
 
 

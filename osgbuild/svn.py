@@ -5,7 +5,7 @@ import re
 import os
 import errno
 
-from .constants import SVN_ROOT, SVN_REDHAT_PATH, SVN_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
+from .constants import SVN_ROOT, SVN_REDHAT_PATH, SVN_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS, MAIN_OSGVER, UPCOMING_OSGVER
 from .error import Error, SVNError, UsageError
 from . import utils
 
@@ -166,17 +166,30 @@ def restricted_branch_matches_target(branch, target):
     """
     for (branch_pattern, branch_name) in SVN_RESTRICTED_BRANCHES.items():
         branch_match = re.search(branch_pattern, branch)
+        if not branch_match:
+            continue
         for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
             target_match = re.search(target_pattern, target)
+            if not target_match:
+                continue
 
-            if branch_match and target_match and branch_name == target_name:
-                if branch_name == "versioned":
-                    return branch_match.group("osgver") == target_match.group("osgver")
-                elif branch_name == "upcoming":
-                    return ((branch_match.group("osgver") or "3.5") ==
-                            (target_match.group("osgver") or "3.5"))
-                else:
-                    return True
+            target_osgver = target_match.groupdict().get("osgver", None)
+            branch_osgver = branch_match.groupdict().get("osgver", None)
+            if branch_name == "main":
+                branch_osgver = MAIN_OSGVER
+            if target_name == "main":
+                target_osgver = MAIN_OSGVER
+            if branch_name == "upcoming":
+                branch_osgver = branch_osgver or UPCOMING_OSGVER
+            if target_name == "upcoming":
+                target_osgver = target_osgver or UPCOMING_OSGVER
+
+            if target_name in ["main", "versioned"] and branch_name in ["main", "versioned"]:
+                return branch_osgver == target_osgver
+            elif target_name == "upcoming" and branch_name == "upcoming":
+                return branch_osgver == target_osgver
+            elif target_name == branch_name:
+                return True
 
     return False
 

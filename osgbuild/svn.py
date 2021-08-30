@@ -5,7 +5,7 @@ import re
 import os
 import errno
 
-from .constants import SVN_ROOT, SVN_REDHAT_PATH, SVN_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS, MAIN_OSGVER, UPCOMING_OSGVER
+from .constants import SVN_ROOT, SVN_REDHAT_PATH, SVN_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
 from .error import Error, SVNError, UsageError
 from . import utils
 
@@ -177,13 +177,13 @@ def restricted_branch_matches_target(branch, target):
             target_osgver = target_match.groupdict().get("osgver", None)
             branch_osgver = branch_match.groupdict().get("osgver", None)
             if branch_name == "main":
-                branch_osgver = MAIN_OSGVER
+                branch_osgver = "3.5"
             if target_name == "main":
-                target_osgver = MAIN_OSGVER
+                target_osgver = "3.5"
             if branch_name == "upcoming":
-                branch_osgver = branch_osgver or UPCOMING_OSGVER
+                branch_osgver = branch_osgver or "3.5"
             if target_name == "upcoming":
-                target_osgver = target_osgver or UPCOMING_OSGVER
+                target_osgver = target_osgver or "3.5"
 
             if target_name in ["main", "versioned"] and branch_name in ["main", "versioned"]:
                 return branch_osgver == target_osgver

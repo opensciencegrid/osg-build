@@ -152,31 +152,52 @@ def is_restricted_target(target):
     return False
 
 def restricted_branch_matches_target(branch, target):
-    """Return True if the pattern that matches 'branch' is associated with the
-    same name (e.g. 'main', 'upcoming', 'versioned') as the pattern that
-    matches 'target'; False otherwise.
+    """Return True if the pattern that matches `branch` is associated with the
+    same name (e.g. 'devops', 'main', 'upcoming', 'versioned') as the pattern that
+    matches `target`; False otherwise.
     Special cases:
-    - if the name is 'versioned' (e.g. we're building from branches/osg-3.1) then the versions also have to match.
-    - if the name is 'upcoming' (e.g. building from branches/3.6-upcoming) then the versions also have to match
-        (treat a missing version ("branches/upcoming") as "3.5")
+    - if the name is 'versioned' (e.g. we're building from 'branches/osg-3.1') then the versions also have to match.
+    - treat 'main' (i.e. 'trunk') as 'versioned' with a version of '3.5'
+    - if the name is 'upcoming' (e.g. building from 'branches/3.6-upcoming') then the versions also have to match.
+      treat a missing version ('branches/upcoming') as '3.5'
 
     Precondition: is_restricted_branch(branch) and is_restricted_target(target)
     are True.
 
     """
+    branch_match = branch_name = target_match = target_name = None
     for (branch_pattern, branch_name) in SVN_RESTRICTED_BRANCHES.items():
         branch_match = re.search(branch_pattern, branch)
-        for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
-            target_match = re.search(target_pattern, target)
+        if branch_match:
+            break
+    if not branch_match:
+        return False
 
-            if branch_match and target_match and branch_name == target_name:
-                if branch_name == "versioned":
-                    return branch_match.group("osgver") == target_match.group("osgver")
-                elif branch_name == "upcoming":
-                    return ((branch_match.group("osgver") or "3.5") ==
-                            (target_match.group("osgver") or "3.5"))
-                else:
-                    return True
+    for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
+        target_match = re.search(target_pattern, target)
+        if target_match:
+            break
+    if not target_match:
+        return False
+
+    branch_osgver = branch_match.groupdict().get("osgver", None)
+    target_osgver = target_match.groupdict().get("osgver", None)
+    if branch_name == "main":
+        branch_name = "versioned"
+        branch_osgver = "3.5"
+    if target_name == "main":
+        target_name = "versioned"
+        target_osgver = "3.5"
+    if branch_name == "upcoming":
+        branch_osgver = branch_osgver or "3.5"
+    if target_name == "upcoming":
+        target_osgver = target_osgver or "3.5"
+
+    if branch_name != target_name:
+        return False
+
+    if branch_name in ["upcoming", "versioned"]:
+        return branch_osgver == target_osgver
 
     return False
 

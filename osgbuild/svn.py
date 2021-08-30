@@ -165,32 +165,39 @@ def restricted_branch_matches_target(branch, target):
     are True.
 
     """
+    branch_match = branch_name = target_match = target_name = None
     for (branch_pattern, branch_name) in SVN_RESTRICTED_BRANCHES.items():
         branch_match = re.search(branch_pattern, branch)
-        if not branch_match:
-            continue
-        for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
-            target_match = re.search(target_pattern, target)
-            if not target_match:
-                continue
+        if branch_match:
+            break
+    if not branch_match:
+        return False
 
-            target_osgver = target_match.groupdict().get("osgver", None)
-            branch_osgver = branch_match.groupdict().get("osgver", None)
-            if branch_name == "main":
-                branch_osgver = "3.5"
-            if target_name == "main":
-                target_osgver = "3.5"
-            if branch_name == "upcoming":
-                branch_osgver = branch_osgver or "3.5"
-            if target_name == "upcoming":
-                target_osgver = target_osgver or "3.5"
+    for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
+        target_match = re.search(target_pattern, target)
+        if target_match:
+            break
+    if not target_match:
+        return False
 
-            if target_name in ["main", "versioned"] and branch_name in ["main", "versioned"]:
-                return branch_osgver == target_osgver
-            elif target_name == "upcoming" and branch_name == "upcoming":
-                return branch_osgver == target_osgver
-            elif target_name == branch_name:
-                return True
+    branch_osgver = branch_match.groupdict().get("osgver", None)
+    target_osgver = target_match.groupdict().get("osgver", None)
+    if branch_name == "main":
+        branch_name = "versioned"
+        branch_osgver = "3.5"
+    if target_name == "main":
+        target_name = "versioned"
+        target_osgver = "3.5"
+    if branch_name == "upcoming":
+        branch_osgver = branch_osgver or "3.5"
+    if target_name == "upcoming":
+        target_osgver = target_osgver or "3.5"
+
+    if branch_name != target_name:
+        return False
+
+    if branch_name in ["upcoming", "versioned"]:
+        return branch_osgver == target_osgver
 
     return False
 

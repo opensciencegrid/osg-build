@@ -152,13 +152,14 @@ def is_restricted_target(target):
     return False
 
 def restricted_branch_matches_target(branch, target):
-    """Return True if the pattern that matches 'branch' is associated with the
-    same name (e.g. 'main', 'upcoming', 'versioned') as the pattern that
-    matches 'target'; False otherwise.
+    """Return True if the pattern that matches `branch` is associated with the
+    same name (e.g. 'devops', 'main', 'upcoming', 'versioned') as the pattern that
+    matches `target`; False otherwise.
     Special cases:
-    - if the name is 'versioned' (e.g. we're building from branches/osg-3.1) then the versions also have to match.
-    - if the name is 'upcoming' (e.g. building from branches/3.6-upcoming) then the versions also have to match
-        (treat a missing version ("branches/upcoming") as "3.5")
+    - if the name is 'versioned' (e.g. we're building from 'branches/osg-3.1') then the versions also have to match.
+    - treat 'main' (i.e. 'trunk') as 'versioned' with a version of '3.5'
+    - if the name is 'upcoming' (e.g. building from 'branches/3.6-upcoming') then the versions also have to match.
+      treat a missing version ('branches/upcoming') as '3.5'
 
     Precondition: is_restricted_branch(branch) and is_restricted_target(target)
     are True.

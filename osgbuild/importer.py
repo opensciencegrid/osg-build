@@ -65,18 +65,16 @@ def verify_rpm(srpm):
     if err:
         raise Error("rpm: %s does not look like an RPM" % srpm)
 
-def srpm_nvr(srpm):
-    """Extract the NVR (Name, Version, Release) from the name of an srpm."""
-    base_srpm = os.path.basename(srpm)
-    match = re.match(r"""(.+)-(.+)-(.+)\.src\.rpm$""",
-                     base_srpm)
-    if match:
-        name, version, release = match.group(1,2,3)
-        return (name, version, release)
-    else:
-        raise Error("Unable to extract NVR from SRPM filename " +
-                    base_srpm)
-
+def srpm_nv(srpm):
+    """Return the NV (Name, Version) from an SRPM."""
+    output, ret = utils.sbacktick(["rpm", "-qp", "--qf", "%{name} %{version}", srpm])
+    if ret == 0:
+        try:
+            name, version = output.rstrip().split(" ")
+            return name, version
+        except ValueError:  # not enough/too many items
+            pass
+    raise Error("Unable to extract name and version from SRPM %s: %s" % (srpm, output))
 
 def make_svn_tree(srpm, url, extra_action=None, provider=None, sha1sum=None):
     """Create an svn tree for the srpm and populate it as follows:
@@ -86,7 +84,7 @@ def make_svn_tree(srpm, url, extra_action=None, provider=None, sha1sum=None):
                               as well as a comment describing where it's from
 
     """
-    name, version = srpm_nvr(srpm)[0:2]
+    name, version = srpm_nv(srpm)
     abs_srpm = os.path.abspath(srpm)
 
     package_dir = os.path.abspath(os.getcwd())
@@ -378,7 +376,7 @@ def extract_orig_spec(osg_dir):
 
 def move_to_cache(srpm, upstream_root):
     """Move the srpm to the upstream cache. Return the path to the file in the cache."""
-    name, version = srpm_nvr(srpm)[0:2]
+    name, version = srpm_nv(srpm)
     base_srpm = os.path.basename(srpm)
     upstream_dir = os.path.join(upstream_root, name, version)
     utils.safe_makedirs(upstream_dir)

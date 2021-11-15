@@ -170,36 +170,39 @@ def restricted_branch_matches_target(branch, target):
         branch_match = re.search(branch_pattern, branch)
         if branch_match:
             break
-    if not branch_match:
-        return False
+    assert branch_match, \
+            "No SVN_RESTRICTED_BRANCHES pattern matching %s -- is_restricted_branch() should have caught this" % branch
 
     for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
         target_match = re.search(target_pattern, target)
         if target_match:
             break
-    if not target_match:
-        return False
+    assert target_match, \
+            "No KOJI_RESTRICTED_TARGETS pattern matching %s -- is_restricted_target() should have caught this" % target
 
+    # At this point branch_name should be one of the values (right-hand side) of
+    # SVN_RESTRICTED_BRANCHES, and target_name should be one of the values of
+    # KOJI_RESTRICTED_TARGETS.
+
+    # These might have OSG version numbers ("3.5") in them; make sure they match
     branch_osgver = branch_match.groupdict().get("osgver", None)
     target_osgver = target_match.groupdict().get("osgver", None)
+
+    # Deal with "main" (i.e. the "trunk" branch or the "osg-elX" targets), which are aliases for "3.5"
     if branch_name == "main":
         branch_name = "versioned"
         branch_osgver = "3.5"
     if target_name == "main":
         target_name = "versioned"
         target_osgver = "3.5"
+    # Deal with "upcoming", which is the same as "3.5-upcoming"
     if branch_name == "upcoming":
         branch_osgver = branch_osgver or "3.5"
     if target_name == "upcoming":
         target_osgver = target_osgver or "3.5"
 
-    if branch_name != target_name:
-        return False
-
-    if branch_name in ["upcoming", "versioned"]:
-        return branch_osgver == target_osgver
-
-    return False
+    # branch_osgver and target_osgver might be None, e.g. for devops but that's OK
+    return (branch_name == target_name) and (branch_osgver == target_osgver)
 
 def verify_correct_branch(package_dir, buildopts):
     """Check that the user is not trying to build with bad branch/target

@@ -589,7 +589,7 @@ def format_valid_routes(valid_routes):
         dvers_list = _commajoin(route.dvers)
         if route.extra_dvers:
             dvers_list += ', [%s]' % _commajoin(route.extra_dvers)
-        formatted += " - %-20s: %-26s -> %-26s (%s)\n" % (
+        formatted += " - %-25s: %-31s -> %-31s (%s)\n" % (
             route_name,
             route.from_tag_hint % '*',
             route.to_tag_hint % '*',
@@ -604,7 +604,7 @@ def format_aliases(aliases):
     :rtype: str
     """
     return "\n".join(
-        [" - %-20s: %s" % (name, _commajoin(aliases[name]))
+        [" - %-25s: %s" % (name, _commajoin(aliases[name]))
          for name in sorted(aliases)]
     )
 

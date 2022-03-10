@@ -31,6 +31,7 @@ PROVIDER_PATTERNS = [
     (r'fedoraproject\.org/pub/fedora/' , 'fedora') ,
     (r'globus\.org'                    , 'globus') ,
     (r'koji\.fedoraproject\.org/'      , 'fedora') ,
+    (r'kojipkgs\.fedoraproject\.org/'  , 'fedora') ,
     (r'xrootd\.web\.cern\.ch/'         , 'xrootd') ]
 
 

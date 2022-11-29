@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.18.0
+Version:        1.19.0
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -171,6 +171,9 @@ fi
 
 
 %changelog
+* Tue Nov 29 2022 Carl Edquist <edquist@cs.wisc.edu> - 1.19.0-1
+- Add el9 support (SOFTWARE-5342)
+
 * Thu Feb 04 2021 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.18.0-1
 - Add support for 3.5-upcoming and 3.6-upcoming repos  (SOFTWARE-4424)
 - Use real python 3 for el8 (instead of platform-python)

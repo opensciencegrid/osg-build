@@ -374,7 +374,7 @@ rpmbuild     Build using rpmbuild(8) on the local machine
     rpmbuild_mock_group.add_option(
         "--distro-tag",
         help="The distribution tag to append to the end of the release. "
-        "Default: osg.el7, or osg.el8 for EL 7 or 8 respectively")
+        "Default: osg.el7, or osg.el8, etc. for EL 7 or 8, etc. respectively")
     parser.add_option_group(rpmbuild_mock_group)
 
     if mock:
@@ -424,8 +424,8 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             type="string",
             help="The koji target to use for building. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available. Default: osg-el7 or osg-el8 for EL 7/8 "
-            "respectively")
+            "desired repo is available. Default: osg-el7 or osg-el8, etc. "
+            "for EL 7 or 8, etc. respectively")
         koji_group.add_option(
             "--koji-tag",
             action="callback",
@@ -434,8 +434,8 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="The koji tag to add packages to. The special value TARGET "
             "uses the destination tag defined in the koji target. "
             "It is recommended to use the --repo option instead of this when the "
-            "desired repo is available. Default: osg-el7 or osg-el8 for EL 7/8 "
-            "respectively")
+            "desired repo is available. Default: osg-el7 or osg-el8, etc. "
+            "for EL 7 or 8, etc. respectively")
         koji_group.add_option(
             "--koji-target-and-tag", "--ktt",
             action="callback",

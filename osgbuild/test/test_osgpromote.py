@@ -23,6 +23,8 @@ TAGS = ['devops-el7-itb',
         'devops-el7-production',
         'devops-el8-itb',
         'devops-el8-production',
+        'devops-el9-itb',
+        'devops-el9-production',
         'hcc-el7',
         'hcc-el7-build',
         'hcc-el7-release',
@@ -31,6 +33,10 @@ TAGS = ['devops-el7-itb',
         'hcc-el8-build',
         'hcc-el8-release',
         'hcc-el8-testing',
+        'hcc-el9',
+        'hcc-el9-build',
+        'hcc-el9-release',
+        'hcc-el9-testing',
         'osg-3.4-el6-build',
         'osg-3.4-el6-contrib',
         'osg-3.4-el6-development',
@@ -136,6 +142,15 @@ TAGS = ['devops-el7-itb',
         'osg-3.6-el8-release',
         'osg-3.6-el8-release-build',
         'osg-3.6-el8-testing',
+        'osg-3.6-el9-bootstrap',
+        'osg-3.6-el9-build',
+        'osg-3.6-el9-contrib',
+        'osg-3.6-el9-development',
+        'osg-3.6-el9-empty',
+        'osg-3.6-el9-prerelease',
+        'osg-3.6-el9-release',
+        'osg-3.6-el9-release-build',
+        'osg-3.6-el9-testing',
         'osg-3.6-upcoming-el7-build',
         'osg-3.6-upcoming-el7-development',
         'osg-3.6-upcoming-el7-prerelease',
@@ -146,6 +161,11 @@ TAGS = ['devops-el7-itb',
         'osg-3.6-upcoming-el8-prerelease',
         'osg-3.6-upcoming-el8-release',
         'osg-3.6-upcoming-el8-testing',
+        'osg-3.6-upcoming-el9-build',
+        'osg-3.6-upcoming-el9-development',
+        'osg-3.6-upcoming-el9-prerelease',
+        'osg-3.6-upcoming-el9-release',
+        'osg-3.6-upcoming-el9-testing',
         'osg-upcoming-el7-build',
         'osg-upcoming-el7-development',
         'osg-upcoming-el7-prerelease',
@@ -184,6 +204,13 @@ class FakeKojiHelper(promoter.KojiHelper):
                 {'nvr': 'reject-distinct-repos-2-1.osg36.el8', 'latest': True},
                 {'nvr': 'partially-overlapping-dvers-in-repo-1-1.osg36.el8', 'latest': True},
                 ],
+            'osg-3.6-el9-development': [
+                {'nvr': 'goodpkg-1999-1.osg36.el9', 'latest': False},
+                {'nvr': 'goodpkg-2000-1.osg36.el9', 'latest': True},
+                {'nvr': 'reject-distinct-dvers-1-1.osg36.el9', 'latest': True},
+                {'nvr': 'reject-distinct-repos-2-1.osg36.el9', 'latest': True},
+                {'nvr': 'partially-overlapping-dvers-in-repo-1-1.osg36.el9', 'latest': True},
+                ],
             'osg-upcoming-el7-development': [
                 {'nvr': 'goodpkg-1999-1.osgup.el7', 'latest': False},
                 {'nvr': 'goodpkg-2000-1.osgup.el7', 'latest': True},
@@ -211,6 +238,10 @@ class FakeKojiHelper(promoter.KojiHelper):
             'osg-3.6-upcoming-el8-development': [
                 {'nvr': 'goodpkg-2000-1.osg35.el8', 'latest': True},
                 {'nvr': 'reject-distinct-repos-1-1.osg35.el8', 'latest': True},
+            ],
+            'osg-3.6-upcoming-el9-development': [
+                {'nvr': 'goodpkg-2000-1.osg35.el9', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg35.el9', 'latest': True},
             ],
     }
 
@@ -323,8 +354,8 @@ class TestRouteLoader(unittest.TestCase):
 
 
 class TestPromoter(unittest.TestCase):
-    dvers = ['el7', 'el8']
-    dvers_upcoming = ['el7', 'el8']
+    dvers = ['el7', 'el8', 'el9']
+    dvers_upcoming = ['el7', 'el8', 'el9']
 
     def setUp(self):
         self.configuration = _config()
@@ -406,7 +437,7 @@ class TestPromoter(unittest.TestCase):
         self.testing_promoter.add_promotion('goodpkg')
         promoted_builds = self.testing_promoter.do_promotions()
         self.assertEqual(2, len(self.kojihelper.newly_tagged_packages))
-        for dver in ['el7', 'el8']:
+        for dver in ['el7', 'el8', 'el9']:
             tag = 'osg-3.6-%s-testing' % dver
             dist = 'osg36.%s' % dver
             nvr = 'goodpkg-2000-1.%s' % dist

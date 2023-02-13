@@ -369,6 +369,10 @@ def verify_correct_branch(package_dir, buildopts):
 
     for dver in buildopts['enabled_dvers']:
         target = buildopts['targetopts_by_dver'][dver]['koji_target']
+        _do_target_remote_checks(target, remote, branch)
+
+
+def _do_target_remote_checks(target, remote, branch):
         if target.startswith("hcc-"):
             if "master" not in branch:
                 raise Error("""\

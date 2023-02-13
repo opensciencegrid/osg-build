@@ -5,6 +5,7 @@ import re
 import os
 import errno
 
+from .constants import GIT_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
 from .error import Error, GitError
 from . import utils
 from . import constants
@@ -367,9 +368,17 @@ def verify_correct_branch(package_dir, buildopts):
     if remote in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
         verify_git_svn_commit(package_dir)
 
+    if not is_restricted_branch(branch):
+        # Developer branch -- any target ok
+        return
     for dver in buildopts['enabled_dvers']:
         target = buildopts['targetopts_by_dver'][dver]['koji_target']
         _do_target_remote_checks(target, remote, branch)
+        if not is_restricted_target(target):
+            # Some custom target -- any branch ok
+            continue
+        if not restricted_branch_matches_target(branch, target):
+            raise GitError("Forbidden to build from %s branch into %s target" % (branch, target))
 
 
 def _do_target_remote_checks(target, remote, branch):

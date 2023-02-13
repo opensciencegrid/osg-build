@@ -39,9 +39,9 @@ def is_git(package_dir):
 #
 # Branch checking
 #
-# We need to forbid building from certain SVN branches into certain Koji
+# We need to forbid building from certain git branches into certain Koji
 # targets. This is implemented by having two dicts mapping regexp patterns to
-# names, one containing the restricted SVN branches and one containing the
+# names, one containing the restricted git branches and one containing the
 # restricted Koji targets.
 #
 # We're permissive by default: if neither the branch nor the target match any
@@ -51,19 +51,18 @@ def is_git(package_dir):
 #
 
 def is_restricted_branch(branch):
-    """branch is an SVN branch such as 'trunk' or 'branches/osg-3.1'.
-    Assumes no extra characters on either side (no 'native/redhat/trunk' or
-    'trunk/gums')
+    """branch is a git branch such as 'osg-3.6' or 'devops'.
+    Allows for an optional word as an extra path component on the left.
 
     """
-    for pattern in SVN_RESTRICTED_BRANCHES:
+    for pattern in GIT_RESTRICTED_BRANCHES:
         if re.search(pattern, branch):
             return True
     return False
 
 
 def is_restricted_target(target):
-    """target is a koji target such as 'el5-osg' or 'osg-3.1-el5'.
+    """target is a koji target such as 'osg-el6' or 'osg-3.6-el8'.
     Assumes no extra characters on either side.
 
     """
@@ -88,12 +87,12 @@ def restricted_branch_matches_target(branch, target):
 
     """
     branch_match = branch_name = target_match = target_name = None
-    for (branch_pattern, branch_name) in SVN_RESTRICTED_BRANCHES.items():
+    for (branch_pattern, branch_name) in GIT_RESTRICTED_BRANCHES.items():
         branch_match = re.search(branch_pattern, branch)
         if branch_match:
             break
     assert branch_match, \
-            "No SVN_RESTRICTED_BRANCHES pattern matching %s -- is_restricted_branch() should have caught this" % branch
+            "No GIT_RESTRICTED_BRANCHES pattern matching %s -- is_restricted_branch() should have caught this" % branch
 
     for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
         target_match = re.search(target_pattern, target)
@@ -103,7 +102,7 @@ def restricted_branch_matches_target(branch, target):
             "No KOJI_RESTRICTED_TARGETS pattern matching %s -- is_restricted_target() should have caught this" % target
 
     # At this point branch_name should be one of the values (right-hand side) of
-    # SVN_RESTRICTED_BRANCHES, and target_name should be one of the values of
+    # GIT_RESTRICTED_BRANCHES, and target_name should be one of the values of
     # KOJI_RESTRICTED_TARGETS.
 
     # These might have OSG version numbers ("3.5") in them; make sure they match

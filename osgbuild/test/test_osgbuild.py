@@ -438,9 +438,22 @@ class TestKoji(TestCase):
             self.is_building_for("osg-upcoming-el8", output),
             "falsely building for el8-upcoming")
 
-    def test_verify_correct_branch(self):
+    def test_verify_correct_branch_svn(self):
         try:
             _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(C.SVN_ROOT, DEVOPS, "koji")])
+        except CalledProcessError as err:
+            out_list = err.output.split("\n")
+            self.assertTrue(
+                regex_in_list(r".*Forbidden to build from .+ branch into .+ target", out_list),
+                "did not detect attempt to build for wrong branch (wrong error message)")
+            return
+        self.fail("did not detect attempt to build for wrong branch (no error message)")
+
+    def test_verify_correct_branch_git(self):
+        try:
+            # SCM URI format is 'git+https://host/.../repo.git?path#revision'
+            scm_uri = "git+%s?%s#%s" % (C.OSG_REMOTE, "koji", "devops")
+            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", scm_uri])
         except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(

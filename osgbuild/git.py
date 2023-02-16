@@ -139,7 +139,7 @@ def get_branch(package_dir):
         raise GitError("'git branch' returned no output.")
 
     branch = [ line[2:] for line in out.splitlines() if line.startswith('* ') ]
-    if len(branch) != 1 or not branch[0] or '(' in branch[0]:
+    if len(branch) != 1 or not branch[0] or ' ' in branch[0]:
         raise GitError("'git branch' indicates no branch is checked out")
     return branch[0]
 

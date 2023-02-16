@@ -5,6 +5,7 @@ import re
 import os
 import errno
 
+from .constants import GIT_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
 from .error import Error, GitError
 from . import utils
 from . import constants
@@ -36,6 +37,95 @@ def is_git(package_dir):
         os.chdir(pwd)
     return True
 
+#
+# Branch checking
+#
+# We need to forbid building from certain git branches into certain Koji
+# targets. This is implemented by having two dicts mapping regexp patterns to
+# names, one containing the restricted git branches and one containing the
+# restricted Koji targets.
+#
+# We're permissive by default: if neither the branch nor the target match any
+# of the regexps in their respective dicts, the build is allowed. On the other
+# hand, if both are restricted then the branch name has to match the target
+# name.
+#
+
+def is_restricted_branch(branch):
+    """branch is a git branch such as 'osg-3.6' or 'devops'.
+    Allows for an optional word as an extra path component on the left.
+
+    """
+    for pattern in GIT_RESTRICTED_BRANCHES:
+        if re.search(pattern, branch):
+            return True
+    return False
+
+
+def is_restricted_target(target):
+    """target is a koji target such as 'osg-el6' or 'osg-3.6-el8'.
+    Assumes no extra characters on either side.
+
+    """
+    for pattern in KOJI_RESTRICTED_TARGETS:
+        if re.search(pattern, target):
+            return True
+    return False
+
+
+def restricted_branch_matches_target(branch, target):
+    """Return True if the pattern that matches `branch` is associated with the
+    same name (e.g. 'devops', 'main', 'upcoming', 'versioned') as the pattern that
+    matches `target`; False otherwise.
+    Special cases:
+    - if the name is 'versioned' (e.g. we're building from 'branches/osg-3.1') then the versions also have to match.
+    - treat 'main' (i.e. 'trunk') as 'versioned' with a version of '3.5'
+    - if the name is 'upcoming' (e.g. building from 'branches/3.6-upcoming') then the versions also have to match.
+      treat a missing version ('branches/upcoming') as '3.5'
+
+    Precondition: is_restricted_branch(branch) and is_restricted_target(target)
+    are True.
+
+    """
+    branch_match = branch_name = target_match = target_name = None
+    for (branch_pattern, branch_name) in GIT_RESTRICTED_BRANCHES.items():
+        branch_match = re.search(branch_pattern, branch)
+        if branch_match:
+            break
+    assert branch_match, \
+            "No GIT_RESTRICTED_BRANCHES pattern matching %s -- is_restricted_branch() should have caught this" % branch
+
+    for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
+        target_match = re.search(target_pattern, target)
+        if target_match:
+            break
+    assert target_match, \
+            "No KOJI_RESTRICTED_TARGETS pattern matching %s -- is_restricted_target() should have caught this" % target
+
+    # At this point branch_name should be one of the values (right-hand side) of
+    # GIT_RESTRICTED_BRANCHES, and target_name should be one of the values of
+    # KOJI_RESTRICTED_TARGETS.
+
+    # These might have OSG version numbers ("3.5") in them; make sure they match
+    branch_osgver = branch_match.groupdict().get("osgver", None)
+    target_osgver = target_match.groupdict().get("osgver", None)
+
+    # Deal with "main" (i.e. the "trunk" branch or the "osg-elX" targets), which are aliases for "3.5"
+    if branch_name == "main":
+        branch_name = "versioned"
+        branch_osgver = "3.5"
+    if target_name == "main":
+        target_name = "versioned"
+        target_osgver = "3.5"
+    # Deal with "upcoming", which is the same as "3.5-upcoming"
+    if branch_name == "upcoming":
+        branch_osgver = branch_osgver or "3.5"
+    if target_name == "upcoming":
+        target_osgver = target_osgver or "3.5"
+
+    # branch_osgver and target_osgver might be None, e.g. for devops but that's OK
+    return (branch_name == target_name) and (branch_osgver == target_osgver)
+
 
 def get_branch(package_dir):
     """Return the current git branch for a given directory."""
@@ -47,7 +137,11 @@ def get_branch(package_dir):
     out = out.strip()
     if not out:
         raise GitError("'git branch' returned no output.")
-    return out.split()[-1]
+
+    branch = [ line[2:] for line in out.splitlines() if line.startswith('* ') ]
+    if len(branch) != 1 or not branch[0] or ' ' in branch[0]:
+        raise GitError("'git branch' indicates no branch is checked out")
+    return branch[0]
 
 
 def get_known_remote(package_dir):
@@ -278,8 +372,20 @@ def verify_correct_branch(package_dir, buildopts):
     if remote in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
         verify_git_svn_commit(package_dir)
 
+    if not is_restricted_branch(branch):
+        # Developer branch -- any target ok
+        return
     for dver in buildopts['enabled_dvers']:
         target = buildopts['targetopts_by_dver'][dver]['koji_target']
+        _do_target_remote_checks(target, remote, branch)
+        if not is_restricted_target(target):
+            # Some custom target -- any branch ok
+            continue
+        if not restricted_branch_matches_target(branch, target):
+            raise GitError("Forbidden to build from %s branch into %s target" % (branch, target))
+
+
+def _do_target_remote_checks(target, remote, branch):
         if target.startswith("hcc-"):
             if "master" not in branch:
                 raise Error("""\
@@ -290,7 +396,7 @@ master branch!  You must switch branches.""")
                 raise Error("""\
 Error: You must build into the HCC repo when building from
 a HCC git checkout.  You must switch git repos or build targets.""")
-        elif re.search(r"osg(?:-\d+\.\d+)?-upcoming$", target):
+        elif re.search(r"osg(?:-\d+\.\d+)?-upcoming-el\d+$", target):
             if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
                 raise Error("""\
 Error: You may not build into the OSG repo when building from

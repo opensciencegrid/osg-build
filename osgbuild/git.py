@@ -396,7 +396,7 @@ master branch!  You must switch branches.""")
                 raise Error("""\
 Error: You must build into the HCC repo when building from
 a HCC git checkout.  You must switch git repos or build targets.""")
-        elif re.search(r"osg(?:-\d+\.\d+)?-upcoming$", target):
+        elif re.search(r"osg(?:-\d+\.\d+)?-upcoming-el\d+$", target):
             if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
                 raise Error("""\
 Error: You may not build into the OSG repo when building from

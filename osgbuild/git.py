@@ -137,7 +137,11 @@ def get_branch(package_dir):
     out = out.strip()
     if not out:
         raise GitError("'git branch' returned no output.")
-    return out.split()[-1]
+
+    branch = [ line[2:] for line in out.splitlines() if line.startswith('* ') ]
+    if len(branch) != 1 or not branch[0] or '(' in branch[0]:
+        raise GitError("'git branch' indicates no branch is checked out")
+    return branch[0]
 
 
 def get_known_remote(package_dir):

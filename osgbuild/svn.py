@@ -194,12 +194,12 @@ def restricted_branch_matches_target(branch, target):
         branch_osgver = "3.5"
     if target_name == "main":
         target_name = "versioned"
-        target_osgver = "3.5"
+        target_osgver = "3.6"
     # Deal with "upcoming", which is the same as "3.5-upcoming"
     if branch_name == "upcoming":
         branch_osgver = branch_osgver or "3.5"
     if target_name == "upcoming":
-        target_osgver = target_osgver or "3.5"
+        target_osgver = target_osgver or "3.6"
 
     # branch_osgver and target_osgver might be None, e.g. for devops but that's OK
     return (branch_name == target_name) and (branch_osgver == target_osgver)

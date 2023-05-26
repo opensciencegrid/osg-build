@@ -1,0 +1,32 @@
+#!/bin/bash
+# sha1vdt
+#
+# A quick and dirty script to get the sha1 hash of a file in the upstream directory
+# and format it appropriately for inclusion in a .source file.
+#
+# Usage: sha1vdt <filename>
+#
+# The filename should be in the upstream directory, i.e. under /p/vdt/public/html/upstream
+
+
+fail () {
+    ret=$1
+    shift
+    echo "$@" >&2
+    exit $ret
+}
+
+
+filename=${1?Need filename}
+abs_filename=$(readlink -f "$filename") || fail 1 "Couldn't get absolute path of $filename"
+
+# the absolute path sometimes includes the /afs/cs.wisc.edu prefix; strip that off
+short_filename=${abs_filename#/afs/cs.wisc.edu}
+short_filename2=${short_filename#/p/vdt/public/html/upstream/}
+if [[ $short_filename == $short_filename2 ]]; then
+    fail 2 "$filename is not under /p/vdt/public/html/upstream"
+fi
+
+set -o pipefail
+sha1sum=$(sha1sum "$filename" | awk '{print $1}') || fail 3 "Error getting sha1sum"
+printf "%s sha1sum=%s\n" "$short_filename2" "$sha1sum"

@@ -38,9 +38,9 @@ To submit test build(s):
 To submit final build(s):
     %(prog)s koji PACKAGE1 <PACKAGE2..n>
 
-To submit build(s) for EL6 or EL7 only:
-    %(prog)s koji --el6 PACKAGE1 <PACKAGE2..n>
+To submit build(s) for EL7 or EL8 only:
     %(prog)s koji --el7 PACKAGE1 <PACKAGE2..n>
+    %(prog)s koji --el8 PACKAGE1 <PACKAGE2..n>
 
 Also see the documentation at:
     https://opensciencegrid.github.io/technology/software/osg-build-tools/

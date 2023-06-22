@@ -37,15 +37,6 @@ TAGS = ['devops-el7-itb',
         'hcc-el9-build',
         'hcc-el9-release',
         'hcc-el9-testing',
-        'osg-3.4-el6-build',
-        'osg-3.4-el6-contrib',
-        'osg-3.4-el6-development',
-        'osg-3.4-el6-empty',
-        'osg-3.4-el6-prerelease',
-        'osg-3.4-el6-release',
-        'osg-3.4-el6-release-build',
-        'osg-3.4-el6-rolling',
-        'osg-3.4-el6-testing',
         'osg-3.4-el7-build',
         'osg-3.4-el7-contrib',
         'osg-3.4-el7-development',
@@ -324,7 +315,7 @@ class TestRouteLoader(unittest.TestCase):
         self.assertEqual('hcc-%s-testing', self.routes['hcc'].from_tag_hint)
         self.assertEqual('hcc-%s-release', self.routes['hcc'].to_tag_hint)
         self.assertEqual('hcc', self.routes['hcc'].repo)
-        self.assertEqual(['el6', 'el7'], self.routes['hcc'].dvers)
+        self.assertEqual(['el7'], self.routes['hcc'].dvers)
 
     def test_osg_route(self):
         self.assertEqual('osg-3.5-%s-development', self.routes['3.5-testing'].from_tag_hint)

@@ -89,7 +89,7 @@ DEFAULT_BUILDOPTS_COMMON = {
     'working_directory': '.',
 }
 
-DVERS = ['el6', 'el7', 'el8', 'el9', 'fc32', 'fc33', 'fc34', 'fc35']
+DVERS = ['el7', 'el8', 'el9', 'fc32', 'fc33', 'fc34', 'fc35']
 
 DEFAULT_BUILDOPTS_BY_DVER = {}
 for dver in DVERS:
@@ -106,18 +106,14 @@ DEFAULT_BUILDOPTS_BY_DVER['el7']['_binary_payload'] = 'w2.xzdio'
 FALLBACK_DVER = 'el7'
 DEFAULT_DVERS = ['el7', 'el8']
 DEFAULT_DVERS_BY_REPO = {
-    '3.3': ['el6', 'el7'],
-    'osg-3.3': ['el6', 'el7'],
-    '3.4': ['el6', 'el7'],
-    'osg-3.4': ['el6', 'el7'],
     '3.5': ['el7', 'el8'],
     'osg-3.5': ['el7', 'el8'],
     '3.5-upcoming': ['el7', 'el8'],
     '3.6': ['el7', 'el8'],
     'osg-3.6': ['el7', 'el8'],
     '3.6-upcoming': ['el7', 'el8'],
-    'internal': ['el6', 'el7'],
-    'condor': ['el6', 'el7'],
+    'internal': ['el7'],
+    'condor': ['el7'],
     'devops': ['el7', 'el8'],
     'upcoming': ['el7', 'el8'],
 }

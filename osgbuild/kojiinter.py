@@ -84,6 +84,17 @@ def download_koji_file(task_id, filename, destdir):
         desthandle.write(handle.read())
 
 
+def chop_package_el_suffix(package):
+    # type: (str) -> str
+    """If the package directory has the el version(s) at the end, e.g.
+    condor.el9, buildsys-macros.el8, foobar.el7.el8
+    chop them off. This gives us the "base" package name for adding to the
+    Koji tag.
+    """
+    el_pattern = re.compile(r"([.]el\d+)+$")
+    real_package = el_pattern.sub("", package)
+    return real_package
+
 
 class KojiInter(object):
     """An interface around the koji cli"""
@@ -186,8 +197,9 @@ class KojiShellInter(object):
         if owner is None:
             owner = self.user
 
+        real_package = chop_package_el_suffix(package)
         found = False
-        list_pkgs = utils.backtick(self.koji_cmd + ["list-pkgs", "--package", package])
+        list_pkgs = utils.backtick(self.koji_cmd + ["list-pkgs", "--package", real_package])
         for line in list_pkgs.split("\n"):
             fields = re.split(r"\s*", line, 2)
             try:
@@ -197,7 +209,7 @@ class KojiShellInter(object):
                 pass
 
         if not found:
-            cmd = (self.koji_cmd + ["add-pkg", tag, package, "--owner", owner])
+            cmd = (self.koji_cmd + ["add-pkg", tag, real_package, "--owner", owner])
             log.info("Calling koji to add the package to tag %s", tag)
             if not self.dry_run:
                 utils.checked_call(cmd)
@@ -468,16 +480,16 @@ class KojiLibInter(object):
         tag_obj = self.kojisession.getTag(tag)
         if not tag_obj:
             raise KojiError("Invalid tag %s" % tag)
+        real_package = chop_package_el_suffix(package)
         try:
-            package_list = self.kojisession.listPackages(tagID=tag_obj['id'], pkgID=package)
+            package_list = self.kojisession.listPackages(tagID=tag_obj['id'], pkgID=real_package)
         except kojilib.GenericError: # koji raises this if the package doesn't exist
             package_list = None
         if not package_list:
             if not self.dry_run:
-                return self.kojisession.packageListAdd(tag, package, owner)
+                return self.kojisession.packageListAdd(tag, real_package, owner)
             else:
-                log.info("kojisession.packageListAdd(%r, %r, %r)", tag, package, owner)
-
+                log.info("kojisession.packageListAdd(%r, %r, %r)", tag, real_package, owner)
 
 
     @koji_error_wrap('building')

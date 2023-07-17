@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""unit tests for the osg-build tasks
+"""integration tests for the osg-build tasks
 """
 # pylint: disable=C0103,R0904,W0614,C0111
 

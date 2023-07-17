@@ -31,7 +31,6 @@ SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
 SVN_REDHAT_PATH = "/native/redhat"
 
 SVN_RESTRICTED_BRANCHES = {
-    r'^trunk$'                             : 'main',
     r'^branches/(?P<osgver>[0-9.]+)-?upcoming$': 'upcoming',
     r'^branches/osg-internal$'             : 'oldinternal',
     r'^branches/devops$'                   : 'devops',
@@ -49,7 +48,6 @@ KOJI_RESTRICTED_TARGETS = {
     r'^(?P<osgver>[0-9.]+)-internal-(el\d+)$' : 'internal',
 }
 GIT_RESTRICTED_BRANCHES = {
-    r'^(\w*/)?master$'                     : 'main',
     r'^(\w*/)?(?P<osgver>[0-9.]+)-?upcoming$': 'upcoming',
     r'^(\w*/)?internal$'                   : 'oldinternal',
     r'^(\w*/)?devops$'                     : 'devops',

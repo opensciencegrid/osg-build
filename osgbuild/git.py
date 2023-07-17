@@ -111,12 +111,9 @@ def restricted_branch_matches_target(branch, target):
     target_osgver = target_match.groupdict().get("osgver", None)
 
     # Deal with "main" (i.e. the "trunk" branch or the "osg-elX" targets), which are aliases for "3.5"
-    if branch_name == "main":
-        branch_name = "versioned"
-        branch_osgver = "3.5"
     if target_name == "main":
         target_name = "versioned"
-        target_osgver = "3.5"
+        target_osgver = "3.6"
 
     # branch_osgver and target_osgver might be None, e.g. for devops but that's OK
     return (branch_name == target_name) and (branch_osgver == target_osgver)

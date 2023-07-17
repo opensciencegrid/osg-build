@@ -188,10 +188,6 @@ def restricted_branch_matches_target(branch, target):
     branch_osgver = branch_match.groupdict().get("osgver", None)
     target_osgver = target_match.groupdict().get("osgver", None)
 
-    # Deal with "main" (i.e. the "trunk" branch or the "osg-elX" targets), which are aliases for "3.5"
-    if branch_name == "main":
-        branch_name = "versioned"
-        branch_osgver = "3.5"
     if target_name == "main":
         target_name = "versioned"
         target_osgver = "3.6"
@@ -207,7 +203,10 @@ def verify_correct_branch(package_dir, buildopts):
     """
     package_info = get_package_info(package_dir)
     url = package_info['canon_url']
-    branch_match = re.search(SVN_REDHAT_PATH + r'/(trunk|branches/[^/]+)/', url)
+    if SVN_REDHAT_PATH + '/trunk/' in url:
+        # Branch nazi mode
+        raise SVNError("trunk has been removed.")
+    branch_match = re.search(SVN_REDHAT_PATH + r'/(branches/[^/]+)/', url)
     if not branch_match:
         # Building from a weird path (such as a tag). Be permissive -- koji
         # itself will catch building from outside SVN so we don't have to

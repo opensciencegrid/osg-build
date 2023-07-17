@@ -190,10 +190,6 @@ def restricted_branch_matches_target(branch, target):
     branch_osgver = branch_match.groupdict().get("osgver", None)
     target_osgver = target_match.groupdict().get("osgver", None)
 
-    # Deal with "main" (i.e. the "trunk" branch or the "osg-elX" targets), which are aliases for "3.5"
-    if branch_name == "main":
-        branch_name = "versioned"
-        branch_osgver = "3.5"
     if target_name == "main":
         target_name = "versioned"
         target_osgver = "3.6"
@@ -203,13 +199,18 @@ def restricted_branch_matches_target(branch, target):
 
 def verify_correct_branch(package_dir, buildopts):
     """Check that the user is not trying to build with bad branch/target
-    combinations. For example, building from trunk into upcoming, or building
-    from osg-3.1 into osg-3.2.
+    combinations. For example, building from osg-3.6 into 3.6-upcoming, or building
+    from osg-3.6 into 23-main.
 
     """
     package_info = get_package_info(package_dir)
     url = package_info['canon_url']
-    branch_match = re.search(SVN_REDHAT_PATH + r'/(trunk|branches/[^/]+)/', url)
+    # Check for old, deprecated branches
+    if SVN_REDHAT_PATH + '/trunk/' in url:
+        raise SVNError("trunk has been removed; use branches/osg-3.5 instead")
+    elif SVN_REDHAT_PATH + '/branches/upcoming/' in url:
+        raise SVNError("unversioned upcoming has been removed; use branches/3.5-upcoming instead")
+    branch_match = re.search(SVN_REDHAT_PATH + r'/(branches/[^/]+)/', url)
     if not branch_match:
         # Building from a weird path (such as a tag). Be permissive -- koji
         # itself will catch building from outside SVN so we don't have to

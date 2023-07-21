@@ -92,7 +92,7 @@ DEFAULT_BUILDOPTS_COMMON = {
     'working_directory': '.',
 }
 
-DVERS = ['el7', 'el8', 'el9', 'fc32', 'fc33', 'fc34', 'fc35']
+DVERS = ['el7', 'el8', 'el9']
 
 DEFAULT_BUILDOPTS_BY_DVER = {}
 for dver in DVERS:

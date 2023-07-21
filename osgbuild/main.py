@@ -482,12 +482,6 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="Do not build package directly from SVN/Git "
             "(default for scratch builds)")
         koji_group.add_option(
-            "--upcoming", action="callback",
-            callback=parser_targetopts_callback,
-            type=None,
-            help="Target build for the 3.5-upcoming osg repos. "
-            "Deprecated: use --3.5-upcoming instead.")
-        koji_group.add_option(
             "--3.5-upcoming", action="callback",
             callback=parser_targetopts_callback,
             type=None,

@@ -32,7 +32,7 @@ SVN_REDHAT_PATH = "/native/redhat"
 
 SVN_RESTRICTED_BRANCHES = {
     r'^trunk$'                             : 'main',
-    r'^branches/(?P<osgver>\d+\.\d+)?-?upcoming$': 'upcoming',
+    r'^branches/(?P<osgver>\d+\.\d+)-?upcoming$': 'upcoming',
     r'^branches/osg-internal$'             : 'internal',
     r'^branches/devops$'                   : 'devops',
     r'^branches/osg-(?P<osgver>\d+\.\d+)$' : 'versioned',
@@ -40,7 +40,7 @@ SVN_RESTRICTED_BRANCHES = {
     r'^branches/condor'                    : 'condor'}
 KOJI_RESTRICTED_TARGETS = {
     r'^osg-(el\d+)$'                       : 'main',
-    r'^osg-(?P<osgver>\d+\.\d+)?-?upcoming-(el\d+)$': 'upcoming',
+    r'^osg-(?P<osgver>\d+\.\d+)-?upcoming-(el\d+)$': 'upcoming',
     r'^devops-(el\d+)$'                    : 'devops',
     r'^osg-(el\d+)-internal$'              : 'internal',
     r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'  : 'versioned',
@@ -48,7 +48,7 @@ KOJI_RESTRICTED_TARGETS = {
     r'^condor-(el\d+)$'                    : 'condor'}
 GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?master$'                     : 'main',
-    r'^(\w*/)?(?P<osgver>\d+\.\d+)?-?upcoming$': 'upcoming',
+    r'^(\w*/)?(?P<osgver>\d+\.\d+)-?upcoming$': 'upcoming',
     r'^(\w*/)?internal$'                   : 'internal',
     r'^(\w*/)?devops$'                     : 'devops',
     r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned',
@@ -121,7 +121,6 @@ DEFAULT_DVERS_BY_REPO = {
     'internal': ['el7'],
     'condor': ['el7'],
     'devops': ['el7', 'el8'],
-    'upcoming': ['el7', 'el8'],
 }
 assert FALLBACK_DVER in DVERS
 for d in DEFAULT_DVERS:
@@ -132,7 +131,6 @@ for ds in DEFAULT_DVERS_BY_REPO.values():
 
 REPO_HINTS_STATIC = {
     'osg': {'target': 'osg-%(dver)s', 'tag': 'osg-%(dver)s'},
-    'upcoming': {'target': 'osg-upcoming-%(dver)s', 'tag': 'osg-%(dver)s'},
     'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
     'devops': {'target': 'devops-%(dver)s', 'tag': 'osg-%(dver)s'},
     'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},

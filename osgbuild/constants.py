@@ -38,7 +38,7 @@ SVN_RESTRICTED_BRANCHES = {
     r'^branches/osg-(?P<osgver>\d+\.\d+)$' : 'versioned',
     r'^branches/(?P<osgver>[0-9.]+)-main$' : 'versioned',
     r'^branches/(?P<osgver>[0-9.]+)-internal$' : 'internal',
-    r'^branches/condor'                    : 'condor'}
+}
 KOJI_RESTRICTED_TARGETS = {
     r'^osg-(el\d+)$'                       : 'main',
     r'^osg-(?P<osgver>[0-9.]+)-?upcoming-(el\d+)$': 'upcoming',
@@ -47,7 +47,7 @@ KOJI_RESTRICTED_TARGETS = {
     r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'  : 'versioned',
     r'^(?P<osgver>[0-9.]+)-main-(el\d+)$'  : 'versioned',
     r'^(?P<osgver>[0-9.]+)-internal-(el\d+)$' : 'internal',
-    r'^condor-(el\d+)$'                    : 'condor'}
+}
 GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?master$'                     : 'main',
     r'^(\w*/)?(?P<osgver>[0-9.]+)-?upcoming$': 'upcoming',
@@ -56,7 +56,7 @@ GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'   : 'versioned',
     r'^(\w*/)?(?P<osgver>[0-9.]+)-main$'   : 'versioned',
     r'^(\w*/)?(?P<osgver>[0-9.]+)-internal$' : 'internal',
-    r'^(\w*/)?condor-(el\d+)'              : 'condor'}
+}
 
 CSL_KOJI_DIR = "/p/vdt/workspace/koji-1.15.3"
 
@@ -122,7 +122,6 @@ DEFAULT_DVERS_BY_REPO = {
     '23-upcoming': ['el8', 'el9'],
     '23-internal': ['el8', 'el9'],
     'internal': ['el7'],
-    'condor': ['el7'],
     'devops': ['el7', 'el8'],
 }
 assert FALLBACK_DVER in DVERS
@@ -137,7 +136,6 @@ REPO_HINTS_STATIC = {
     'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
     'devops': {'target': 'devops-%(dver)s', 'tag': 'osg-%(dver)s'},
     'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},
-    'condor': {'target': 'condor-%(dver)s', 'tag': 'condor-%(dver)s'},
 }
 
 BUGREPORT_EMAIL = "help@osg-htc.org"

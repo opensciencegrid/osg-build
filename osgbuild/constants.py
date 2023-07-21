@@ -137,7 +137,7 @@ REPO_HINTS_STATIC = {
     'condor': {'target': 'condor-%(dver)s', 'tag': 'condor-%(dver)s'},
 }
 
-BUGREPORT_EMAIL = "osg-software@opensciencegrid.org"
+BUGREPORT_EMAIL = "help@osg-htc.org"
 
 BACKGROUND_THRESHOLD = 5
 

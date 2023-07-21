@@ -197,15 +197,17 @@ def restricted_branch_matches_target(branch, target):
 
 def verify_correct_branch(package_dir, buildopts):
     """Check that the user is not trying to build with bad branch/target
-    combinations. For example, building from trunk into upcoming, or building
-    from osg-3.1 into osg-3.2.
+    combinations. For example, building from osg-3.6 into 3.6-upcoming, or building
+    from osg-3.6 into 23-main.
 
     """
     package_info = get_package_info(package_dir)
     url = package_info['canon_url']
+    # Check for old, deprecated branches
     if SVN_REDHAT_PATH + '/trunk/' in url:
-        # Branch nazi mode
-        raise SVNError("trunk has been removed.")
+        raise SVNError("trunk has been removed; use branches/osg-3.5 instead")
+    elif SVN_REDHAT_PATH + '/branches/upcoming/' in url:
+        raise SVNError("unversioned upcoming has been removed; use branches/3.5-upcoming instead")
     branch_match = re.search(SVN_REDHAT_PATH + r'/(branches/[^/]+)/', url)
     if not branch_match:
         # Building from a weird path (such as a tag). Be permissive -- koji

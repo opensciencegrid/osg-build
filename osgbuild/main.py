@@ -499,7 +499,8 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "--repo", action="callback",
             callback=parser_targetopts_callback,
             type="string", dest="repo",
-            help="Specify a set of repos to build to (osg-3.4 (or just 3.4), "
+            help="Specify a set of repos to build to (osg-3.6, 3.6-upcoming, "
+            + "23-main, 23-upcoming, "
             + ", ".join(REPO_HINTS_STATIC.keys())
             + ")")
         parser.add_option_group(koji_group)

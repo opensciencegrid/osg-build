@@ -406,42 +406,9 @@ class TestKoji(TestCase):
         self.assertTrue(
             regex_in_list(r".*kojisession.build\([^,]+?, 'osg.+el[78]', " + re.escape("{'scratch': True}") + r", None\)", out_list))
 
-    def test_koji_lib_old_upcoming(self):
-        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-upcoming-el8", output))
-
-    def test_koji_lib_old_upcoming2(self):
-        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", "--el7", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
-        self.assertFalse(self.is_building_for("osg-upcoming-el8", output))
-
-    def test_koji_lib_old_upcoming3(self):
-        output = backtick_osg_build(self.kdr_lib + ["--repo", "upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-upcoming-el8", output))
-
-    def test_koji_shell_old_upcoming(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(
-            self.is_building_for("osg-upcoming-el7", output),
-            "not building for el7-upcoming")
-        self.assertFalse(
-            self.is_building_for("osg-upcoming-el8", output),
-            "falsely building for el8-upcoming")
-
-    def test_koji_shell_old_upcoming2(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--repo", "upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(
-            self.is_building_for("osg-upcoming-el7", output),
-            "not building for el7-upcoming")
-        self.assertFalse(
-            self.is_building_for("osg-upcoming-el8", output),
-            "falsely building for el8-upcoming")
-
     def test_verify_correct_branch_svn(self):
         try:
-            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(C.SVN_ROOT, DEVOPS, "koji")])
+            _ = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--dry-run", opj(C.SVN_ROOT, OSG_36, "osg-xrootd")])
         except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(
@@ -453,8 +420,9 @@ class TestKoji(TestCase):
     def test_verify_correct_branch_git(self):
         try:
             # SCM URI format is 'git+https://host/.../repo.git?path#revision'
-            scm_uri = "git+%s?%s#%s" % (C.OSG_REMOTE, "koji", "devops")
-            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", scm_uri])
+            gitbranch = re.sub(r"^native/redhat/branches/", "", OSG_36)
+            scm_uri = "git+%s?%s#%s" % (C.OSG_REMOTE, "osg-xrootd", gitbranch)
+            _ = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--dry-run", scm_uri])
         except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(

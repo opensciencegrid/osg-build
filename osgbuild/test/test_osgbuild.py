@@ -3,91 +3,26 @@
 """
 # pylint: disable=C0103,R0904,W0614,C0111
 
-import atexit
 import grp
 import re
 import os
 from os.path import join as opj
 import pwd
-import shutil
-import tempfile
 import tarfile
 import unittest
 from unittest import makeSuite, TestCase
-import sys
 
 import osgbuild.constants as C
 from osgbuild import main
 from osgbuild import srpm
+from osgbuild.test.common import OSG_36, regex_in_list, get_osg_build_path, go_to_temp_dir, common_setUp, \
+    backtick_osg_build, checked_osg_build
 from osgbuild.utils import (
     checked_backtick,
     checked_call,
     CalledProcessError,
-    find_file,
     errprintf,
     unslurp)
-
-OSG_36 = "native/redhat/branches/osg-3.6"
-OSG_36_UPCOMING = "native/redhat/branches/3.6-upcoming"
-OSG_23_MAIN = "native/redhat/branches/23-main"
-OSG_23_UPCOMING = "native/redhat/branches/23-upcoming"
-
-initial_wd = os.getcwd()
-osg_build_path = find_file('osg-build', [initial_wd,
-                                         '/usr/bin'])
-
-if not osg_build_path:
-    errprintf("osg-build script not found!")
-    sys.exit(255)
-
-osg_build_command = [osg_build_path]
-
-
-def go_to_temp_dir():
-    working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
-    atexit.register(shutil.rmtree, working_dir)
-    os.chdir(working_dir)
-    return working_dir
-
-
-def common_setUp(path, rev):
-    """Create a temporary directory, ensure it gets deleted on exit, cd to it,
-    and check out a specific revision of a path from our SVN.
-
-    """
-    working_dir = go_to_temp_dir()
-    svn_export(path, rev, os.path.basename(path))
-    return opj(working_dir, os.path.basename(path))
-
-
-def backtick_osg_build(cmd_args, *args, **kwargs):
-    kwargs['clocale'] = True
-    kwargs['err2out'] = True
-    return checked_backtick(osg_build_command + cmd_args, *args, **kwargs)
-
-
-def checked_osg_build(cmd_args, *args, **kwargs):
-    return checked_call(osg_build_command + cmd_args, *args, **kwargs)
-
-
-def svn_export(path, rev, destpath):
-    """Run svn export on a revision rev of path into destpath"""
-    try:
-        checked_backtick(
-            ["svn", "export", opj(C.SVN_ROOT, path) + "@" + rev, "-r", rev, destpath],
-            err2out=True)
-    except CalledProcessError as err:
-        errprintf("Error in svn export:\n%s", err.output)
-        raise
-
-
-def get_listing(directory):
-    return checked_backtick(
-            ["ls", directory]).split("\n")
-
-
-def regex_in_list(pattern, listing):
-    return [x for x in listing if re.match(pattern, x)]
 
 
 class TestLint(TestCase):
@@ -138,8 +73,8 @@ class TestPrebuild(TestCase):
         pkg_dir = common_setUp(opj(OSG_36, "xrootd"),
                                "{2023-07-21}")
         checked_osg_build(["prebuild", pkg_dir])
-        upstream_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED))
-        final_contents = get_listing(opj(pkg_dir, C.WD_PREBUILD))
+        upstream_contents = os.listdir(opj(pkg_dir, C.WD_UNPACKED))
+        final_contents = os.listdir(opj(pkg_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             "xrootd.spec" in upstream_contents,
@@ -161,7 +96,7 @@ class TestPrebuild(TestCase):
         pkg_osgonly_dir = common_setUp(opj(OSG_36, "osg-xrootd"),
                                        "{2023-07-21}")
         checked_osg_build(["prebuild", pkg_osgonly_dir])
-        final_contents = get_listing(opj(pkg_osgonly_dir, C.WD_PREBUILD))
+        final_contents = os.listdir(opj(pkg_osgonly_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
@@ -173,7 +108,7 @@ class TestPrebuild(TestCase):
         pkg_passthrough_dir = common_setUp(opj(OSG_36, "htgettoken"),
                                            "{2023-07-21}")
         checked_osg_build(["prebuild", pkg_passthrough_dir])
-        final_contents = get_listing(opj(pkg_passthrough_dir, C.WD_PREBUILD))
+        final_contents = os.listdir(opj(pkg_passthrough_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
@@ -185,8 +120,8 @@ class TestPrebuild(TestCase):
         pkg_dir = common_setUp(opj(OSG_36, "xrootd-multiuser"),
                                "{2023-07-21}")
         out = backtick_osg_build(["prebuild", "--full-extract", pkg_dir])
-        ut_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED_TARBALL))
-        tarball_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED_TARBALL,
+        ut_contents = os.listdir(opj(pkg_dir, C.WD_UNPACKED_TARBALL))
+        tarball_contents = os.listdir(opj(pkg_dir, C.WD_UNPACKED_TARBALL,
                                            "xrootd-multiuser-2.1.3"))
 
         self.assertNotRegexpMatches(
@@ -224,7 +159,7 @@ class TestFetch(TestCase):
         if nocheck:
             cmd.append("--nocheck")
         checked_call(cmd)
-        return get_listing(pdir)
+        return os.listdir(pdir)
 
     def test_cache_fetch(self):
         common_setUp(opj(OSG_36, "xrootd"), "{2023-07-21}")
@@ -314,7 +249,7 @@ class TestFetch(TestCase):
         unslurp("upstream/github.source",
                 "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1 hash=0000000000000000000000000000000000000000")
         checked_osg_build(["prebuild"])
-        contents = get_listing(C.WD_PREBUILD)
+        contents = os.listdir(C.WD_PREBUILD)
 
         self.assertTrue(
             regex_in_list(
@@ -540,7 +475,7 @@ TestSuiteAll = unittest.TestSuite((makeSuite(TestKojiLong), TestSuiteShort, make
 
 if __name__ == '__main__':
     try:
-        errprintf("testing %s", osg_build_path)
+        errprintf("testing %s", get_osg_build_path())
         unittest.main()
     except CalledProcessError as e:
         errprintf("output: %s", e.output)

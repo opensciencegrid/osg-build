@@ -1,1 +1,39 @@
-osgbuild/test/test_osgbuild.py
+#!/bin/bash
+
+: "${PYTHON:=python3}"
+if ! "${PYTHON}" -c 'import sys; sys.exit(0)'; then
+    echo '`'${PYTHON}'`' is not a useable Python interpreter
+    exit 127
+fi
+
+ret=0
+ret1=
+ret2=
+"${PYTHON}" -m "osgbuild.test.test_osgbuild"
+ret1=$?
+ret=$((ret | ret1))
+if command -v koji &>/dev/null; then
+    if [[ -d $HOME/.osg-koji ]]; then
+        "${PYTHON}" -m "osgbuild.test.test_osgbuild_koji"
+        ret2=$?
+        ret=$((ret | ret2))
+    else
+        echo "$HOME/.osg-koji not found; skipping koji tests."
+    fi
+else
+    echo "koji binary not found; skipping koji tests."
+fi
+
+if [[ -n $ret1 ]]; then
+    echo "Common tests returned $ret1"
+else
+    echo "Common tests skipped"
+fi
+
+if [[ -n $ret2 ]]; then
+    echo "Koji tests returned $ret2"
+else
+    echo "Koji tests skipped."
+fi
+
+exit $ret

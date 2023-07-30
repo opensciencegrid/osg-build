@@ -23,6 +23,7 @@ clean:
 	rm -f *.py[co] *~ $(PYDIR)/*.py[co] $(PYDIR)/*~ $(TESTDIR)/*.py[co] $(TESTDIR)/*~ tags
 
 install-common:
+	$(PYTHON) -c 'import sys; print("Python at $(PYTHON) seems to work")'
 	mkdir -p $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(EXTRA_SCRIPTS) $(DESTDIR)/$(BINDIR)

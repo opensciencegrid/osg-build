@@ -26,6 +26,9 @@ install-common:
 	mkdir -p $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(MAIN_SCRIPT) $(DESTDIR)/$(BINDIR)
 	install -p -m 755 $(EXTRA_SCRIPTS) $(DESTDIR)/$(BINDIR)
+	for file in $(MAIN_SCRIPT) $(EXTRA_SCRIPTS); do \
+		sed -ri '1s,^#!/usr/bin/env python.*,#!$(PYTHON),' $(DESTDIR)/$(BINDIR)/$$file; \
+	done
 
 	mkdir -p $(DESTDIR)/$(DATADIR)
 	install -p -m 644 $(SVNDATADIR)/* $(DESTDIR)/$(DATADIR)

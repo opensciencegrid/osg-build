@@ -59,8 +59,6 @@ def main():
 
 try:
     main()
-except SystemExit as err:
-    raise
 except KeyboardInterrupt:
     print("-" * 79, file=sys.stderr)
     print("Interrupted", file=sys.stderr)

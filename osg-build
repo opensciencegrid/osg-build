@@ -46,8 +46,6 @@ Also see the documentation at:
     https://opensciencegrid.github.io/technology/software/osg-build-tools/
 """ % {'prog': os.path.basename(sys.argv[0])}, file=sys.stderr)
     sys.exit(2)
-except SystemExit as err:
-    raise
 except KeyboardInterrupt:
     print("", file=sys.stderr)
     print("-" * 79, file=sys.stderr)

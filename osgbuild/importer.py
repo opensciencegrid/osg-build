@@ -77,7 +77,7 @@ def srpm_nv(srpm):
             pass
     raise Error("Unable to extract name and version from SRPM %s: %s" % (srpm, output))
 
-def make_svn_tree(srpm, url, extra_action=None, provider=None, sha1sum=None):
+def make_svn_tree(srpm, url, dirname=None, extra_action=None, provider=None, sha1sum=None):
     """Create an svn tree for the srpm and populate it as follows:
     $name/osg/*.spec        - the spec file as extracted from the srpm
                               (if extract_spec is True)
@@ -86,11 +86,13 @@ def make_svn_tree(srpm, url, extra_action=None, provider=None, sha1sum=None):
 
     """
     name, version = srpm_nv(srpm)
+    if not dirname:
+        dirname = name
     abs_srpm = os.path.abspath(srpm)
 
     package_dir = os.path.abspath(os.getcwd())
-    if os.path.basename(package_dir) != name:
-        package_dir = os.path.join(package_dir, name)
+    if os.path.basename(package_dir) != dirname:
+        package_dir = os.path.join(package_dir, dirname)
 
     if not os.path.exists(package_dir):
         utils.checked_call(["svn", "mkdir", package_dir])
@@ -418,6 +420,12 @@ downloading and putting the SRPM into the upstream cache.
             "written to SPEC.old; the differences will be written to SPEC. You will have to edit "
             "SPEC to resolve the differences.")
         parser.add_option(
+            "--dirname", default=None,
+            help="The SVN directory name the imported files will be placed into; "
+            "defaults to the name of the package but you might want to change it "
+            "to add an '.el9' suffix for example."
+        )
+        parser.add_option(
             "-e", "--extract-spec", action="store_const", dest='extra_action', const=EXTRA_ACTION_EXTRACT_SPEC,
             help="Extract the spec file from the SRPM and put it into an osg/ subdirectory.")
         parser.add_option(
@@ -481,7 +489,14 @@ downloading and putting the SRPM into the upstream cache.
             sha1sum = None
         verify_rpm(outfile)
         srpm = move_to_cache(outfile, options.upstream)
-        make_svn_tree(srpm, upstream_url, options.extra_action, options.provider, sha1sum)
+        make_svn_tree(
+            srpm,
+            upstream_url,
+            options.dirname,
+            options.extra_action,
+            options.provider,
+            sha1sum
+        )
 
     except UsageError as e:
         parser.print_help()

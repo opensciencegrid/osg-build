@@ -38,6 +38,43 @@ try:
 except (ImportError, AttributeError):
     HAVE_KOJILIB = False
 
+# TODO: replace with @functools.lru_cache() once we drop Python 2
+
+__koji_config_file = None
+__koji_config = None
+
+
+def get_koji_config_file():
+    global __koji_config_file
+
+    if not __koji_config_file:
+        config_file = (utils.find_file("config", [OSG_KOJI_USER_CONFIG_DIR,
+                                                  KOJI_USER_CONFIG_DIR]) or
+                       utils.find_file(KOJI_CONF, DATA_FILE_SEARCH_PATH))
+        if not config_file:
+            raise KojiError("Can't find Koji config file")
+        __koji_config_file = config_file
+
+    return __koji_config_file
+
+
+def get_koji_config(config_file=None):
+    global __koji_config
+
+    if not __koji_config:
+        config = configparser.SafeConfigParser()
+        if not config_file:
+            config_file = get_koji_config_file()
+        config.read(config_file)
+        if not config.has_section("koji"):
+            raise KojiError("Koji config file %s is missing a 'koji' section" % config_file)
+        for opt in "server", "weburl":  # TODO: "authtype" should also be required once we move to kerberos
+            if not config.has_option("koji", opt):
+                raise KojiError("Koji config file %s is missing the '%s' option" % (config_file, opt))
+        __koji_config = config
+
+    return __koji_config
+
 
 def get_koji_cmd(use_osg_koji):
     """Get the command used to call koji."""
@@ -47,15 +84,7 @@ def get_koji_cmd(use_osg_koji):
     elif utils.which("koji"):
         # Not using osg-koji, so we need to find the conf file and do some
         # checks ourselves.
-        conf_file = (utils.find_file(KOJI_CONF, DATA_FILE_SEARCH_PATH) or
-                     utils.find_file(OLD_KOJI_CONF, DATA_FILE_SEARCH_PATH))
-        if not conf_file:
-            raise KojiError("Can't find %s or %s; search path was: %s" %
-                            (KOJI_CONF,
-                             OLD_KOJI_CONF,
-                             os.pathsep.join(DATA_FILE_SEARCH_PATH)))
-
-        return ["koji", "--config", conf_file, "--authtype", "ssl"]
+        return ["koji", "--config", get_koji_config_file(), "--authtype", "ssl"]
     else:
         raise KojiError("Can't find koji or osg-koji!")
 
@@ -413,6 +442,7 @@ class KojiLibInter(object):
         else:
             self.use_old_ssl = False
         self.weburl = os.path.join(KOJI_WEB, "koji")
+        self.topurl = os.path.join(KOJI_WEB, "kojifiles")
         self.dry_run = dry_run
 
         # "Fix" for SOFTWARE-3112:
@@ -423,18 +453,8 @@ class KojiLibInter(object):
         logging.getLogger("requests.packages.urllib3.connectionpool").setLevel(logging.WARNING)
 
     def read_config_file(self, config_file=None):
-        if not config_file:
-            config_file = (
-                utils.find_file('config',
-                                [OSG_KOJI_USER_CONFIG_DIR,
-                                 KOJI_USER_CONFIG_DIR]) or
-                utils.find_file(KOJI_CONF, DATA_FILE_SEARCH_PATH) or
-                utils.find_file(OLD_KOJI_CONF, DATA_FILE_SEARCH_PATH))
-        if not config_file or not os.path.isfile(config_file):
-            raise KojiError("Can't find koji config file.")
         try:
-            cfg = configparser.ConfigParser()
-            cfg.read(config_file)
+            cfg = get_koji_config(config_file)
             items = dict(cfg.items('koji'))
 
             # special case: use_old_ssl is a boolean so get ConfigParser to parse it
@@ -451,7 +471,7 @@ class KojiLibInter(object):
                     log.warning("Ignoring use_old_ssl: only supported on Python 2")
         except configparser.Error as err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
-        for var in ['ca', 'cert', 'server', 'serverca', 'weburl']:
+        for var in ['ca', 'cert', 'server', 'serverca', 'weburl', 'topurl']:
             if items.get(var):
                 setattr(self, var, os.path.expanduser(items[var]))
 
@@ -540,7 +560,7 @@ class KojiLibInter(object):
         opts = {'tag_name': tag_obj['name'],
                 'repoid': repo['id'],
                 'distribution': dist,
-                'topurl': KOJI_HUB + "/mnt/koji"}
+                'topurl': self.topurl}
         output = kojilib.genMockConfig(name, arch, **opts)
         utils.unslurp(outpath, output)
 

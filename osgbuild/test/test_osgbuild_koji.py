@@ -8,7 +8,7 @@ from unittest import TestCase
 
 import osgbuild.constants as C
 from osgbuild import main
-from osgbuild.test.common import OSG_36, common_setUp, backtick_osg_build, regex_in_list, checked_osg_build, \
+from osgbuild.test.common import OSG_23_MAIN, OSG_36, common_setUp, backtick_osg_build, regex_in_list, checked_osg_build, \
     get_osg_build_path
 from osgbuild.utils import CalledProcessError, errprintf
 
@@ -17,8 +17,8 @@ class TestKoji(TestCase):
     """Tests for koji"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(OSG_36, "osg-ce"),
-                                    "{2023-07-21}")
+        self.pkg_dir = common_setUp(opj(OSG_23_MAIN, "osg-xrootd"),
+                                    "{2023-09-21}")
 
     kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
     kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
@@ -32,8 +32,6 @@ class TestKoji(TestCase):
 
     def test_koji_shell_args1(self):
         output = backtick_osg_build(self.kdr_shell + ["--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg.+el7", output),
-                        "not building for el7")
         self.assertTrue(self.is_building_for("osg.+el8", output),
                         "not building for el8")
         self.assertTrue(self.is_building_for("osg.+el9", output),
@@ -41,13 +39,13 @@ class TestKoji(TestCase):
 
     def test_koji_shell_args2(self):
         output = backtick_osg_build(self.kdr_shell + ["--el9", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg.+el9", output),
-                        "not building for el9")
         self.assertFalse(self.is_building_for("osg.+el8", output),
                          "falsely building for el8")
+        self.assertTrue(self.is_building_for("osg.+el9", output),
+                        "not building for el9")
 
     def test_koji_shell_args3(self):
-        output = backtick_osg_build(self.kdr_shell + ["--ktt", "osg-el8", "--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_shell + ["--ktt", "osg-23-main-el8", "--scratch", self.pkg_dir])
         self.assertFalse(
             self.is_building_for("osg.+el9", output),
             "falsely building for el9")
@@ -56,7 +54,7 @@ class TestKoji(TestCase):
             "not building for el8 for the right target")
 
     def test_koji_shell_args4(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el9", "--koji-target", "osg-el9", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_shell + ["--el9", "--koji-target", "osg-23-main-el9", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertFalse(
             regex_in_list(r"Unable to determine redhat release", out_list),
@@ -70,7 +68,7 @@ class TestKoji(TestCase):
 
     def test_verify_correct_branch_svn(self):
         try:
-            _ = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--dry-run", opj(C.SVN_ROOT, OSG_36, "osg-xrootd")])
+            _ = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--dry-run", opj(C.SVN_ROOT, OSG_23_MAIN, "osg-xrootd")])
         except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(
@@ -84,7 +82,7 @@ class TestKoji(TestCase):
             # SCM URI format is 'git+https://host/.../repo.git?path#revision'
             gitbranch = re.sub(r"^native/redhat/branches/", "", OSG_36)
             scm_uri = "git+%s?%s#%s" % (C.OSG_REMOTE, "osg-xrootd", gitbranch)
-            _ = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--dry-run", scm_uri])
+            _ = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--dry-run", scm_uri])
         except CalledProcessError as err:
             out_list = err.output.split("\n")
             self.assertTrue(
@@ -96,8 +94,8 @@ class TestKoji(TestCase):
 
 class TestKojiNewUpcoming(TestCase):
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(OSG_36, "osg-xrootd"),
-                                    "{2023-07-21}")
+        self.pkg_dir = common_setUp(opj(OSG_23_MAIN, "osg-xrootd"),
+                                    "{2023-09-21}")
 
     kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
     kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
@@ -109,30 +107,20 @@ class TestKojiNewUpcoming(TestCase):
         return (re.search(self.build_target_lib_regex % target, output, re.MULTILINE) or
                 re.search(self.build_target_shell_regex % target, output, re.MULTILINE))
 
-    def test_koji_lib_35upcoming(self):
-        output = backtick_osg_build(self.kdr_lib + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
-
-    def test_koji_lib_35upcoming_shorthand(self):
-        output = backtick_osg_build(self.kdr_lib + ["--3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
+    def test_koji_lib_23upcoming(self):
+        output = backtick_osg_build(self.kdr_lib + ["--repo", "23-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-23-upcoming-el8", output))
+        self.assertTrue(self.is_building_for("osg-23-upcoming-el9", output))
 
     def test_koji_lib_36upcoming(self):
         output = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
         self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
         self.assertTrue(self.is_building_for("osg-3.6-upcoming-el9", output))
 
-    def test_koji_lib_36upcoming_shorthand(self):
-        output = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el9", output))
-
-    def test_koji_shell_35upcoming(self):
-        output = backtick_osg_build(self.kdr_shell + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
+    def test_koji_shell_23upcoming(self):
+        output = backtick_osg_build(self.kdr_shell + ["--repo", "23-upcoming", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg-23-upcoming-el8", output))
+        self.assertTrue(self.is_building_for("osg-23-upcoming-el9", output))
 
     def test_koji_shell_36upcoming(self):
         output = backtick_osg_build(self.kdr_shell + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
@@ -142,11 +130,11 @@ class TestKojiNewUpcoming(TestCase):
 
 class TestKojiLong(TestCase):
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(OSG_36, "osg-xrootd"),
-                                    "{2023-07-21}")
+        self.pkg_dir = common_setUp(opj(OSG_23_MAIN, "osg-xrootd"),
+                                    "{2023-09-21}")
 
     def test_koji_build(self):
-        checked_osg_build(["koji", "--el9", "--scratch", self.pkg_dir, "--wait"])
+        checked_osg_build(["koji", "--repo", "23-main", "--el9", "--scratch", self.pkg_dir, "--wait"])
 
 
 class TestKojiMisc(TestCase):

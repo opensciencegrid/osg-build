@@ -19,6 +19,10 @@ try:
     from six.moves import urllib
 except ImportError:
     from .six.moves import urllib
+try:
+    from typing import Optional
+except ImportError:
+    Optional = None
 
 from .constants import *
 from . import clientcert
@@ -45,6 +49,8 @@ __koji_config = None
 
 
 def get_koji_config_file():
+    # type: () -> str
+    """Return the path to the koji config file; raise KojiError if no such file exists."""
     global __koji_config_file
 
     if not __koji_config_file:
@@ -59,6 +65,13 @@ def get_koji_config_file():
 
 
 def get_koji_config(config_file=None):
+    # type: (Optional[str]) -> configparser.SafeConfigParser
+    """Parse and return a koji config file, validating that it has some of the
+    necessary properties (e.g., a 'koji' section).
+
+    config_file: a path to the koji config file or None (in which case the default path will be used)
+
+    """
     global __koji_config
 
     if not __koji_config:

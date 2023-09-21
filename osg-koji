@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 import os
 import shutil
 import sys
@@ -19,12 +23,15 @@ from osgbuild.utils import (
     safe_make_backup,
     safe_makedirs,
     shell_quote)
+from osgbuild.error import Error, KojiError
+from osgbuild import kojiinter
 
 
 OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
 GLOBUS_DIR = os.path.expanduser("~/.globus")
 KOJI_CONFIG_FILE = "config"
-CLIENT_CERT_FILE = "client.crt"
+DEFAULT_CLIENT_CERT_FILE = "client.crt"
+DEFAULT_AUTHTYPE = "ssl"
 
 PROGRAM_NAME = os.path.basename(sys.argv[0])
 
@@ -54,9 +61,8 @@ request an RFC-style proxy (pass -rfc).
 """
 
 
-class Error(Exception):
-    """Base class for expected exceptions."""
-    pass
+class RunSetupError(Error):
+    """Some sort of error where we suggest that the user run `osg-koji setup`"""
 
 
 def setup_parse_args(args):
@@ -210,7 +216,7 @@ def create_client_symlink_to_proxy(new_client_cert_path):
 
 def setup_koji_client_cert(user_cert, user_key, proxy):
     """Create or copy the client cert file (if needed)."""
-    new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, CLIENT_CERT_FILE)
+    new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, DEFAULT_CLIENT_CERT_FILE)
 
     if proxy is None:
         # no value specified for 'proxy', so ask interactively
@@ -292,26 +298,36 @@ def run_setup(options):
             os.symlink(OSG_KOJI_USER_CONFIG_DIR, KOJI_USER_CONFIG_DIR)
 
 
-def verify_koji_dir(config_dir):
-    """Ensure the files required for koji to work are present in the koji
-    config dir.
-    """
-    for path, descr in [
-            (KOJI_CONFIG_FILE, "Koji configuration file"),
-            (CLIENT_CERT_FILE, "User certificate file (client cert)")]:
+def verify_koji_config(config_file):
+    """Ensure the koji config file exists and the files it references also exist.
+    Returns the koji config."""
+    try:
+        koji_config = kojiinter.get_koji_config(config_file)
+    except KojiError as err:
+        raise RunSetupError("%s\nKoji config file not found at %s, "
+                            "or has invalid contents." % (err, config_file))
+    try:
+        authtype = koji_config.get("koji", "authtype")
+    except configparser.NoOptionError:
+        authtype = DEFAULT_AUTHTYPE
+    if authtype == "ssl":
+        try:
+            client_cert_file = os.path.expanduser(koji_config.get("koji", "cert"))
+        except configparser.NoOptionError:
+            raise RunSetupError("SSL auth requested but client certificate ('cert') not provided in Koji config.")
 
-        fullpath = os.path.join(config_dir, path)
-        if os.path.exists(fullpath):
-            continue
-        if path != CLIENT_CERT_FILE or not os.path.lexists(fullpath):
-            raise Error("%s (%s) not found in config directory (%s).\n%s"
-                        % (descr, path, config_dir, RUN_SETUP_MSG))
-        # CLIENT_CERT_FILE lexists but not exists -> broken symlink; give a warning
-        target = os.readlink(fullpath)
-        print("%s -> %s is a broken symlink.\n"
-              "You may need to run grid-proxy-init before doing authenticated operations."
-              % (fullpath, target),
-              file=sys.stderr)
+        config_dir = os.path.dirname(config_file)
+        fullpath = os.path.join(config_dir, client_cert_file)
+        if not os.path.lexists(fullpath):
+            raise RunSetupError("Client cert file not found at %s" % fullpath)
+        elif not os.path.exists(fullpath):
+            # lexists() is True for a broken symlink, exists() is False
+            target = os.readlink(fullpath)
+            print("%s -> %s is a broken symlink.\n"
+                  "You may need to run grid-proxy-init before doing authenticated operations."
+                  % (fullpath, target),
+                  file=sys.stderr)
+    return koji_config
 
 
 def run_koji(args=None, use_exec=False):
@@ -375,9 +391,14 @@ If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
                 else:
                     raise Error("No koji config directory found.\n"
                                 + RUN_SETUP_MSG)
-                verify_koji_dir(config_dir)
-                args = ["--config=" + os.path.join(config_dir, KOJI_CONFIG_FILE),
-                        "--authtype=ssl"] + argv[1:]
+                config_file = os.path.join(config_dir, KOJI_CONFIG_FILE)
+                koji_config = verify_koji_config(config_file)
+                try:
+                    authtype = koji_config.get("koji", "authtype")
+                except configparser.NoOptionError:
+                    authtype = DEFAULT_AUTHTYPE
+                args = ["--config=" + config_file,
+                        "--authtype=%s" % authtype] + argv[1:]
                 run_koji(args=args, use_exec=True)
         else:
             run_koji()
@@ -387,6 +408,10 @@ If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
     except KeyboardInterrupt:
         print("Interrupted", file=sys.stderr)
         return 3
+    except RunSetupError as err:
+        print(str(err), file=sys.stderr)
+        print(RUN_SETUP_MSG, file=sys.stderr)
+        return 1
     except Error as err:
         print(str(err), file=sys.stderr)
         return 1

@@ -37,8 +37,8 @@ class TestLint(TestCase):
                 "unexpected number of packages checked")
             self.assertRegexpMatches(
                 out,
-                re.escape("rpmlint found problems with condor"),
-                "expected problems not found")
+                re.escape("rpmlint ok for condor"),
+                "rpmlint not ok for condor")
         except:
             errprintf("Problems found. Output:\n%s", out)
             raise

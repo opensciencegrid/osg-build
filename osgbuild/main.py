@@ -1,17 +1,4 @@
-"""osg build script
-
-Wishlist:
-* Better message printing. Should distinguish between when to use logging.*
-  versus print.
-* Better support for multiple packages. If a single build runs into an error,
-  the user should be given a choice to skip that package. Some kind of report
-  afterward showing successful/failed packages should be printed.
-  Should be some sanity checks on all packages before any work on any of them
-  is done.
-* Better exceptions. Should review where they should _really_ be used.
-* Have unit tests for every chunk of code I change.
-"""
-# pylint: disable=W0614,W0602,C0103
+"""osg build script"""
 
 
 # TODO Shouldn't need koji access for 'rpmbuild', but currently does since it
@@ -254,6 +241,7 @@ def repo_hints(targets):
                 osg_match = re.match(r'osg-([0-9.]+)-el\d+', target)
                 osg_main_match = re.match(r'osg-(\d+)-main-el\d+', target)
                 osg_upcoming_match = re.match(r'osg-([0-9.]+)-upcoming-el\d+', target)
+                osg_internal_match = re.match(r'osg-(\d+)-internal-el\d+', target)
                 if osg_match:
                     osgver = osg_match.group(1)
                     __repo_hints_cache[osgver] = __repo_hints_cache['osg-%s' % osgver] = {'target': 'osg-%s-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
@@ -263,6 +251,9 @@ def repo_hints(targets):
                 elif osg_upcoming_match:
                     osgver = osg_upcoming_match.group(1)
                     __repo_hints_cache["%s-upcoming" % osgver] = {'target': 'osg-%s-upcoming-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
+                elif osg_internal_match:
+                    osgver = osg_internal_match.group(1)
+                    __repo_hints_cache["%s-internal" % osgver] = {'target': 'osg-%s-internal-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
 
     return __repo_hints_cache
 

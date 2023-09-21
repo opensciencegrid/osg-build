@@ -1,5 +1,6 @@
 # version now specified in osgbuild/version.py
-PYTHON = python
+PYTHON ?= python3
+PYTHON := $(shell which $(PYTHON) )
 VERSION := $(shell $(PYTHON) -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
 HASH := $(shell git rev-parse HEAD)
 NAME = osg-build

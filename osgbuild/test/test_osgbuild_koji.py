@@ -40,23 +40,23 @@ class TestKoji(TestCase):
                         "not building for el9")
 
     def test_koji_shell_args2(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg.+el7", output),
-                        "not building for el7")
+        output = backtick_osg_build(self.kdr_shell + ["--el9", "--scratch", self.pkg_dir])
+        self.assertTrue(self.is_building_for("osg.+el9", output),
+                        "not building for el9")
         self.assertFalse(self.is_building_for("osg.+el8", output),
                          "falsely building for el8")
 
     def test_koji_shell_args3(self):
         output = backtick_osg_build(self.kdr_shell + ["--ktt", "osg-el8", "--scratch", self.pkg_dir])
         self.assertFalse(
-            self.is_building_for("osg.+el7", output),
-            "falsely building for el7")
+            self.is_building_for("osg.+el9", output),
+            "falsely building for el9")
         self.assertTrue(
             self.is_building_for("osg.+el8", output),
             "not building for el8 for the right target")
 
     def test_koji_shell_args4(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--koji-target", "osg-el7", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_shell + ["--el9", "--koji-target", "osg-el9", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertFalse(
             regex_in_list(r"Unable to determine redhat release", out_list),
@@ -66,7 +66,7 @@ class TestKoji(TestCase):
         output = backtick_osg_build(self.kdr_lib + ["--scratch", self.pkg_dir])
         out_list = output.split("\n")
         self.assertTrue(
-            regex_in_list(r".*kojisession.build\([^,]+?, 'osg.+el[78]', " + re.escape("{'scratch': True}") + r", None\)", out_list))
+            regex_in_list(r".*kojisession.build\([^,]+?, 'osg.+el[89]', " + re.escape("{'scratch': True}") + r", None\)", out_list))
 
     def test_verify_correct_branch_svn(self):
         try:
@@ -121,13 +121,13 @@ class TestKojiNewUpcoming(TestCase):
 
     def test_koji_lib_36upcoming(self):
         output = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
         self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el9", output))
 
     def test_koji_lib_36upcoming_shorthand(self):
         output = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
         self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el9", output))
 
     def test_koji_shell_35upcoming(self):
         output = backtick_osg_build(self.kdr_shell + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
@@ -136,8 +136,8 @@ class TestKojiNewUpcoming(TestCase):
 
     def test_koji_shell_36upcoming(self):
         output = backtick_osg_build(self.kdr_shell + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
         self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
+        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el9", output))
 
 
 class TestKojiLong(TestCase):
@@ -146,7 +146,7 @@ class TestKojiLong(TestCase):
                                     "{2023-07-21}")
 
     def test_koji_build(self):
-        checked_osg_build(["koji", "--el7", "--scratch", self.pkg_dir, "--wait"])
+        checked_osg_build(["koji", "--el9", "--scratch", self.pkg_dir, "--wait"])
 
 
 class TestKojiMisc(TestCase):
@@ -188,7 +188,7 @@ class TestMock(TestCase):
 
     def test_mock_koji_cfg(self):
         if self.check_for_mock_group():
-            checked_osg_build(["mock", self.pkg_dir, "--el7", "--mock-config-from-koji=osg-3.6-el7-build"])
+            checked_osg_build(["mock", self.pkg_dir, "--el9", "--mock-config-from-koji=osg-3.6-el9-build"])
 
 
 if __name__ == '__main__':

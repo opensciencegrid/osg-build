@@ -81,7 +81,7 @@ def get_koji_config(config_file=None):
         config.read(config_file)
         if not config.has_section("koji"):
             raise KojiError("Koji config file %s is missing a 'koji' section" % config_file)
-        for opt in "server", "weburl":  # TODO: "authtype" should also be required once we move to kerberos
+        for opt in "server", "weburl", "topurl":  # TODO: "authtype" should also be required once we move to kerberos
             if not config.has_option("koji", opt):
                 raise KojiError("Koji config file %s is missing the '%s' option" % (config_file, opt))
         __koji_config = config

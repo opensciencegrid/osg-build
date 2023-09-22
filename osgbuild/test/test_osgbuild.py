@@ -6,6 +6,7 @@
 import re
 import os
 from os.path import join as opj
+import sys
 import tarfile
 import unittest
 from unittest import makeSuite, TestCase
@@ -152,7 +153,7 @@ class TestFetch(TestCase):
     """Tests for fetch-sources"""
     @staticmethod
     def fetch_sources(pdir, nocheck=False):
-        cmd = ["python", "-m", "osgbuild.fetch_sources", pdir]
+        cmd = [sys.executable, "-m", "osgbuild.fetch_sources", pdir]
         if nocheck:
             cmd.append("--nocheck")
         checked_call(cmd)

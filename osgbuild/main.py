@@ -10,6 +10,10 @@ import logging
 from optparse import OptionGroup, OptionParser, OptionValueError
 import re
 import tempfile
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 
 from .constants import *
 from .error import UsageError, KojiError, SVNError, GitError, Error
@@ -130,11 +134,15 @@ def main(argv):
                     method()
     # end of main loop
     # HACK
-    task_ids = [_f for _f in task_ids if _f]
+    task_ids = sorted(filter(None, task_ids))
     if kojiinter and kojiinter.KojiInter.backend and task_ids:
+        try:
+            koji_weburl = kojiinter.get_koji_config().get("koji", "weburl")
+        except configparser.Error:
+            koji_weburl = KOJI_WEB + "/koji"
         print("Koji task ids are:", task_ids)
         for tid in task_ids:
-            print(KOJI_WEB + "/koji/taskinfo?taskID=" + str(tid))
+            print(koji_weburl + "/taskinfo?taskID=" + str(tid))
         if not buildopts['no_wait']:
             ret = kojiinter.KojiInter.backend.watch_tasks_with_retry(task_ids)
             # TODO This is not implemented for the KojiShellInter backend

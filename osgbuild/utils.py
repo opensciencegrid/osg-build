@@ -2,7 +2,10 @@
 from __future__ import absolute_import
 from __future__ import print_function
 import errno
-import itertools
+try:
+    from itertools import izip_longest as zip_longest
+except ImportError:
+    from itertools import zip_longest
 import logging
 import os
 import re
@@ -13,28 +16,24 @@ import sys
 import tempfile
 from datetime import datetime
 
-try:
-    import six
-    from six.moves import input, zip_longest
-except ImportError:
-    from . import six
-    from .six.moves import input, zip_longest
-
 
 log = logging.getLogger(__name__)
 
 
-def to_str(strlike):
-    if six.PY3:
-        if isinstance(strlike, bytes):
-            return strlike.decode('utf-8', 'ignore')
+input_ = getattr(__builtins__, "raw_input", input)
+
+
+def to_str(strlike, encoding="latin-1", errors="backslashreplace"):
+    """Turns a bytes into a str (Python 3) or a unicode to a str (Python 2)"""
+    if strlike is None:
+        return
+    if not isinstance(strlike, str):
+        if str is bytes:
+            return strlike.encode(encoding, errors)
         else:
-            return strlike
+            return strlike.decode(encoding, errors)
     else:
-        if isinstance(strlike, unicode):
-            return strlike.encode('utf-8', 'ignore')
-        else:
-            return strlike
+        return strlike
 
 
 class CalledProcessError(Exception):
@@ -307,7 +306,7 @@ def ask(question, choices):
     match = False
     while not match:
         print(question)
-        user_choice = input("[" + "/".join(choices) + "] ? ").strip().lower()
+        user_choice = input_("[" + "/".join(choices) + "] ? ").strip().lower()
         for choice in choices_lc:
             if user_choice.startswith(choice):
                 match = True

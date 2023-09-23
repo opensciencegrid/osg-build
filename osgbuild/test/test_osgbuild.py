@@ -3,96 +3,31 @@
 """
 # pylint: disable=C0103,R0904,W0614,C0111
 
-import atexit
-import grp
 import re
 import os
 from os.path import join as opj
-import pwd
-import shutil
-import tempfile
+import sys
 import tarfile
 import unittest
 from unittest import makeSuite, TestCase
-import sys
 
 import osgbuild.constants as C
-from osgbuild import main
 from osgbuild import srpm
+from osgbuild.test.common import OSG_36, regex_in_list, go_to_temp_dir, common_setUp, \
+    backtick_osg_build, checked_osg_build
 from osgbuild.utils import (
     checked_backtick,
     checked_call,
     CalledProcessError,
-    find_file,
     errprintf,
     unslurp)
-
-TRUNK = "native/redhat/trunk"
-DEVOPS = "native/redhat/branches/devops"
-
-initial_wd = os.getcwd()
-osg_build_path = find_file('osg-build', [initial_wd,
-                                         '/usr/bin'])
-
-if not osg_build_path:
-    errprintf("osg-build script not found!")
-    sys.exit(255)
-
-osg_build_command = [osg_build_path]
-
-
-def go_to_temp_dir():
-    working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
-    atexit.register(shutil.rmtree, working_dir)
-    os.chdir(working_dir)
-    return working_dir
-
-
-def common_setUp(path, rev):
-    """Create a temporary directory, ensure it gets deleted on exit, cd to it,
-    and check out a specific revision of a path from our SVN.
-
-    """
-    working_dir = go_to_temp_dir()
-    svn_export(path, rev, os.path.basename(path))
-    return opj(working_dir, os.path.basename(path))
-
-
-def backtick_osg_build(cmd_args, *args, **kwargs):
-    kwargs['clocale'] = True
-    kwargs['err2out'] = True
-    return checked_backtick(osg_build_command + cmd_args, *args, **kwargs)
-
-
-def checked_osg_build(cmd_args, *args, **kwargs):
-    return checked_call(osg_build_command + cmd_args, *args, **kwargs)
-
-
-def svn_export(path, rev, destpath):
-    """Run svn export on a revision rev of path into destpath"""
-    try:
-        checked_backtick(
-            ["svn", "export", opj(C.SVN_ROOT, path) + "@" + rev, "-r", rev, destpath],
-            err2out=True)
-    except CalledProcessError as err:
-        errprintf("Error in svn export:\n%s", err.output)
-        raise
-
-
-def get_listing(directory):
-    return checked_backtick(
-            ["ls", directory]).split("\n")
-
-
-def regex_in_list(pattern, listing):
-    return [x for x in listing if re.match(pattern, x)]
 
 
 class TestLint(TestCase):
     """Tests for 'lint' task"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "condor"), "{2018-06-27}")
+        self.pkg_dir = common_setUp(opj(OSG_36, "condor"), "{2023-07-21}")
 
     def test_lint(self):
         out = backtick_osg_build(["lint", self.pkg_dir])
@@ -103,8 +38,8 @@ class TestLint(TestCase):
                 "unexpected number of packages checked")
             self.assertRegexpMatches(
                 out,
-                re.escape("rpmlint found problems with condor"),
-                "expected problems not found")
+                re.escape("rpmlint ok for condor"),
+                "rpmlint not ok for condor")
         except:
             errprintf("Problems found. Output:\n%s", out)
             raise
@@ -114,8 +49,8 @@ class TestRpmbuild(TestCase):
     """Tests for 'rpmbuild' task"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "osg-build"),
-                                    "{2018-06-01}")
+        self.pkg_dir = common_setUp(opj(OSG_36, "osg-xrootd"),
+                                    "{2023-07-21}")
 
     def test_rpmbuild(self):
         out = backtick_osg_build(["rpmbuild", self.pkg_dir])
@@ -133,69 +68,66 @@ class TestPrebuild(TestCase):
     """Tests for 'prebuild' task"""
 
     def test_prebuild(self):
-        pkg_dir = common_setUp(opj(TRUNK, "mash"),
-                               "{2011-12-08}")
+        pkg_dir = common_setUp(opj(OSG_36, "xrootd"),
+                               "{2023-07-21}")
         checked_osg_build(["prebuild", pkg_dir])
-        upstream_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED))
-        final_contents = get_listing(opj(pkg_dir, C.WD_PREBUILD))
+        upstream_contents = os.listdir(opj(pkg_dir, C.WD_UNPACKED))
+        final_contents = os.listdir(opj(pkg_dir, C.WD_PREBUILD))
 
         self.assertTrue(
-            "mash.spec" in upstream_contents,
+            "xrootd.spec" in upstream_contents,
             "spec file not in upstream contents")
         self.assertTrue(
-            "mash-0.5.22.tar.gz" in upstream_contents,
+            "xrootd.tar.gz" in upstream_contents,
             "source tarball not in upstream contents")
         self.assertTrue(
-            "mash.spec" in final_contents,
+            "xrootd.spec" in final_contents,
             "spec file not in final contents")
         self.assertTrue(
-            "multilib-python.patch" in final_contents,
+            "1868-env-hostname-override.patch" in final_contents,
             "osg patch not in final contents")
         self.assertTrue(
-            regex_in_list(r"mash-0[.]5[.]22-2[.]osg[.]el\d[.]src[.]rpm", final_contents),
+            regex_in_list(r"xrootd-5[.]6[.]1-1[.]1[.]osg[.]el\d+[.]src[.]rpm", final_contents),
             "srpm not successfully built")
 
     def test_prebuild_osgonly(self):
-        pkg_osgonly_dir = common_setUp(opj(TRUNK, "osg-build"),
-                                       "{2018-06-01}")
+        pkg_osgonly_dir = common_setUp(opj(OSG_36, "osg-xrootd"),
+                                       "{2023-07-21}")
         checked_osg_build(["prebuild", pkg_osgonly_dir])
-        final_contents = get_listing(opj(pkg_osgonly_dir, C.WD_PREBUILD))
+        final_contents = os.listdir(opj(pkg_osgonly_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
-                r"osg-build-1[.]12[.]2-1[.]osg[.]el\d[.]src[.]rpm",
+                r"osg-xrootd-3[.]6-20[.]osg[.]el\d+[.]src[.]rpm",
                 final_contents),
             "srpm not successfully built")
 
     def test_prebuild_passthrough(self):
-        pkg_passthrough_dir = common_setUp(opj(TRUNK, "osg-build"),
-                                           "{2018-06-01}")
+        pkg_passthrough_dir = common_setUp(opj(OSG_36, "htgettoken"),
+                                           "{2023-07-21}")
         checked_osg_build(["prebuild", pkg_passthrough_dir])
-        final_contents = get_listing(opj(pkg_passthrough_dir, C.WD_PREBUILD))
+        final_contents = os.listdir(opj(pkg_passthrough_dir, C.WD_PREBUILD))
 
         self.assertTrue(
             regex_in_list(
-                r"osg-build-1[.]12[.]2-1[.]osg[.]el\d[.]src[.]rpm",
+                r"htgettoken-1[.]18-1[.]osg[.]el\d+[.]src[.]rpm",
                 final_contents),
             "srpm not successfully built")
 
     def test_prebuild_full_extract(self):
-        pkg_dir = common_setUp(opj(TRUNK, "mash"),
-                               "{2011-12-08}")
+        pkg_dir = common_setUp(opj(OSG_36, "xrootd-multiuser"),
+                               "{2023-07-21}")
         out = backtick_osg_build(["prebuild", "--full-extract", pkg_dir])
-        ut_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED_TARBALL))
-        tarball_contents = get_listing(opj(pkg_dir, C.WD_UNPACKED_TARBALL,
-                                           "mash-0.5.22"))
+        ut_contents = os.listdir(opj(pkg_dir, C.WD_UNPACKED_TARBALL))
+        tarball_contents = os.listdir(opj(pkg_dir, C.WD_UNPACKED_TARBALL,
+                                           "xrootd-multiuser-2.1.3"))
 
         self.assertNotRegexpMatches(
             out,
             re.escape("cpio: premature end of archive"),
             "file unreadable by cpio")
         self.assertTrue(
-            "mash.spec" in ut_contents,
-            "spec file not in unpacked tarball dir")
-        self.assertTrue(
-            "README" in tarball_contents,
+            "README.md" in tarball_contents,
             "expected file not in unpacked sources")
 # end of TestPrebuild
 
@@ -204,15 +136,15 @@ class TestPrepare(TestCase):
     """Tests for 'prepare' task"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(TRUNK, "mash"),
-                                    "{2018-06-27}")
+        self.pkg_dir = common_setUp(opj(OSG_36, "xrootd-multiuser"),
+                                    "{2023-07-21}")
 
     def test_prepare(self):
         checked_osg_build(["prepare", self.pkg_dir])
-        srcdir = opj(self.pkg_dir, C.WD_RESULTS, "BUILD", "mash-0.5.22")
+        srcdir = opj(self.pkg_dir, C.WD_RESULTS, "BUILD", "xrootd-multiuser-2.1.3")
         self.assertTrue(os.path.exists(srcdir), "SRPM not unpacked")
         try:
-            checked_call(["grep", "-q", "LCMAPS plugins", opj(srcdir, "mash/multilib.py")])
+            checked_call(["grep", "-Fq", "ThreadSetgroups(0, nullptr)", opj(srcdir, "src/UserSentry.hh")])
         except CalledProcessError:
             self.fail("Patches not applied")
 
@@ -221,38 +153,38 @@ class TestFetch(TestCase):
     """Tests for fetch-sources"""
     @staticmethod
     def fetch_sources(pdir, nocheck=False):
-        cmd = ["python", "-m", "osgbuild.fetch_sources", pdir]
+        cmd = [sys.executable, "-m", "osgbuild.fetch_sources", pdir]
         if nocheck:
-            cmd.append("--nocheck")
+            cmd += ["--nocheck", "--quiet"]
         checked_call(cmd)
-        return get_listing(pdir)
+        return os.listdir(pdir)
 
     def test_cache_fetch(self):
-        common_setUp(opj(DEVOPS, "mash"), "{2019-10-01}")
-        contents = self.fetch_sources("mash")
+        common_setUp(opj(OSG_36, "xrootd"), "{2023-07-21}")
+        contents = self.fetch_sources("xrootd")
 
         self.assertTrue(
-            "mash.spec" in contents,
+            "xrootd.spec" in contents,
             "spec file not found")
         self.assertTrue(
-            "mash-0.5.22.tar.gz" in contents,
+            "xrootd.tar.gz" in contents,
             "source tarball not found")
         head_out = checked_backtick(
-            ["head", "-n", "15", "mash/mash.spec"])
+            ["head", "-n", "1", "xrootd/xrootd.spec"])
         self.assertRegexpMatches(
             head_out,
-            r"Patch0:\s+multilib-python.patch",
+            r"# OSG additions",
             "Spec file not overridden")
 
     def test_git_fetch(self):
-        common_setUp(opj(DEVOPS, "osg-build"), "{2020-07-01}")
-        contents = self.fetch_sources("osg-build")
+        common_setUp(opj(OSG_36, "xrootd-multiuser"), "{2023-07-21}")
+        contents = self.fetch_sources("xrootd-multiuser")
 
         self.assertTrue(
-            "osg-build.spec" in contents,
+            "xrootd-multiuser.spec" in contents,
             "spec file not found")
         self.assertTrue(
-            "osg-build-1.16.2.tar.gz" in contents,
+            "xrootd-multiuser-2.1.3.tar.gz" in contents,
             "source tarball not found")
 
     def test_git_fetch_with_release(self):
@@ -315,7 +247,7 @@ class TestFetch(TestCase):
         unslurp("upstream/github.source",
                 "type=github repo=opensciencegrid/cvmfs-config-osg tag=v2.1 hash=0000000000000000000000000000000000000000")
         checked_osg_build(["prebuild"])
-        contents = get_listing(C.WD_PREBUILD)
+        contents = os.listdir(C.WD_PREBUILD)
 
         self.assertTrue(
             regex_in_list(
@@ -324,213 +256,8 @@ class TestFetch(TestCase):
             "srpm not successfully built")
 
 
-
-class TestMock(TestCase):
-    """Tests for mock"""
-
-    def setUp(self):
-        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
-                                    "{2021-01-27}")
-
-    def check_for_mock_group(self):
-        username = pwd.getpwuid(os.getuid()).pw_name
-        try:
-            mock_group = grp.getgrnam('mock')
-        except KeyError:
-            errprintf("mock group not found")
-            return False
-        try:
-            if username in mock_group.gr_mem:
-                return True
-        except AttributeError:
-            pass
-        errprintf("%s not in mock group", username)
-        return False
-
-    def test_mock_koji_cfg(self):
-        if self.check_for_mock_group():
-            checked_osg_build(["mock", self.pkg_dir, "--el7", "--mock-config-from-koji=osg-3.6-el7-build"])
-
-
-class TestKoji(TestCase):
-    """Tests for koji"""
-
-    def setUp(self):
-        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
-                                    "{2021-01-27}")
-
-    kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
-    kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
-
-    build_target_lib_regex = r"^.*kojisession.build\([^,]+?, '%s'"
-    build_target_shell_regex = r"(osg-)?koji .*build %s"
-
-    def is_building_for(self, target, output):
-        return (re.search(self.build_target_lib_regex % target, output, re.MULTILINE) or
-                re.search(self.build_target_shell_regex % target, output, re.MULTILINE))
-
-    def test_koji_shell_args1(self):
-        output = backtick_osg_build(self.kdr_shell + ["--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-el7", output),
-                        "not building for el7")
-        self.assertTrue(self.is_building_for("osg-el8", output),
-                        "not building for el8")
-
-    def test_koji_shell_args2(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-el7", output),
-                        "not building for el7")
-        self.assertFalse(self.is_building_for("osg-el8", output),
-                         "falsely building for el8")
-
-    def test_koji_shell_args3(self):
-        output = backtick_osg_build(self.kdr_shell + ["--ktt", "osg-el8", "--scratch", self.pkg_dir])
-        self.assertFalse(
-            self.is_building_for("osg-el7", output),
-            "falsely building for el7")
-        self.assertTrue(
-            self.is_building_for("osg-el8", output),
-            "not building for el8 for the right target")
-
-    def test_koji_shell_args4(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--koji-target", "osg-el7", "--koji-tag", "TARGET", "--scratch", self.pkg_dir])
-        out_list = output.split("\n")
-        self.assertFalse(
-            regex_in_list(r"Unable to determine redhat release", out_list),
-            "Bad error with --koji-tag=TARGET")
-
-    def test_koji_lib_args1(self):
-        output = backtick_osg_build(self.kdr_lib + ["--scratch", self.pkg_dir])
-        out_list = output.split("\n")
-        self.assertTrue(
-            regex_in_list(r".*kojisession.build\([^,]+?, 'osg-el[78]', " + re.escape("{'scratch': True}") + r", None\)", out_list))
-
-    def test_koji_lib_old_upcoming(self):
-        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-upcoming-el8", output))
-
-    def test_koji_lib_old_upcoming2(self):
-        output = backtick_osg_build(self.kdr_lib + ["--upcoming", "--scratch", "--el7", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
-        self.assertFalse(self.is_building_for("osg-upcoming-el8", output))
-
-    def test_koji_lib_old_upcoming3(self):
-        output = backtick_osg_build(self.kdr_lib + ["--repo", "upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-upcoming-el8", output))
-
-    def test_koji_shell_old_upcoming(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(
-            self.is_building_for("osg-upcoming-el7", output),
-            "not building for el7-upcoming")
-        self.assertFalse(
-            self.is_building_for("osg-upcoming-el8", output),
-            "falsely building for el8-upcoming")
-
-    def test_koji_shell_old_upcoming2(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el7", "--repo", "upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(
-            self.is_building_for("osg-upcoming-el7", output),
-            "not building for el7-upcoming")
-        self.assertFalse(
-            self.is_building_for("osg-upcoming-el8", output),
-            "falsely building for el8-upcoming")
-
-    def test_verify_correct_branch_svn(self):
-        try:
-            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", opj(C.SVN_ROOT, DEVOPS, "koji")])
-        except CalledProcessError as err:
-            out_list = err.output.split("\n")
-            self.assertTrue(
-                regex_in_list(r".*Forbidden to build from .+ branch into .+ target", out_list),
-                "did not detect attempt to build for wrong branch (wrong error message)")
-            return
-        self.fail("did not detect attempt to build for wrong branch (no error message)")
-
-    def test_verify_correct_branch_git(self):
-        try:
-            # SCM URI format is 'git+https://host/.../repo.git?path#revision'
-            scm_uri = "git+%s?%s#%s" % (C.OSG_REMOTE, "koji", "devops")
-            _ = backtick_osg_build(self.kdr_lib + ["--upcoming", "--dry-run", scm_uri])
-        except CalledProcessError as err:
-            out_list = err.output.split("\n")
-            self.assertTrue(
-                regex_in_list(r".*Forbidden to build from .+ branch into .+ target", out_list),
-                "did not detect attempt to build for wrong branch (wrong error message)")
-            return
-        self.fail("did not detect attempt to build for wrong branch (no error message)")
-
-
-class TestKojiNewUpcoming(TestCase):
-    def setUp(self):
-        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
-                                    "{2021-01-27}")
-
-    kdr_shell = ["koji", "--dry-run", "--koji-backend=shell"]
-    kdr_lib = ["koji", "--dry-run", "--koji-backend=kojilib"]
-
-    build_target_lib_regex = r"^.*kojisession.build\([^,]+?, '%s'"
-    build_target_shell_regex = r"(osg-)?koji .*build %s"
-
-    def is_building_for(self, target, output):
-        return (re.search(self.build_target_lib_regex % target, output, re.MULTILINE) or
-                re.search(self.build_target_shell_regex % target, output, re.MULTILINE))
-
-    def test_koji_lib_35upcoming(self):
-        output = backtick_osg_build(self.kdr_lib + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
-
-    def test_koji_lib_35upcoming_shorthand(self):
-        output = backtick_osg_build(self.kdr_lib + ["--3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
-
-    def test_koji_lib_36upcoming(self):
-        output = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
-
-    def test_koji_lib_36upcoming_shorthand(self):
-        output = backtick_osg_build(self.kdr_lib + ["--3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
-
-    def test_koji_shell_35upcoming(self):
-        output = backtick_osg_build(self.kdr_shell + ["--repo", "3.5-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.5-upcoming-el8", output))
-
-    def test_koji_shell_36upcoming(self):
-        output = backtick_osg_build(self.kdr_shell + ["--repo", "3.6-upcoming", "--scratch", self.pkg_dir])
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el7", output))
-        self.assertTrue(self.is_building_for("osg-3.6-upcoming-el8", output))
-
-
-class TestKojiLong(TestCase):
-    def setUp(self):
-        self.pkg_dir = common_setUp(opj(DEVOPS, "koji"),
-                                    "{2021-01-27}")
-
-    def test_koji_build(self):
-        checked_osg_build(["koji", "--el7", "--scratch", self.pkg_dir, "--wait"])
-
-
 class TestMisc(TestCase):
     """Other tests"""
-
-    def test_cmdline_scratch_svn(self):
-        buildopts = main.init(
-            ["osg-build", "koji", "--scratch", "."])[0]
-        self.assertFalse(buildopts['vcs'],
-                         "vcs not false for scratch build")
-
-        buildopts = main.init(
-            ["osg-build", "koji", "."])[0]
-        self.assertTrue(buildopts['vcs'],
-                        "vcs not true for non-scratch build")
 
     def test_rpmbuild_defines(self):
         buildopts_el = dict()
@@ -563,15 +290,15 @@ class TestMisc(TestCase):
             self.fail("osg-build --version failed")
 
 
-short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc, TestKoji, TestKojiNewUpcoming)
+short_test_cases = (TestLint, TestRpmbuild, TestPrebuild, TestPrepare, TestFetch, TestMisc)
 TestSuiteShort = unittest.TestSuite()
 TestSuiteShort.addTests([makeSuite(t) for t in short_test_cases])
-# Make sure TestKojiLong comes first since it requires user interaction.
-TestSuiteAll = unittest.TestSuite((makeSuite(TestKojiLong), TestSuiteShort, makeSuite(TestMock)))
+TestSuiteAll = TestSuiteShort  # backward compat
 
 if __name__ == '__main__':
     try:
-        errprintf("testing %s", osg_build_path)
+        import osgbuild.main
+        errprintf("testing %s", osgbuild.main)
         unittest.main()
     except CalledProcessError as e:
         errprintf("output: %s", e.output)

@@ -1,5 +1,6 @@
 # version now specified in osgbuild/version.py
-PYTHON = python
+PYTHON ?= python3
+PYTHON := $(shell which $(PYTHON) )
 VERSION := $(shell $(PYTHON) -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
 HASH := $(shell git rev-parse HEAD)
 NAME = osg-build
@@ -9,7 +10,7 @@ TESTDIR = $(PYDIR)/test
 SVNDATADIR = data
 MAIN_SCRIPT = $(NAME)
 EXTRA_SCRIPTS = koji-tag-diff osg-import-srpm osg-koji osg-promote koji-blame
-MAIN_TEST_SYMLINK = osg-build-test
+TEST_SCRIPT = osg-build-test
 MAIN_TEST = $(TESTDIR)/test_osgbuild.py
 PYTHON_SITELIB := $(shell $(PYTHON) -c "import sysconfig; print(sysconfig.get_paths()['platlib'])")
 BINDIR = /usr/bin
@@ -41,12 +42,13 @@ install: install-common
 
 	mkdir -p $(DESTDIR)/$(PYTHON_SITELIB)/$(TESTDIR)
 	install -p -m 755 $(TESTDIR)/*.py $(DESTDIR)/$(PYTHON_SITELIB)/$(TESTDIR)
+	install -p -m 755 $(TEST_SCRIPT) $(DESTDIR)/$(BINDIR)
+	sed -ri '1s,^#!/usr/bin/env python.*,#!$(PYTHON),' $(DESTDIR)/$(BINDIR)/$(TEST_SCRIPT)
 
-	ln -snf $(PYTHON_SITELIB)/$(MAIN_TEST) $(DESTDIR)/$(BINDIR)/$(MAIN_TEST_SYMLINK)
 
 dist:
 	mkdir -p $(NAME_VERSION)
-	cp -rp $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(PYDIR) $(SVNDATADIR) Makefile pylintrc $(NAME_VERSION)/
+	cp -rp $(MAIN_SCRIPT) $(EXTRA_SCRIPTS) $(TEST_SCRIPT) $(PYDIR) $(SVNDATADIR) Makefile pylintrc $(NAME_VERSION)/
 	tar czf $(NAME_VERSION).tar.gz $(NAME_VERSION)/ --exclude='*/.svn*' --exclude='*/*.py[co]' --exclude='*/*~'
 
 check:

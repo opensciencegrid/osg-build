@@ -160,8 +160,13 @@ You might need to log out and log in for the changes to take effect""")
         if self.target_arch:
             rebuild_cmd += ['--arch', self.target_arch]
         if self.mock_version >= (1,4,0):
-            # systemd-nspawn is often broken; don't use it. network is required for maven builds :(
-            rebuild_cmd += ['--enable-network', '--config-opts=use_nspawn=False']
+            # network is required for maven builds :(
+            rebuild_cmd += ['--enable-network']
+            # systemd-nspawn is often broken (especially in a container); don't use it
+            if self.mock_version < (5,):
+                rebuild_cmd += ['--config-opts=use_nspawn=False']
+            else:  # same thing, different syntax
+                rebuild_cmd += ['--isolation=simple']
             if int(self.buildopts["redhat_release"]) >= 8 and utils.get_local_machine_release() < 8:
                 rebuild_cmd += ["--bootstrap-chroot"]
         else:

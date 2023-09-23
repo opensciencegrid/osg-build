@@ -533,6 +533,10 @@ if __name__ == '__main__':
         for arg in sys.argv[1:]:
             if arg == "--nocheck":
                 nocheck = True
+            elif arg == "--quiet":
+                log.setLevel(logging.ERROR)
+            elif arg == "--debug":
+                log.setLevel(logging.DEBUG)
             else:
                 package_dirs.append(arg)
     try:

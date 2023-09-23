@@ -155,7 +155,7 @@ class TestFetch(TestCase):
     def fetch_sources(pdir, nocheck=False):
         cmd = [sys.executable, "-m", "osgbuild.fetch_sources", pdir]
         if nocheck:
-            cmd.append("--nocheck")
+            cmd += ["--nocheck", "--quiet"]
         checked_call(cmd)
         return os.listdir(pdir)
 

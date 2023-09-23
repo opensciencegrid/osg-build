@@ -104,7 +104,13 @@ def get_koji_cmd(use_osg_koji):
 
 def get_cn():
     """Return the user's koji login (their CN)"""
-    return clientcert.ClientCert(KOJI_CLIENT_CERT).first_commonname
+    # TODO This is gonna stop working when we use Kerberos
+    client_cert = KOJI_CLIENT_CERT
+    try:
+        client_cert = get_koji_config().get("koji", "cert")
+    except KojiError:
+        pass
+    return clientcert.ClientCert(client_cert).first_commonname
 
 
 def download_koji_file(task_id, filename, destdir):
@@ -112,7 +118,12 @@ def download_koji_file(task_id, filename, destdir):
     in destdir/task_id/filename
 
     """
-    url = KOJI_HUB + "/koji/getfile?taskID=%d&name=%s" % (task_id, filename)
+    weburl = KOJI_WEB + "/koji"
+    try:
+        weburl = get_koji_config().get("koji", "weburl")
+    except KojiError:
+        pass
+    url = weburl + "/getfile?taskID=%d&name=%s" % (task_id, filename)
     log.debug('Retrieving ' + url)
     try:
         handle = urllib.request.urlopen(url)

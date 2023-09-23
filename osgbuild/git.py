@@ -4,6 +4,12 @@ from __future__ import print_function
 import re
 import os
 import errno
+try:
+    from urllib2.urlparse import urlsplit  # Python 2
+except ImportError:
+    # noinspection PyCompatibility
+    from urllib.parse import urlsplit  # Python 3
+
 
 from .constants import GIT_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
 from .error import Error, GitError
@@ -13,10 +19,12 @@ from . import constants
 def is_git(package_dir):
     """Determine whether a given directory is part of a git repo."""
     # If package_dir is a URL, not a directory, then we can't cd into it to
-    # check. Assume False for now.
+    # check. Assume False unless it's a git or git+https URL or similar
     if utils.is_url(package_dir):
+        scheme, _ = package_dir.split(":", 1)
+        if "git" in scheme:
+            return True
         return False
-    # TODO: Allow specifying a git URL to build from.
     pwd = os.getcwd()
     try:
         try:
@@ -36,6 +44,31 @@ def is_git(package_dir):
     finally:
         os.chdir(pwd)
     return True
+
+
+def parse_git_url(git_url):
+    """Parse a git URL of the type recognized by Koji, which looks like
+    `git+REPO?DIRECTORY#BRANCH`
+    where REPO is a remote URL like "https://github.com/opensciencegrid/Software-Redhat.git"
+    DIRECTORY is a directory like "osg-xrootd"
+    BRANCH is a git branch like "osg-3.6"
+
+    Return (REMOTE, DIRECTORY, BRANCH) or (None, None, None) if parsing failed.
+    """
+    scheme, netloc, path, query, fragment = urlsplit(git_url)
+    try:
+        if not (scheme and netloc and path and query):
+            return None, None, None
+        scheme = scheme.rsplit("+")[-1]  # git+https -> https
+        if not path.endswith(".git"):
+            path = path + ".git"
+        repo = "{scheme}://{netloc}{path}".format(**locals())
+        directory = query
+        branch = fragment or "HEAD"
+        return repo, directory, branch
+    except TypeError:
+        return None, None, None
+
 
 #
 # Branch checking
@@ -355,17 +388,23 @@ def verify_correct_branch(package_dir, buildopts):
     """Check that the user is not trying to build from trunk into upcoming, or
     vice versa.
     """
-    branch = get_branch(package_dir)
-    remote = get_known_remote(package_dir)[1]
+    if utils.is_url(package_dir):
+        # a git url -- we can only do some of our checks
+        remote, _, branch = parse_git_url(package_dir)
+        if not remote:
+            raise GitError("URL %s failed to parse as a git URL" % package_dir)
+    else:
+        branch = get_branch(package_dir)
+        remote = get_known_remote(package_dir)[1]
 
-    verify_correct_remote(package_dir)
+        verify_correct_remote(package_dir)
+
+        if remote in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
+            verify_git_svn_commit(package_dir)
 
     # We only have branching rules for OSG and HCC repos
     if remote not in constants.KNOWN_GIT_REMOTES:
         return
-
-    if remote in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
-        verify_git_svn_commit(package_dir)
 
     if not is_restricted_branch(branch):
         # Developer branch -- any target ok
@@ -418,25 +457,30 @@ into the upcoming targets.  Either switch the branch to master,
 
 def koji(package_dir, koji_obj, buildopts):
     """koji task with a git build."""
-    package_dir = os.path.abspath(package_dir)
-    verify_package_dir(package_dir)
-    package_name = os.path.basename(package_dir)
+    if utils.is_url(package_dir):
+        remote, package_name, branch = parse_git_url(package_dir)
+        if not remote:
+            raise Error("Package '%s' does not parse as a Git URL" % package_dir)
+        rev = branch
+    else:
+        package_dir = os.path.abspath(package_dir)
+        verify_package_dir(package_dir)
+        package_name = os.path.basename(package_dir)
+        remote = get_fetch_url(package_dir, get_known_remote(package_dir)[0])
+
+        top_dir = os.path.split(os.path.abspath(package_dir))[0]
+        command = ["git", "--work-tree", top_dir, "--git-dir", os.path.join(top_dir, ".git"),
+                   "log", "-1", "--pretty=format:%H"]
+        out, err = utils.sbacktick(command, err2out=True)
+        if err:
+            raise GitError("Exit code %d getting git hash for directory %s. Output:\n%s" % (err, package_dir, out))
+        rev = out.strip()
+
     if not re.match(r"\w+", package_name): # sanity check
-        raise Error("Package directory '%s' gives invalid package name '%s'" % (package_dir, package_name))
+        raise Error("Package '%s' gives invalid package name '%s'" % (package_dir, package_name))
     if not buildopts.get('scratch'):
         koji_obj.add_pkg(package_name)
-
-    remote = get_fetch_url(package_dir, get_known_remote(package_dir)[0])
-    top_dir = os.path.split(os.path.abspath(package_dir))[0]
-    command = ["git", "--work-tree", top_dir, "--git-dir", os.path.join(top_dir, ".git"),
-               "log", "-1", "--pretty=format:%H"]
-    out, err = utils.sbacktick(command, err2out=True)
-    if err:
-        raise GitError("Exit code %d getting git hash for directory %s. Output:\n%s" % (err, package_dir, out))
-    rev = out.strip()
 
     return koji_obj.build_git(remote,
                               rev,
                               package_name)
-
-

@@ -13,10 +13,12 @@ from . import utils
 def is_svn(package_dir):
     """Determine whether a given directory is part of an SVN repo."""
     # If package_dir is a URL, not a directory, then we can't cd into it to
-    # check. Assume True for now.
+    # check. Assume True unless it's a git or git+https URL or similar
     if utils.is_url(package_dir):
+        scheme, _ = package_dir.split(":", 1)
+        if "git" in scheme:
+            return False
         return True
-    # TODO: Allow specifying a git URL to build from.
     pwd = os.getcwd()
     try:
         try:

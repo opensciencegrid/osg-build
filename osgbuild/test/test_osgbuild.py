@@ -13,7 +13,7 @@ from unittest import makeSuite, TestCase
 
 import osgbuild.constants as C
 from osgbuild import srpm
-from osgbuild.test.common import OSG_36, regex_in_list, get_osg_build_path, go_to_temp_dir, common_setUp, \
+from osgbuild.test.common import OSG_36, regex_in_list, go_to_temp_dir, common_setUp, \
     backtick_osg_build, checked_osg_build
 from osgbuild.utils import (
     checked_backtick,
@@ -297,7 +297,8 @@ TestSuiteAll = TestSuiteShort  # backward compat
 
 if __name__ == '__main__':
     try:
-        errprintf("testing %s", get_osg_build_path())
+        import osgbuild.main
+        errprintf("testing %s", osgbuild.main)
         unittest.main()
     except CalledProcessError as e:
         errprintf("output: %s", e.output)

@@ -8,8 +8,7 @@ from unittest import TestCase
 
 import osgbuild.constants as C
 from osgbuild import main
-from osgbuild.test.common import OSG_23_MAIN, OSG_36, common_setUp, backtick_osg_build, regex_in_list, checked_osg_build, \
-    get_osg_build_path
+from osgbuild.test.common import OSG_23_MAIN, OSG_36, common_setUp, backtick_osg_build, regex_in_list, checked_osg_build
 from osgbuild.utils import CalledProcessError, errprintf
 
 
@@ -181,7 +180,7 @@ class TestMock(TestCase):
 
 if __name__ == '__main__':
     try:
-        errprintf("testing %s", get_osg_build_path())
+        errprintf("testing %s", main)
         unittest.main()
     except CalledProcessError as e:
         errprintf("output: %s", e.output)

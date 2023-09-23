@@ -26,21 +26,6 @@ def regex_in_list(pattern, listing):
     return [x for x in listing if re.match(pattern, x)]
 
 
-__osg_build_path_cache = None
-def get_osg_build_path():
-    # type: () -> str
-    global __osg_build_path_cache
-
-    if not __osg_build_path_cache:
-        __osg_build_path_cache = find_file("osg-build",
-                                           [os.getcwd()] + os.environ["PATH"].split(":"))
-        if not __osg_build_path_cache:
-            errprintf("osg-build script not found!")
-            sys.exit(127)
-
-    return __osg_build_path_cache
-
-
 def go_to_temp_dir():
     working_dir = tempfile.mkdtemp(prefix="osg-build-test-")
     atexit.register(shutil.rmtree, working_dir, ignore_errors=True, onerror=None)
@@ -61,11 +46,11 @@ def common_setUp(path, rev):
 def backtick_osg_build(cmd_args, *args, **kwargs):
     kwargs['clocale'] = True
     kwargs['err2out'] = True
-    return checked_backtick([get_osg_build_path()] + cmd_args, *args, **kwargs)
+    return checked_backtick([sys.executable, "-m", "osgbuild.main"] + cmd_args, *args, **kwargs)
 
 
 def checked_osg_build(cmd_args, *args, **kwargs):
-    return checked_call([get_osg_build_path()] + cmd_args, *args, **kwargs)
+    return checked_call([sys.executable, "-m", "osgbuild.main"] + cmd_args, *args, **kwargs)
 
 
 def svn_export(path, rev, destpath):

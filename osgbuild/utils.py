@@ -466,23 +466,30 @@ def get_local_machine_dver():
     """Return the distro version (e.g. 'el6', 'el7') of the local machine
     or the empty string if we can't figure it out."""
     try:
-        redhat_release_contents = slurp("/etc/redhat-release")
-        if not redhat_release_contents:
+        os_release_contents = slurp("/etc/os-release")
+        if not os_release_contents:
             return ""  # empty file?
     except EnvironmentError:  # some error reading the file
         return ""
 
-    for rhellike in ["Scientific", "Red Hat Enterprise", "CentOS"]:
-        if rhellike in redhat_release_contents:
-            match = re.search(r"release (\d+)", redhat_release_contents)
-            if match:
-                return "el" + match.group(1)
-            else:
-                return ""
-    match = re.search(r"Fedora release (\d+)", redhat_release_contents)
-    if match:
-        return "fc" + match.group(1)
-    return ""
+    os_release = {}
+    for line in os_release_contents.split("\n"):
+        if "=" in line:
+            key, value = line.split("=", 1)
+            os_release[key] = value.strip('"')
+
+    version_id = os_release.get("VERSION_ID", "")
+    if not version_id:
+        # dunno, bailing
+        return ""
+
+    major_version = version_id.split(".")[0]
+    if "rhel" in os_release.get("ID_LIKE", ""):
+        return "el%s" % major_version
+    elif "fedora" == os_release.get("ID"):
+        return "fc%s" % major_version
+    else:
+        return ""
 
 
 def get_local_machine_release():

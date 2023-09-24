@@ -290,7 +290,7 @@ class SRPMBuild(object):
             raise ProgramNotFoundError("rpmlint")
         conf_file = utils.find_file("rpmlint.cfg", DATA_FILE_SEARCH_PATH)
         if not conf_file:
-            raise FileNotFoundError("rpmlint.cfg", DATA_FILE_SEARCH_PATH)
+            raise FileNotFoundInSearchPathError("rpmlint.cfg", DATA_FILE_SEARCH_PATH)
         srpm = self.prebuild()
         lint_output, lint_returncode = utils.sbacktick(
             ["rpmlint", "-f", conf_file, srpm])

@@ -119,7 +119,7 @@ class Configuration(object):
         cp = configparser.RawConfigParser()
         cp.read(utils.find_files(inifile, constants.DATA_FILE_SEARCH_PATH))
         if not cp.sections():
-            raise error.FileNotFoundError(inifile, constants.DATA_FILE_SEARCH_PATH)
+            raise error.FileNotFoundInSearchPathError(inifile, constants.DATA_FILE_SEARCH_PATH)
 
         for sec in cp.sections():
             if not sec.startswith('route '):

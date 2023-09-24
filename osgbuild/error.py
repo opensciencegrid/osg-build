@@ -34,15 +34,10 @@ class GlobNotFoundError(Error):
         Error.__init__(self, msg)
 
 
-# TODO: Rename to avoid shadowing Python 3 builtin
-class FileNotFoundError(Error):
-    def __init__(self, fname, searchpath=None):
-        msg = "Couldn't find file named '%s'." % fname
-        if searchpath:
-            Error.__init__(self, msg + " Search path was:\n%s" %
-                           os.pathsep.join(searchpath))
-        else:
-            Error.__init__(self, msg)
+class FileNotFoundInSearchPathError(Error):
+    def __init__(self, fname, searchpath):
+        msg = "Couldn't find file named '%s' in search path %s." % (fname, os.pathsep.join(searchpath))
+        Error.__init__(self, msg)
 
 
 class ProgramNotFoundError(Error):

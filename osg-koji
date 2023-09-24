@@ -184,7 +184,7 @@ def copy_old_client_cert(new_client_cert_path):
     try:
         shutil.copy(OLD_CLIENT_CERT_FILE, new_client_cert_path)
     except EnvironmentError as err:
-        raise Error("Unable to copy client cert: %s" % str(err))
+        raise Error("Unable to copy client cert: %s" % err)
 
 
 @with_safe_umask
@@ -211,7 +211,7 @@ def create_client_symlink_to_proxy(new_client_cert_path):
     try:
         os.symlink(proxy_filename, new_client_cert_path)
     except EnvironmentError as err:
-        raise Error("Unable to create symlink: %s" % str(err))
+        raise Error("Unable to create symlink: %s" % err)
 
 
 def setup_koji_client_cert(user_cert, user_key, proxy):

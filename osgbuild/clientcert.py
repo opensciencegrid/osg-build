@@ -53,7 +53,7 @@ class ClientCert(object):
                 self.filename,
                 "cannot determine valid dates from openssl output"
                     "\n%s\n"
-                    "Error was: %s" % (output, str(err)))
+                    "Error was: %s" % (output, err))
 
         return startdate, enddate
 

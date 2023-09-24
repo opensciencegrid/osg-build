@@ -511,7 +511,7 @@ downloading and putting the SRPM into the upstream cache.
         logging.critical(str(e))
         logging.debug(e.traceback)
     except Exception as e:
-        logging.critical("Unhandled exception: %s", str(e))
+        logging.critical("Unhandled exception: %s", e)
         logging.critical(traceback.format_exc())
         return 1
 

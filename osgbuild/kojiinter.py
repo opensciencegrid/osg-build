@@ -433,9 +433,9 @@ def koji_error_wrap(description):
             try:
                 return function_to_wrap(*args, **kwargs)
             except kojilib.ServerOffline as err:
-                raise KojiError("Server outage detected while %s: %s" % (description, str(err)))
+                raise KojiError("Server outage detected while %s: %s" % (description, err))
             except kojilib.GenericError as err:
-                raise KojiError("Error of type %s while %s: %s" % (type_of_error(err), description, str(err)))
+                raise KojiError("Error of type %s while %s: %s" % (type_of_error(err), description, err))
         return wrapped_function
     return koji_error_wrap_helper
 
@@ -494,7 +494,7 @@ class KojiLibInter(object):
                 if use_old_ssl:
                     log.warning("Ignoring use_old_ssl: only supported on Python 2")
         except configparser.Error as err:
-            raise KojiError("Can't read config file from %s: %s" % (config_file, str(err)))
+            raise KojiError("Can't read config file from %s: %s" % (config_file, err))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl', 'topurl']:
             if items.get(var):
                 setattr(self, var, os.path.expanduser(items[var]))

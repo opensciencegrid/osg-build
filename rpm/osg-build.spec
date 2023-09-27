@@ -1,8 +1,8 @@
-#global betatag .pre
+%global betatag .pre
 %global _release 1
 
 Name:           osg-build
-Version:        1.19.0
+Version:        1.99.0
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -171,6 +171,9 @@ fi
 
 
 %changelog
+* Wed Sep 27 2023 Matyas Selmeci <matyas@cs.wisc.edu> - 1.99.0-0.1.pre
+- Start of V2 branch
+
 * Tue Nov 29 2022 Carl Edquist <edquist@cs.wisc.edu> - 1.19.0-1
 - Add el9 support (SOFTWARE-5342)
 

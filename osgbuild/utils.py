@@ -298,7 +298,7 @@ def ask(question, choices):
     match = False
     while not match:
         print(question)
-        user_choice = input_("[" + "/".join(choices) + "] ? ").strip().lower()
+        user_choice = input("[" + "/".join(choices) + "] ? ").strip().lower()
         for choice in choices_lc:
             if user_choice.startswith(choice):
                 match = True

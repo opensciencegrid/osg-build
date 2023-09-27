@@ -1,11 +1,6 @@
 """utilities for osg-build"""
-from __future__ import absolute_import
-from __future__ import print_function
 import errno
-try:
-    from itertools import izip_longest as zip_longest
-except ImportError:
-    from itertools import zip_longest
+from itertools import zip_longest
 import logging
 import os
 import re
@@ -18,9 +13,6 @@ from datetime import datetime
 
 
 log = logging.getLogger(__name__)
-
-
-input_ = getattr(__builtins__, "raw_input", input)
 
 
 def to_str(strlike, encoding="latin-1", errors="backslashreplace"):

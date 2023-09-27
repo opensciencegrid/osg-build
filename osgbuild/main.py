@@ -4,16 +4,11 @@
 # TODO Shouldn't need koji access for 'rpmbuild', but currently does since it
 # gets the values for the --repo arg -- which is only used for koji builds.
 # Make it so.
-from __future__ import absolute_import
-from __future__ import print_function
 import logging
 from optparse import OptionGroup, OptionParser, OptionValueError
 import re
 import tempfile
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+import configparser
 
 from .constants import *
 from .error import UsageError, KojiError, SVNError, GitError, Error

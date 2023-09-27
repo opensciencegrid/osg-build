@@ -54,8 +54,6 @@ If type is unspecified, it will be inferred by the form of the first argument:
 """
 
 # pylint: disable=W0614
-from __future__ import absolute_import
-from __future__ import print_function
 import collections
 import fnmatch
 import hashlib

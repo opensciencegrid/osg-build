@@ -1,6 +1,5 @@
 """mock wrapper class and functions for osg-build"""
 # pylint: disable=W0614
-from __future__ import absolute_import
 from fnmatch import fnmatch
 from glob import glob
 import atexit

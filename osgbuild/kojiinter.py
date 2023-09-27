@@ -2,12 +2,7 @@
 # pylint: disable=W0614,C0103
 
 
-from __future__ import absolute_import
-from __future__ import print_function
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+import configparser
 import logging
 import random
 import re
@@ -16,10 +11,7 @@ import string
 import sys
 import time
 import urllib
-try:
-    from typing import Optional
-except ImportError:
-    Optional = None
+from typing import Optional
 
 from .constants import *
 from . import clientcert

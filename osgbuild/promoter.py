@@ -1,14 +1,9 @@
 """A package promotion script for OSG"""
 
 
-from __future__ import absolute_import
-from __future__ import print_function
 import re
 import sys
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+import configparser
 
 from . import constants
 from . import error

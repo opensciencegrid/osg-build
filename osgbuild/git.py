@@ -1,14 +1,8 @@
 """Helper functions for a git build."""
-from __future__ import absolute_import
-from __future__ import print_function
 import re
 import os
 import errno
-try:
-    from urllib2.urlparse import urlsplit  # Python 2
-except ImportError:
-    # noinspection PyCompatibility
-    from urllib.parse import urlsplit  # Python 3
+from urllib.parse import urlsplit  # Python 3
 
 
 from .constants import GIT_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS

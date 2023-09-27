@@ -8,11 +8,7 @@ from os.path import join as opj
 
 from osgbuild import constants as C
 
-try:
-    # type checking, if avaliable
-    from typing import List, Optional
-except ImportError:  # Python 2
-    List = Optional = None
+from typing import List, Optional
 
 from osgbuild.utils import find_file, errprintf, checked_backtick, checked_call, CalledProcessError
 

@@ -388,6 +388,8 @@ if HAVE_KOJILIB:
     # kojicli.watch_tasks() expects a global variable named options with
     # an attribute poll_interval to determine how often to poll the server
     # for a status update.
+    # TODO This doesn't seem to be true by Koji 1.33 so this hack can be removed;
+    #      poll_interval is now an argument to watch_tasks()
     class _KojiCliOptions(object): # pylint: disable=C0111,R0903
         def __init__(self, poll_interval):
             self.poll_interval = poll_interval

@@ -107,7 +107,9 @@ def get_cn():
     # TODO This is gonna stop working when we use Kerberos
     client_cert = KOJI_CLIENT_CERT
     try:
-        client_cert = get_koji_config().get("koji", "cert")
+        client_cert = os.path.expanduser(
+            get_koji_config().get("koji", "cert")
+        )
     except KojiError:
         pass
     return clientcert.ClientCert(client_cert).first_commonname

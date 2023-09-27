@@ -66,11 +66,9 @@ import os
 import tempfile
 import shutil
 import sys
-try:
-    from six.moves import urllib
-except ImportError:
-    from .six.moves import urllib
-
+import urllib
+import urllib.error
+import urllib.request
 
 from . import constants as C
 from .error import Error, GlobNotFoundError

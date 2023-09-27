@@ -15,10 +15,7 @@ import os
 import string
 import sys
 import time
-try:
-    from six.moves import urllib
-except ImportError:
-    from .six.moves import urllib
+import urllib
 try:
     from typing import Optional
 except ImportError:

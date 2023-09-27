@@ -17,19 +17,10 @@ Requires:       %{name}-base = %{version}
 Requires:       %{name}-mock = %{version}
 Requires:       %{name}-koji = %{version}
 
-%if (0%{?fedora} >= 31 || 0%{?rhel} >= 8)
 BuildRequires: python3
 %define __python /usr/bin/python3
-%else
-BuildRequires: python2
-%define __python /usr/bin/python2
-%endif
 
-%if 0%{?rhel} < 8
-BuildRequires:       git
-%else
 BuildRequires:       git-core
-%endif
 
 
 %description
@@ -38,21 +29,13 @@ See %{url} for details.
 
 
 %package base
-%if 0%{?rhel} < 8
-Requires:       git
-%else
 Requires:       git-core
-%endif
 Requires:       rpm-build
 Requires:       quilt
 Requires:       rpmlint
 Requires:       subversion
 Requires:       wget
 Requires:       epel-rpm-macros
-%if 0%{?rhel} < 8
-Requires:       python >= 2.6
-Requires:       python-six
-%endif
 Summary:        OSG-Build base package, not containing mock or koji modules or koji-based tools
 
 %description base
@@ -77,7 +60,7 @@ Summary:        OSG-Build Mock plugin, allows builds with mock
 %package koji
 Requires:       %{name}-base = %{version}
 Requires:       openssl
-Requires:       koji >= 1.13.0
+Requires:       koji >= 1.21.0
 Requires:       voms-clients-cpp
 Summary:        OSG-Build Koji plugin and Koji-based tools
 
@@ -106,10 +89,6 @@ Summary:        OSG-Build tests
 %install
 find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!%{__python},' '{}' +
 make install DESTDIR=$RPM_BUILD_ROOT PYTHON=%{__python}
-%if 0%{?rhel} < 8
-rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
-# ^ don't bundle "six" in the RPM; it's a dependency instead
-%endif
 
 %check
 SW_VERSION=$(%{__python} -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
@@ -127,9 +106,7 @@ fi
 %{_bindir}/osg-build-test
 %dir %{python_sitelib}/osgbuild/test
 %{python_sitelib}/osgbuild/test/*.py*
-%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 %{python_sitelib}/osgbuild/test/__pycache__
-%endif
 
 %files base
 %{_bindir}/%{name}
@@ -147,12 +124,7 @@ fi
 %{python_sitelib}/osgbuild/utils.py*
 %{python_sitelib}/osgbuild/version.py*
 %{_datadir}/%{name}/rpmlint.cfg
-%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 %python_sitelib/osgbuild/__pycache__
-%endif
-%if 0%{?rhel} >= 8
-%{python_sitelib}/osgbuild/six.py*
-%endif
 
 %files mock
 %{python_sitelib}/osgbuild/mock.py*

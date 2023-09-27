@@ -22,9 +22,6 @@ log = logging.getLogger(__name__)
 
 HAVE_KOJILIB = None
 try:
-    if os.path.isdir(CSL_KOJI_DIR):
-        sys.path.append(CSL_KOJI_DIR)
-        sys.path.append(CSL_KOJI_DIR + "/cli")
     import koji as kojilib
     from koji_cli import lib as kojicli
     HAVE_KOJILIB = True

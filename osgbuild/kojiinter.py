@@ -11,6 +11,7 @@ import string
 import sys
 import time
 import urllib
+import urllib.request, urllib.error
 from typing import Optional
 
 from .constants import *

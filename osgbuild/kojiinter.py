@@ -450,10 +450,6 @@ class KojiLibInter(object):
             self.user = user or get_cn()
         else:
             self.user = user or "osgbuild"
-        if sys.version_info[0] == 2:
-            self.use_old_ssl = True
-        else:
-            self.use_old_ssl = False
         self.weburl = os.path.join(KOJI_WEB, "koji")
         self.topurl = os.path.join(KOJI_WEB, "kojifiles")
         self.dry_run = dry_run
@@ -470,18 +466,12 @@ class KojiLibInter(object):
             cfg = get_koji_config(config_file)
             items = dict(cfg.items('koji'))
 
-            # special case: use_old_ssl is a boolean so get ConfigParser to parse it
-            use_old_ssl = None
             try:
                 use_old_ssl = cfg.getboolean('koji', 'use_old_ssl')
-            except configparser.NoOptionError:
-                pass
-
-            if sys.version_info[0] == 2 and use_old_ssl is not None:
-                self.use_old_ssl = use_old_ssl
-            else:
                 if use_old_ssl:
                     log.warning("Ignoring use_old_ssl: only supported on Python 2")
+            except configparser.NoOptionError:
+                pass
         except configparser.Error as err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, err))
         for var in ['ca', 'cert', 'server', 'serverca', 'weburl', 'topurl']:
@@ -491,7 +481,7 @@ class KojiLibInter(object):
 
     def init_koji_session(self, login=True):
         log.info("Initializing koji session to %s", self.server)
-        self.kojisession = kojilib.ClientSession(self.server, {'user': self.user, 'use_old_ssl': self.use_old_ssl})
+        self.kojisession = kojilib.ClientSession(self.server, {'user': self.user})
         if login and not self.dry_run:
             self.login_to_koji()
 
@@ -696,4 +686,3 @@ class KojiLibInter(object):
 
 
 # end of class KojiLibInter
-

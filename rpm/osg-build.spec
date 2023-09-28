@@ -1,5 +1,5 @@
 %global betatag .pre
-%global _release 1
+%global _release 2
 
 Name:           osg-build
 Version:        1.99.0
@@ -89,6 +89,8 @@ Summary:        OSG-Build tests
 %install
 find . -type f -exec sed -ri '1s,^#!/usr/bin/env python,#!%{__python},' '{}' +
 make install DESTDIR=$RPM_BUILD_ROOT PYTHON=%{__python}
+rm -f $RPM_BUILD_ROOT/%{_bindir}/sha1vdt
+# ^ this script is useless unless AFS is available
 
 %check
 SW_VERSION=$(%{__python} -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
@@ -142,6 +144,19 @@ fi
 
 
 %changelog
+* Thu Sep 29 2023  átyás Selmeci <matyas@cs.wisc.edu> - 1.99.0-0.2.pre
+- Merge v1.20.0-1:
+    - Allow building from git branches and add branch protection (SOFTWARE-5476)
+    - Make OSG 3.6 the default target release series (SOFTWARE-5208)
+    - Remove el6 and pre-3.5 promotion routes
+    - Drup unversioned '--upcoming' flag and repos
+    - Chop off .elX suffix from package directories before running `koji add-pkg` (SOFTWARE-5502)
+    - Add support for OSG 23 (SOFTWARE-5622)
+    - Drop support for building into 'trunk' and unversioned 'upcoming';
+      drop promotion routes for 3.5 and unversioned upcoming
+    - Combine osg-koji-site.conf and osg-koji-home.conf into osg-koji.conf;
+      add additional variables to osg-koji.conf
+
 * Wed Sep 27 2023 Matyas Selmeci <matyas@cs.wisc.edu> - 1.99.0-0.1.pre
 - Start of V2 branch
 

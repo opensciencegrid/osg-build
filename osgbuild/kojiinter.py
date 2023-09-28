@@ -52,7 +52,7 @@ def get_koji_config_file():
 
 
 def get_koji_config(config_file=None):
-    # type: (Optional[str]) -> configparser.SafeConfigParser
+    # type: (Optional[str]) -> configparser.ConfigParser
     """Parse and return a koji config file, validating that it has some of the
     necessary properties (e.g., a 'koji' section).
 
@@ -62,7 +62,7 @@ def get_koji_config(config_file=None):
     global __koji_config
 
     if not __koji_config:
-        config = configparser.SafeConfigParser()
+        config = configparser.ConfigParser()
         if not config_file:
             config_file = get_koji_config_file()
         config.read(config_file)

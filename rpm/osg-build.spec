@@ -2,7 +2,7 @@
 %global _release 1
 
 Name:           osg-build
-Version:        1.19.0
+Version:        1.20.0
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -110,6 +110,8 @@ make install DESTDIR=$RPM_BUILD_ROOT PYTHON=%{__python}
 rm -f $RPM_BUILD_ROOT/%{python_sitelib}/osgbuild/six.py*
 # ^ don't bundle "six" in the RPM; it's a dependency instead
 %endif
+rm -f $RPM_BUILD_ROOT/%{_bindir}/sha1vdt
+# ^ this script is useless unless AFS is available
 
 %check
 SW_VERSION=$(%{__python} -c "import sys; sys.path.insert(0, '.'); from osgbuild import version; sys.stdout.write(version.__version__ + '\n')")
@@ -170,6 +172,18 @@ fi
 
 
 %changelog
+* Thu Sep 29 2023 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.20.0-1
+- Allow building from git branches and add branch protection (SOFTWARE-5476)
+- Make OSG 3.6 the default target release series (SOFTWARE-5208)
+- Remove el6 and pre-3.5 promotion routes
+- Drup unversioned '--upcoming' flag and repos
+- Chop off .elX suffix from package directories before running `koji add-pkg` (SOFTWARE-5502)
+- Add support for OSG 23 (SOFTWARE-5622)
+- Drop support for building into 'trunk' and unversioned 'upcoming';
+  drop promotion routes for 3.5 and unversioned upcoming
+- Combine osg-koji-site.conf and osg-koji-home.conf into osg-koji.conf;
+  add additional variables to osg-koji.conf
+
 * Tue Nov 29 2022 Carl Edquist <edquist@cs.wisc.edu> - 1.19.0-1
 - Add el9 support (SOFTWARE-5342)
 

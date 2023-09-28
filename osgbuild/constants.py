@@ -15,8 +15,7 @@ KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.koji")
 OSG_KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")
 KOJI_CLIENT_CERT = os.path.join(OSG_KOJI_USER_CONFIG_DIR, "client.crt")
 
-KOJI_CONF = "osg-koji-site.conf"
-OLD_KOJI_CONF = "osg-koji.conf"
+KOJI_CONF = "osg-koji.conf"
 DATA_DIR = "/usr/share/osg-build"
 
 KOJI_HUB = "https://koji.opensciencegrid.org"

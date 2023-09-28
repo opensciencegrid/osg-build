@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from typing import AnyStr
 from datetime import datetime
 
 
@@ -16,14 +17,17 @@ log = logging.getLogger(__name__)
 
 
 def to_str(strlike, encoding="latin-1", errors="backslashreplace"):
-    """Turns a bytes into a str (Python 3) or a unicode to a str (Python 2)"""
-    if strlike is None:
-        return
-    if not isinstance(strlike, str):
-        if str is bytes:
-            return strlike.encode(encoding, errors)
-        else:
-            return strlike.decode(encoding, errors)
+    """Decodes a bytes into a str Python 3; runs str() on other types"""
+    if isinstance(strlike, bytes):
+        return strlike.decode(encoding, errors)
+    else:
+        return str(strlike)
+
+
+def maybe_to_str(strlike, encoding="latin-1", errors="backslashreplace"):
+    """Decodes a bytes into a str; leaves other types alone"""
+    if isinstance(strlike, bytes):
+        return strlike.decode(encoding, errors)
     else:
         return strlike
 
@@ -186,7 +190,7 @@ def checked_backtick(*args, **kwargs):
     log.debug("Running `%s`" % cmd)
     proc = subprocess.Popen(cmd, *args[1:], **sp_kwargs)
 
-    output = to_str(proc.communicate()[0])
+    output = maybe_to_str(proc.communicate()[0])
     if not nostrip:
         output = output.strip()
     err = proc.returncode
@@ -350,8 +354,7 @@ def which(program):
     return None
 
 
-
-def printf(fstring, *args, **kwargs):
+def printf(fstring: AnyStr, *args, **kwargs):
     """A shorthand for printing with a format string.
     The kwargs 'file' and 'end' are as in the Python3 print function.
     """
@@ -365,10 +368,12 @@ def printf(fstring, *args, **kwargs):
     else:
         file_.write(ffstring % args)
 
-def errprintf(fstring, *args, **kwargs):
+
+def errprintf(fstring: AnyStr, *args, **kwargs):
     """printf to stderr"""
     kwargs.pop('file', None)
     printf(fstring, file=sys.stderr, *args, **kwargs)
+
 
 class safelist(list):
     """A version of the list type that has get and pop methods that accept

@@ -62,8 +62,7 @@ class CalledProcessError(Exception):
 try:
     shell_quote = shlex.quote
 except AttributeError:
-    import pipes
-    shell_quote = pipes.quote
+    from pipes import quote as shell_quote
 
 
 def checked_call(*args, **kwargs):
@@ -82,15 +81,12 @@ def unchecked_call(*args, **kwargs):
     Prints the command to run and the result if loglevel is DEBUG.
 
     """
-    if type(args[0]) == type(''):
-        cmd = args[0]
-    elif type(args[0]) == type([]) or type(args[0]) == type(()):
-        cmd = "'" + "' '".join(args[0]) + "'"
-    log.debug("Running " + cmd)
+    log.debug("Running %r", args)
 
     err = subprocess.call(*args, **kwargs)
     log.debug("Subprocess returned " + str(err))
     return err
+
 
 def checked_pipeline(cmds, stdin=None, stdout=None, **kw):
     """Run a list of commands pipelined together, raises CalledProcessError if
@@ -107,6 +103,7 @@ def checked_pipeline(cmds, stdin=None, stdout=None, **kw):
     if err:
         raise CalledProcessError([cmds, kw], err, None)
 
+
 def unchecked_pipeline(cmds, stdin=None, stdout=None, **kw):
     """Run a list of commands pipelined together, returns zero if all succeed,
     otherwise the first nonzero return code if any fail.
@@ -118,7 +115,7 @@ def unchecked_pipeline(cmds, stdin=None, stdout=None, **kw):
     log.debug("Running %s" % ' | '.join(map(str, cmds)))
     pipes = []
     final = len(cmds) - 1
-    for i,cmd in enumerate(cmds):
+    for i, cmd in enumerate(cmds):
         _stdin  = stdin  if i == 0     else pipes[-1].stdout
         _stdout = stdout if i == final else subprocess.PIPE
         pipes.append(subprocess.Popen(cmd, stdin=_stdin, stdout=_stdout, **kw))
@@ -128,6 +125,7 @@ def unchecked_pipeline(cmds, stdin=None, stdout=None, **kw):
     rets = [ p.wait() for p in pipes ]
     log.debug("Subprocesses returned (%s)" % ','.join(map(str, rets)))
     return list(filter(None, rets))[0] if any(rets) else 0
+
 
 def backtick(*args, **kwargs):
     """Call a process and return its output, ignoring return code.
@@ -176,7 +174,7 @@ def checked_backtick(*args, **kwargs):
 
     """
     cmd = args[0]
-    if type(cmd) == type('') and 'shell' not in kwargs:
+    if isinstance(cmd, str) and 'shell' not in kwargs:
         cmd = shlex.split(cmd)
 
     sp_kwargs = kwargs.copy()
@@ -214,6 +212,7 @@ def unslurp(filename, contents):
     """Write a string to a file."""
     with open(filename, 'w') as fh:
         fh.write(contents)
+
 
 def atomic_unslurp(filename, contents, mode=0o644):
     """Write contents to a file, making sure a half-written file is never
@@ -261,8 +260,8 @@ def find_files(filename, paths=None):
 
 
 def super_unpack(*compressed_files):
-    '''Extracts compressed files, calling the appropriate expansion
-    program based on the file extension.'''
+    """Extracts compressed files, calling the appropriate expansion
+    program based on the file extension."""
 
     handlers = [
         ('.tar.bz2',  'tar xjf %s'),
@@ -329,9 +328,9 @@ def safe_make_backup(filename, move=True):
         else:
             shutil.copy(filename, newname)
     except EnvironmentError as err:
-        if err.errno == errno.ENOENT: # no file to back up
+        if err.errno == errno.ENOENT:  # no file to back up
             pass
-        elif "are the same file" in str(err): # file already backed up
+        elif "are the same file" in str(err):  # file already backed up
             pass
         else:
             raise
@@ -340,9 +339,9 @@ def safe_make_backup(filename, move=True):
 # original from rsvprobe.py by Marco Mambelli
 def which(program):
     """Python replacement for which"""
-    def is_exe(fpath):
-        "is a regular file and is executable"
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+    def is_exe(f_path):
+        """is a regular file and is executable"""
+        return os.path.isfile(f_path) and os.access(f_path, os.X_OK)
     fpath, _ = os.path.split(program)
     if fpath:
         if is_exe(program):
@@ -445,6 +444,7 @@ def is_url(location):
 # Functions for manipulating a directory stack in the style of bash
 # pushd/popd.
 __dir_stack = []
+
 
 def pushd(new_dir):
     """Change the current working directory to `new_dir`, and push the

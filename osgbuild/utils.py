@@ -1,6 +1,7 @@
 """utilities for osg-build"""
 from __future__ import absolute_import
 from __future__ import print_function
+import contextlib
 import errno
 try:
     from itertools import izip_longest as zip_longest
@@ -514,3 +515,11 @@ def get_local_machine_release():
         return int(re.search(r"\d+", dver).group(0))
     except AttributeError:  # no match
         return 0
+
+
+@contextlib.contextmanager
+def chdir(directory):
+    olddir = os.getcwd()
+    os.chdir(directory)
+    yield
+    os.chdir(olddir)

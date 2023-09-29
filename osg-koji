@@ -48,10 +48,6 @@ You must manually copy your certs:
     chmod 0600 %(new_client_cert_path)s
 
 where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
-
-If you wish to use grid proxy authentication, make a symlink from
-%(new_client_cert_path)s to your proxy. If using voms-proxy-init, be sure to
-request an RFC-style proxy (pass -rfc).
 """
 
 
@@ -73,14 +69,6 @@ def setup_parse_args(args):
     parser.add_option(
         "-k", "--userkey", "--user-key", dest="user_key", metavar="FILE",
         help="Path to user private key file. Default: %default")
-
-    parser.add_option(
-        "--proxy", action="store_true", dest="proxy",
-        help="Use a grid proxy for authentication. Default: ask")
-
-    parser.add_option(
-        "--no-proxy", action="store_false", dest="proxy",
-        help="Do not use a grid proxy for authentication. Default: ask")
 
     parser.add_option(
         "--write-client-conf", action="store_true",
@@ -195,84 +183,42 @@ def create_client_cert_from_cert_and_key(new_client_cert_path, user_cert, user_k
     os.system("sed -i -e 's/\015$//g' %s" % shell_quote(new_client_cert_path))
 
 
-@with_safe_umask
-def create_client_symlink_to_proxy(new_client_cert_path):
-    """Create a symlink at `new_client_cert_path` to the expected grid proxy
-    location for this user.
-    """
-    safe_make_backup(new_client_cert_path)
-    proxy_filename = '/tmp/x509up_u%d' % os.getuid()
-    try:
-        os.symlink(proxy_filename, new_client_cert_path)
-    except EnvironmentError as err:
-        raise Error("Unable to create symlink: %s" % err)
-
-
 def setup_koji_client_cert(user_cert, user_key, proxy):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, DEFAULT_CLIENT_CERT_FILE)
 
-    if proxy is None:
-        # no value specified for 'proxy', so ask interactively
-        if (os.path.lexists(new_client_cert_path) and
-                not ask_yn("""
+    if (os.path.lexists(new_client_cert_path) and
+            not ask_yn("""
 Client certificate file '%s' already exists.
 Do you want to recreate it now? Enter yes if you have trouble logging in via
-the command-line tools, if you got a new certificate, or want to switch to
-using a grid certificate/key pair instead of a grid proxy or vice versa.
+the command-line tools or if you got a new certificate.
 """ % new_client_cert_path)):
 
-            print("Not writing client cert file " + new_client_cert_path)
-            return
+        print("Not writing client cert file " + new_client_cert_path)
+        return
 
-        if (os.path.exists(KOJI_USER_CONFIG_DIR) and
-                (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
-                 not os.path.samefile(KOJI_USER_CONFIG_DIR,
-                                      OSG_KOJI_USER_CONFIG_DIR)) and
-                os.path.isfile(OLD_CLIENT_CERT_FILE)):
+    if (os.path.exists(KOJI_USER_CONFIG_DIR) and
+            (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
+             not os.path.samefile(KOJI_USER_CONFIG_DIR,
+                                  OSG_KOJI_USER_CONFIG_DIR)) and
+            os.path.isfile(OLD_CLIENT_CERT_FILE)):
 
-            if ask_yn("""
+        if ask_yn("""
 You already have a client certificate at '%s'.
 Reuse that file?
 """ % OLD_CLIENT_CERT_FILE):
-                copy_old_client_cert(new_client_cert_path)
-                return
-
-        if ask_yn("""
-Symlink to expected grid proxy location? Doing so means you can use a grid
-proxy (from grid-proxy-init or voms-proxy-init) for authentication and
-thereby not need to type your password in as often.
-"""):
-            create_client_symlink_to_proxy(new_client_cert_path)
-            print("Proxy symlink created.")
+            copy_old_client_cert(new_client_cert_path)
             return
 
-        # if we get here, there's no old cert to copy
-        if os.path.isfile(user_cert) and os.path.isfile(user_key):
-            create_client_cert_from_cert_and_key(new_client_cert_path,
-                                                 user_cert, user_key)
-            print("Created %s from %s and %s" % (new_client_cert_path,
-                                                 user_cert, user_key))
-            return
-
-        # if we get here, nothing worked
-        print(MANUAL_CERT_INSTALL_MSG_TEMPLATE % locals())
-        sys.exit(1)
-    elif proxy is True:
-        create_client_symlink_to_proxy(new_client_cert_path)
-        print("Proxy symlink created.")
-    elif proxy is False:
-        if os.path.isfile(user_cert) and os.path.isfile(user_key):
-            create_client_cert_from_cert_and_key(new_client_cert_path,
-                                                 user_cert, user_key)
-            print("Created %s from %s and %s" % (new_client_cert_path,
-                                                 user_cert, user_key))
-            return
-        # if we get here, nothing worked
-        print(MANUAL_CERT_INSTALL_MSG_TEMPLATE % locals())
-        sys.exit(1)
-    else:
-        raise ValueError("Unexpected value for `proxy`: %s" % proxy)
+    if os.path.isfile(user_cert) and os.path.isfile(user_key):
+        create_client_cert_from_cert_and_key(new_client_cert_path,
+                                             user_cert, user_key)
+        print("Created %s from %s and %s" % (new_client_cert_path,
+                                             user_cert, user_key))
+        return
+    # if we get here, nothing worked
+    print(MANUAL_CERT_INSTALL_MSG_TEMPLATE % locals())
+    sys.exit(1)
 
 
 def run_setup(options):
@@ -318,7 +264,8 @@ def verify_koji_config(config_file):
             # lexists() is True for a broken symlink, exists() is False
             target = os.readlink(fullpath)
             print("%s -> %s is a broken symlink.\n"
-                  "You may need to run grid-proxy-init before doing authenticated operations."
+                  "Note: grid certificates no longer function; if you were using them before,\n"
+                  "please re-run osg-koji setup."
                   % (fullpath, target),
                   file=sys.stderr)
     return koji_config
@@ -358,10 +305,8 @@ def main(argv=None):
 Setup is done. You may verify that you can log in via the command-line
 tools by running:
 
-    %s list-permissions --mine
+    %s hello
 
-If you authenticate with a proxy, be sure to have a valid one first.
-If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
 """ % (PROGRAM_NAME))
 
             elif argv[1] == "help":

@@ -162,7 +162,7 @@ you should say yes.
             shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
                         new_koji_config_path)
     else:
-        shutil.copy(find_file("osg-koji-home.conf", DATA_FILE_SEARCH_PATH),
+        shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
                     new_koji_config_path)
 
 

@@ -1,6 +1,7 @@
 """utilities for osg-build"""
 from __future__ import absolute_import
 from __future__ import print_function
+import contextlib
 import errno
 try:
     from itertools import izip_longest as zip_longest
@@ -405,12 +406,26 @@ class safelist(list):
 
 
 def get_screen_columns():
+    # type: () -> int
     """Return the number of columns in the screen"""
+    default = 80
     try:
-        return int(os.environ.get('COLUMNS', backtick("stty size").split()[1])) or 80
+        columns = int(os.environ.get('COLUMNS', backtick("stty size").split()[1]))
+        if columns < 10:
+            columns = default
     except TypeError:
-        return 80
+        columns = default
+    return columns
 
+
+def print_line(file=None):
+    """Print a line the width of the screen (minus 1) so it doesn't cause an
+    extra line break
+
+    """
+    if not file:
+        file = sys.stdout
+    print("-" * (get_screen_columns() - 1), file=file)
 
 
 def print_table(columns_by_header):
@@ -419,7 +434,7 @@ def print_table(columns_by_header):
     field_width = int(screen_columns / len(columns_by_header))
     columns = []
     for entry in sorted(columns_by_header):
-        columns.append([entry, '---'] + sorted(columns_by_header[entry]))
+        columns.append([entry, '-' * len(entry)] + sorted(columns_by_header[entry]))
     for columns_in_row in zip_longest(fillvalue='', *columns):
         for col in columns_in_row:
             printf("%-*s", field_width - 1, col, end=' ')
@@ -500,3 +515,11 @@ def get_local_machine_release():
         return int(re.search(r"\d+", dver).group(0))
     except AttributeError:  # no match
         return 0
+
+
+@contextlib.contextmanager
+def chdir(directory):
+    olddir = os.getcwd()
+    os.chdir(directory)
+    yield
+    os.chdir(olddir)

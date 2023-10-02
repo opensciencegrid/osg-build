@@ -8,6 +8,7 @@ from optparse import OptionParser
 
 from osgbuild.constants import (
     DATA_FILE_SEARCH_PATH,
+    DEFAULT_AUTHTYPE,
     KOJI_USER_CONFIG_DIR,     # old koji config dir
     OSG_KOJI_USER_CONFIG_DIR) # new koji config dir (created by this script)
 from osgbuild.utils import (
@@ -25,7 +26,6 @@ OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
 GLOBUS_DIR = os.path.expanduser("~/.globus")
 KOJI_CONFIG_FILE = "config"
 DEFAULT_CLIENT_CERT_FILE = "client.crt"
-DEFAULT_AUTHTYPE = "ssl"
 
 PROGRAM_NAME = os.path.basename(sys.argv[0])
 

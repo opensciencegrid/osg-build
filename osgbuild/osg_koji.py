@@ -50,6 +50,17 @@ You must manually copy your certs:
 where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
 """
 
+KERBEROS_AUTH_BLOCK = """
+; configuration for Kerberos/GSSAPI authentication
+authtype = kerberos
+"""
+
+SSL_AUTH_BLOCK = """
+; configuration for SSL authentication
+authtype = ssl
+; client certificate
+cert = ~/.osg-koji/client.crt
+"""
 
 class RunSetupError(Error):
     """Some sort of error where we suggest that the user run `osg-koji setup`"""
@@ -94,13 +105,26 @@ def setup_parse_args(args):
         help="Do not overwrite the server CA certs bundle. Default: overwrite"
     )
 
+    parser.add_option(
+        "--kerberos", action="store_const", const="kerberos", dest="authtype",
+        help="Configure Koji for Kerberos authentication" +
+             (" (default)" if DEFAULT_AUTHTYPE == "kerberos" else ""),
+    )
+
+    parser.add_option(
+        "--ssl", action="store_const", const="ssl", dest="authtype",
+        help="Configure Koji for SSL authentication" +
+             (" (default)" if DEFAULT_AUTHTYPE == "ssl" else ""),
+    )
+
     parser.set_defaults(
         user_cert=os.path.join(GLOBUS_DIR, "usercert.pem"),
         user_key=os.path.join(GLOBUS_DIR, "userkey.pem"),
         proxy=None,
         write_client_conf=None,
         dot_koji_symlink=None,
-        server_cert=True
+        server_cert=True,
+        authtype=DEFAULT_AUTHTYPE,
     )
 
     options = parser.parse_args(args)[0]
@@ -126,8 +150,17 @@ def get_openssl_version():
     return _openssl_version
 
 
-def setup_koji_config_file(write_client_conf):
+def setup_koji_config_file(write_client_conf, authtype):
     """Create the koji config file (if needed)."""
+    def _append_auth():
+        with open(new_koji_config_path, "a") as conf_file:
+            if authtype == "kerberos":
+                conf_file.write(KERBEROS_AUTH_BLOCK)
+            elif authtype == "ssl":
+                conf_file.write(SSL_AUTH_BLOCK)
+            else:
+                raise ValueError(f"Invalid authtype {authtype}")
+
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
                                         KOJI_CONFIG_FILE)
     if write_client_conf is False:
@@ -143,9 +176,11 @@ you should say yes.
             safe_make_backup(new_koji_config_path)
             shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
                         new_koji_config_path)
+            _append_auth()
     else:
         shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
                     new_koji_config_path)
+        _append_auth()
 
 
 def with_safe_umask(function_to_wrap):
@@ -223,10 +258,11 @@ Reuse that file?
 
 def run_setup(options):
     """Set up the koji config dir"""
-    user_cert, user_key = options.user_cert, options.user_key
     safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
-    setup_koji_config_file(options.write_client_conf)
-    setup_koji_client_cert(user_cert, user_key, options.proxy)
+    setup_koji_config_file(options.write_client_conf, options.authtype)
+    if options.authtype == "ssl":
+        user_cert, user_key = options.user_cert, options.user_key
+        setup_koji_client_cert(user_cert, user_key, options.proxy)
 
     if not os.path.exists(KOJI_USER_CONFIG_DIR):
         if (options.dot_koji_symlink or

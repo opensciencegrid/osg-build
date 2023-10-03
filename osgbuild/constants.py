@@ -17,7 +17,7 @@ KOJI_CLIENT_CERT = os.path.join(OSG_KOJI_USER_CONFIG_DIR, "client.crt")
 
 KOJI_CONF = "osg-koji.conf"
 DATA_DIR = "/usr/share/osg-build"
-DEFAULT_AUTHTYPE = "ssl"
+DEFAULT_AUTHTYPE = "kerberos"
 
 KOJI_HUB = "https://koji.opensciencegrid.org"
 KOJI_WEB = "https://koji.opensciencegrid.org"

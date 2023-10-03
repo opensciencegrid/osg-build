@@ -350,11 +350,8 @@ def run_koji(args=None, use_exec=False):
         raise
 
 
-def main(argv=None):
-    "Main function"
-    if argv is None:
-        argv = sys.argv
-
+def main(argv, use_exec=False):
+    """Main function"""
     # Kind of a hack
     if os.path.exists(CSL_KOJI_DIR):
         os.environ['PATH'] = (os.path.join(CSL_KOJI_DIR, "cli")
@@ -399,7 +396,7 @@ If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
                     authtype = DEFAULT_AUTHTYPE
                 args = ["--config=" + config_file,
                         "--authtype=%s" % authtype] + argv[1:]
-                run_koji(args=args, use_exec=True)
+                return run_koji(args=args, use_exec=use_exec)
         else:
             run_koji()
             print(EXTRA_HELP)
@@ -421,5 +418,6 @@ If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
 
     return 0
 
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv, use_exec=True))

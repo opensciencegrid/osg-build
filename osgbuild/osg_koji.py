@@ -114,7 +114,6 @@ def setup_parse_args(args):
     parser.set_defaults(
         user_cert=os.path.join(GLOBUS_DIR, "usercert.pem"),
         user_key=os.path.join(GLOBUS_DIR, "userkey.pem"),
-        proxy=None,
         write_client_conf=None,
         dot_koji_symlink=None,
         authtype=DEFAULT_AUTHTYPE,
@@ -193,7 +192,7 @@ def create_client_cert_from_cert_and_key(new_client_cert_path, user_cert, user_k
     os.system("sed -i -e 's/\015$//g' %s" % shell_quote(new_client_cert_path))
 
 
-def setup_koji_client_cert(user_cert, user_key, proxy):
+def setup_koji_client_cert(user_cert, user_key):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, DEFAULT_CLIENT_CERT_FILE)
 
@@ -237,7 +236,7 @@ def run_setup(options):
     setup_koji_config_file(options.write_client_conf, options.authtype)
     if options.authtype == "ssl":
         user_cert, user_key = options.user_cert, options.user_key
-        setup_koji_client_cert(user_cert, user_key, options.proxy)
+        setup_koji_client_cert(user_cert, user_key)
 
     if not os.path.exists(KOJI_USER_CONFIG_DIR):
         if (options.dot_koji_symlink or

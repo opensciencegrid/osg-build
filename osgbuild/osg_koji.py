@@ -325,8 +325,7 @@ tools by running:
                 elif os.path.exists(KOJI_USER_CONFIG_DIR):
                     config_dir = KOJI_USER_CONFIG_DIR
                 else:
-                    raise Error("No koji config directory found.\n"
-                                + RUN_SETUP_MSG)
+                    raise RunSetupError("No Koji config directory found")
                 config_file = os.path.join(config_dir, KOJI_CONFIG_FILE)
                 koji_config = verify_koji_config(config_file)
                 try:
@@ -345,11 +344,11 @@ tools by running:
         print("Interrupted", file=sys.stderr)
         return 3
     except RunSetupError as err:
-        print(str(err), file=sys.stderr)
+        print(err, file=sys.stderr)
         print(RUN_SETUP_MSG, file=sys.stderr)
         return 1
     except Error as err:
-        print(str(err), file=sys.stderr)
+        print(err, file=sys.stderr)
         return 1
     except Exception as err:
         print("Unhandled exception: " + str(err), file=sys.stderr)

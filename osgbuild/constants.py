@@ -77,7 +77,6 @@ DEFAULT_BUILDOPTS_COMMON = {
     'full_extract': False,
     'getfiles': False,
     'koji_backend': None,
-    'kojilogin': None,
     'mock_clean': True,
     'mock_config': None,
     'mock_config_from_koji': None,

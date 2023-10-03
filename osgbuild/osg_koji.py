@@ -291,11 +291,8 @@ def run_koji(args=None, use_exec=False):
         raise
 
 
-def main(argv=None):
-    "Main function"
-    if argv is None:
-        argv = sys.argv
-
+def main(argv, use_exec=False):
+    """Main function"""
     try:
         if len(argv) > 1:
             if argv[1] == "setup":
@@ -328,7 +325,7 @@ tools by running:
                     authtype = DEFAULT_AUTHTYPE
                 args = ["--config=" + config_file,
                         "--authtype=%s" % authtype] + argv[1:]
-                run_koji(args=args, use_exec=True)
+                return run_koji(args=args, use_exec=use_exec)
         else:
             run_koji()
             print(EXTRA_HELP)
@@ -350,5 +347,6 @@ tools by running:
 
     return 0
 
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv, use_exec=True))

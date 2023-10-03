@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+import os, sys
+from osgbuild import osg_koji
+
+sys.exit(osg_koji.main(sys.argv, use_exec=True))

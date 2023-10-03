@@ -100,12 +100,6 @@ def setup_parse_args(args):
         help="Do not create a ~/.koji -> ~/.osg-koji symlink. Default: ask")
 
     parser.add_option(
-        "--no-server-cert", action="store_false",
-        dest="server_cert",
-        help="Do not overwrite the server CA certs bundle. Default: overwrite"
-    )
-
-    parser.add_option(
         "--kerberos", action="store_const", const="kerberos", dest="authtype",
         help="Configure Koji for Kerberos authentication" +
              (" (default)" if DEFAULT_AUTHTYPE == "kerberos" else ""),
@@ -123,7 +117,6 @@ def setup_parse_args(args):
         proxy=None,
         write_client_conf=None,
         dot_koji_symlink=None,
-        server_cert=True,
         authtype=DEFAULT_AUTHTYPE,
     )
 

@@ -125,24 +125,6 @@ def setup_parse_args(args):
     return options
 
 
-_openssl_version = None  # pylint: disable=invalid-name
-def get_openssl_version():
-    """Return the version of OpenSSL as a (major, minor, release) tuple"""
-    global _openssl_version  # pylint: disable=global-statement,invalid-name
-
-    if _openssl_version is None:
-        version_output = backtick("openssl version")
-        try:
-            version = version_output.strip().split(' ')[1]
-            major, minor, release = version.split('.', 2)
-            major, minor = int(major), int(minor)
-            _openssl_version = (major, minor, release)
-        except ValueError:
-            print("openssl version returned unexpected output: '%s'"
-                  % version_output)
-    return _openssl_version
-
-
 def setup_koji_config_file(write_client_conf, authtype):
     """Create the koji config file (if needed)."""
     def _append_auth():

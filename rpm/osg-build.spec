@@ -139,7 +139,7 @@ fi
 %{python_sitelib}/osgbuild/clientcert.py*
 %{python_sitelib}/osgbuild/kojiinter.py*
 %{python_sitelib}/osgbuild/promoter.py*
-%{_datadir}/%{name}/osg-koji.conf
+%{_datadir}/%{name}/osg-koji.conf.in
 %{_datadir}/%{name}/promoter.ini
 
 

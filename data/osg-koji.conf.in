@@ -9,5 +9,7 @@ server = https://%(koji_hub)s/kojihub
 weburl = https://%(koji_web)s/koji
 ;url for koji file access
 topurl = https://%(koji_hub)s/kojifiles
-;certificate of the CA that issued the HTTP server certificate
-serverca = /etc/pki/tls/certs/ca-bundle.crt
+;certificate bundle containing the cert of the CA that issued the HTTPS server certificate
+serverca = ${SERVERCA}
+
+${AUTH_BLOCK}

@@ -43,8 +43,7 @@ def get_koji_config_file():
 
     if not __koji_config_file:
         config_file = (utils.find_file("config", [OSG_KOJI_USER_CONFIG_DIR,
-                                                  KOJI_USER_CONFIG_DIR]) or
-                       utils.find_file(KOJI_CONF, DATA_FILE_SEARCH_PATH))
+                                                  KOJI_USER_CONFIG_DIR]))
         if not config_file:
             raise KojiError("Can't find Koji config file")
         __koji_config_file = config_file

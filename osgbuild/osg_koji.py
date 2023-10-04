@@ -2,6 +2,7 @@
 import configparser
 import os
 import shutil
+from string import Template
 import sys
 
 from optparse import OptionParser
@@ -25,6 +26,9 @@ from osgbuild import kojiinter
 OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
 GLOBUS_DIR = os.path.expanduser("~/.globus")
 KOJI_CONFIG_FILE = "config"
+KOJI_CONFIG_TEMPLATE = "osg-koji.conf.in"
+SERVERCA_REDHAT = "/etc/pki/tls/certs/ca-bundle.crt"
+SERVERCA_UBUNTU = "/etc/ssl/certs"
 DEFAULT_CLIENT_CERT_FILE = "client.crt"
 
 PROGRAM_NAME = os.path.basename(sys.argv[0])
@@ -124,43 +128,54 @@ def setup_parse_args(args):
     return options
 
 
+def make_config_text(authtype):
+    template_path = find_file(KOJI_CONFIG_TEMPLATE, DATA_FILE_SEARCH_PATH)
+    if os.path.exists(SERVERCA_REDHAT):
+        serverca = SERVERCA_REDHAT
+    elif os.path.exists(SERVERCA_UBUNTU):
+        serverca = SERVERCA_UBUNTU
+    else:
+        raise Error("System CA certificates bundle not found (looked in %s and %s)" % (SERVERCA_UBUNTU, SERVERCA_REDHAT))
+
+    if authtype == "kerberos":
+        print("Configuring the Koji client for Kerberos auth.")
+        print("If you want to configure SSL auth instead (not recommended),")
+        print("re-run this program with --ssl.")
+        auth_block = KERBEROS_AUTH_BLOCK
+    elif authtype == "ssl":
+        print("Configuring the Koji client for SSL auth.")
+        print("If you want to configure Kerberos auth instead (recommended),")
+        print("re-run this program with --kerberos.")
+        auth_block = SSL_AUTH_BLOCK
+    else:
+        raise ValueError(f"Invalid authtype {authtype}")
+
+    with open(template_path, "r") as template_fh:
+        config_text = Template(template_fh.read()).safe_substitute({
+            "SERVERCA": serverca,
+            "AUTH_BLOCK": auth_block,
+        })
+        return config_text
+
+
 def setup_koji_config_file(write_client_conf, authtype):
     """Create the koji config file (if needed)."""
-    def _append_auth():
-        with open(new_koji_config_path, "a") as conf_file:
-            if authtype == "kerberos":
-                print("Configuring the Koji client for Kerberos auth.")
-                print("If you want to configure SSL auth instead (not recommended),")
-                print("re-run this program with --ssl.")
-                conf_file.write(KERBEROS_AUTH_BLOCK)
-            elif authtype == "ssl":
-                print("Configuring the Koji client for SSL auth.")
-                print("If you want to configure Kerberos auth instead (recommended),")
-                print("re-run this program with --kerberos.")
-                conf_file.write(SSL_AUTH_BLOCK)
-            else:
-                raise ValueError(f"Invalid authtype {authtype}")
-
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
                                         KOJI_CONFIG_FILE)
-    if write_client_conf is False:
-        return
-    elif os.path.exists(new_koji_config_path):
-        if (write_client_conf or
-                ask_yn("""\
+    if os.path.exists(new_koji_config_path):
+        if write_client_conf is False:
+            return
+        if write_client_conf is None and not ask_yn("""\
 Koji configuration file '%s' already exists.
 Overwrite it with a new config file? Unless you have made changes to the file,
 you should say yes.
-""" % new_koji_config_path)):
+""" % new_koji_config_path):
+            return
+        safe_make_backup(new_koji_config_path, simple_suffix=True)
 
-            safe_make_backup(new_koji_config_path)
-            shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
-                        new_koji_config_path)
-            _append_auth()
-    else:
-        shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
-                    new_koji_config_path)
-        _append_auth()
+    config_text = make_config_text(authtype)
+    with open(new_koji_config_path, "w") as config_fh:
+        config_fh.write(config_text)
 
 
 def with_safe_umask(function_to_wrap):

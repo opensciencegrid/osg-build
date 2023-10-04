@@ -86,19 +86,6 @@ def get_koji_cmd():
         raise KojiError("'osg-koji' not found")
 
 
-def get_cn():
-    """Return the user's koji login (their CN)"""
-    # TODO This is gonna stop working when we use Kerberos
-    client_cert = KOJI_CLIENT_CERT
-    try:
-        client_cert = os.path.expanduser(
-            get_koji_config().get("koji", "cert")
-        )
-    except KojiError:
-        pass
-    return clientcert.ClientCert(client_cert).first_commonname
-
-
 def download_koji_file(task_id, filename, destdir):
     """Download a the file 'filename' for task number 'task_id' and place it
     in destdir/task_id/filename

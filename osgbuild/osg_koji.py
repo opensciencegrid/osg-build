@@ -309,13 +309,13 @@ def run_koji(args=None, use_exec=False):
 
 def main(argv, use_exec=False):
     """Main function"""
+    koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
     try:
         if len(argv) > 1:
             if argv[1] == "setup":
                 options = setup_parse_args(argv[2:])
                 run_setup(options)
-                config_file = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
-                koji_config = verify_koji_config(config_file)
+                koji_config = verify_koji_config(koji_config_path)
                 try:
                     authtype = koji_config.get("koji", "authtype")
                 except configparser.NoOptionError:
@@ -336,19 +336,14 @@ You may need to run `kinit` before running the above command.
                 run_koji(args=argv[1:])
                 print(EXTRA_HELP)
             else:
-                if os.path.exists(OSG_KOJI_USER_CONFIG_DIR):
-                    config_dir = OSG_KOJI_USER_CONFIG_DIR
-                elif os.path.exists(KOJI_USER_CONFIG_DIR):
-                    config_dir = KOJI_USER_CONFIG_DIR
-                else:
-                    raise RunSetupError("No Koji config directory found")
-                config_file = os.path.join(config_dir, KOJI_CONFIG_FILE)
-                koji_config = verify_koji_config(config_file)
+                if not os.path.exists(koji_config_path):
+                    raise RunSetupError(f"No Koji config found at {koji_config_path}")
+                koji_config = verify_koji_config(koji_config_path)
                 try:
                     authtype = koji_config.get("koji", "authtype")
                 except configparser.NoOptionError:
                     authtype = DEFAULT_AUTHTYPE
-                args = ["--config=" + config_file,
+                args = ["--config=" + koji_config_path,
                         "--authtype=%s" % authtype] + argv[1:]
                 return run_koji(args=args, use_exec=use_exec)
         else:

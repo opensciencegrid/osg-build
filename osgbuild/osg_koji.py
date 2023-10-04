@@ -129,8 +129,14 @@ def setup_koji_config_file(write_client_conf, authtype):
     def _append_auth():
         with open(new_koji_config_path, "a") as conf_file:
             if authtype == "kerberos":
+                print("Configuring the Koji client for Kerberos auth.")
+                print("If you want to configure SSL auth instead (not recommended),")
+                print("re-run this program with --ssl.")
                 conf_file.write(KERBEROS_AUTH_BLOCK)
             elif authtype == "ssl":
+                print("Configuring the Koji client for SSL auth.")
+                print("If you want to configure Kerberos auth instead (recommended),")
+                print("re-run this program with --kerberos.")
                 conf_file.write(SSL_AUTH_BLOCK)
             else:
                 raise ValueError(f"Invalid authtype {authtype}")
@@ -308,6 +314,12 @@ def main(argv, use_exec=False):
             if argv[1] == "setup":
                 options = setup_parse_args(argv[2:])
                 run_setup(options)
+                config_file = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
+                koji_config = verify_koji_config(config_file)
+                try:
+                    authtype = koji_config.get("koji", "authtype")
+                except configparser.NoOptionError:
+                    authtype = DEFAULT_AUTHTYPE
                 print("""
 Setup is done. You may verify that you can log in via the command-line
 tools by running:
@@ -315,7 +327,11 @@ tools by running:
     %s hello
 
 """ % (PROGRAM_NAME))
-
+                if authtype == "kerberos":
+                    print("""
+Koji has been configured to use Kerberos auth.
+You may need to run `kinit` before running the above command.
+""")
             elif argv[1] == "help":
                 run_koji(args=argv[1:])
                 print(EXTRA_HELP)

@@ -41,7 +41,7 @@ necessary files in %s.""" % (PROGRAM_NAME, OSG_KOJI_USER_CONFIG_DIR)
 
 EXTRA_HELP = """
 %s adds the following commands:
-	setup                     Initialize the configuration in %s
+        setup                     Initialize the configuration in %s
                                   See "setup --help" for options.
 """ % (PROGRAM_NAME, OSG_KOJI_USER_CONFIG_DIR)
 

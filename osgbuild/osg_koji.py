@@ -344,8 +344,11 @@ def run_koji(args=None, use_exec=False):
         raise
 
 
-def main(argv, use_exec=False):
+def main(argv=None, use_exec=False):
     """Main function"""
+    if argv is None:
+        argv = sys.argv
+
     try:
         if len(argv) > 1:
             if argv[1] == "setup":

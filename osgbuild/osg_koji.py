@@ -322,8 +322,11 @@ def run_koji(args=None, use_exec=False):
         raise
 
 
-def main(argv, use_exec=False):
+def main(argv=None, use_exec=False):
     """Main function"""
+    if argv is None:
+        argv = sys.argv
+
     koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
     try:
         if len(argv) > 1:

@@ -350,8 +350,11 @@ def run_koji(args=None, use_exec=False):
         raise
 
 
-def main(argv, use_exec=False):
+def main(argv=None, use_exec=False):
     """Main function"""
+    if argv is None:
+        argv = sys.argv
+
     # Kind of a hack
     if os.path.exists(CSL_KOJI_DIR):
         os.environ['PATH'] = (os.path.join(CSL_KOJI_DIR, "cli")

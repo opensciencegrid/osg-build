@@ -18,8 +18,8 @@ KOJI_CLIENT_CERT = os.path.join(OSG_KOJI_USER_CONFIG_DIR, "client.crt")
 DATA_DIR = "/usr/share/osg-build"
 DEFAULT_AUTHTYPE = "kerberos"
 
-KOJI_HUB = "https://koji.opensciencegrid.org"
-KOJI_WEB = "https://koji.opensciencegrid.org"
+KOJI_HUB = "https://koji.osg-htc.org"
+KOJI_WEB = "https://koji.osg-htc.org"
 
 DATA_FILE_SEARCH_PATH = [os.path.abspath(os.path.dirname(__file__) + "/../data")]
 if "OSG_LOCATION" in os.environ:

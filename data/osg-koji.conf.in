@@ -1,6 +1,6 @@
 [koji]
 ;configuration for koji cli tool
-koji_hub = koji.opensciencegrid.org
+koji_hub = koji.osg-htc.org
 koji_web = %(koji_hub)s
 
 ;url of XMLRPC server

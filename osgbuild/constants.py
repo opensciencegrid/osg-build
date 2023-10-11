@@ -1,6 +1,5 @@
 """Global constants for osg-build"""
 import os
-import sys
 
 WD_RESULTS = '_build_results'
 WD_PREBUILD = '_final_srpm_contents'
@@ -16,6 +15,8 @@ OSG_KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")
 KOJI_CLIENT_CERT = os.path.join(OSG_KOJI_USER_CONFIG_DIR, "client.crt")
 
 DATA_DIR = "/usr/share/osg-build"
+PROMOTER_INI = 'promoter.ini'
+SIGNING_KEYS_INI = 'signing_keys.ini'
 DEFAULT_AUTHTYPE = "kerberos"
 
 KOJI_HUB = "https://koji.osg-htc.org"
@@ -134,4 +135,3 @@ REPO_HINTS_STATIC = {
 BUGREPORT_EMAIL = "help@osg-htc.org"
 
 BACKGROUND_THRESHOLD = 5
-

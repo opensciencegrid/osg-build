@@ -1,4 +1,5 @@
 """utilities for osg-build"""
+import configparser
 import contextlib
 import errno
 from itertools import zip_longest
@@ -10,9 +11,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import AnyStr
+from typing import Any, AnyStr, Iterable, List, Union
 from datetime import datetime
 
+from . import constants
+from . import error
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +66,40 @@ try:
     shell_quote = shlex.quote
 except AttributeError:
     from pipes import quote as shell_quote
+
+
+class IniConfiguration:
+    def __init__(self,
+                 inifiles: Union[str, Iterable[str]],
+                 parser_class=configparser.RawConfigParser):
+        if not inifiles:
+            raise ValueError("At least one inifile must be provided")
+
+        self.cp = parser_class()
+        self.cp.read(inifiles)
+        if not self.cp.sections:
+            raise error.Error("No configuration could be loaded")
+
+    def config_safe_get(self, section: str, option: str, default=None) -> Any:
+        """Read an option from a config file, returning the default value
+        if the option or section is missing.
+        """
+        try:
+            return self.cp.get(section, option)
+        except (configparser.NoSectionError, configparser.NoOptionError):
+            return default
+
+    def config_safe_get_list(self, section: str, option: str) -> List[str]:
+        """Read an option from a config file and parse it as a comma-or-whitespace-
+        separated list, returning the empty list value if the option or section
+        is missing.
+        """
+        return self._parse_list_str(self.config_safe_get(section, option, ""))
+
+    @staticmethod
+    def _parse_list_str(list_str: str) -> List[str]:
+        # split string on whitespace or commas, removing empty items
+        return list(filter(None, re.split(r'[ ,\t\n]', list_str)))
 
 
 def checked_call(*args, **kwargs):
@@ -232,30 +269,32 @@ def atomic_unslurp(filename, contents, mode=0o644):
     os.chmod(filename, mode)
 
 
-def find_file(filename, paths=None):
+def find_file(filename, paths=None, strict=False):
     """Go through each directory in paths and look for filename in it. Return
     the first match.
 
     """
-    matches = find_files(filename, paths)
+    matches = find_files(filename, paths, strict)
     if matches:
         return matches[0]
     else:
         return None
 
 
-def find_files(filename, paths=None):
+def find_files(filename, paths=None, strict=False):
     """Go through each directory in paths and look for filename in it. Return
     all matches.
 
     """
     matches = []
     if paths is None:
-        paths = sys.path
+        paths = constants.DATA_FILE_SEARCH_PATH
     for p in paths:
         j = os.path.join(p, filename)
         if os.path.isfile(j):
             matches += [j]
+    if not matches and strict:
+        raise error.FileNotFoundInSearchPathError(filename, paths)
     return matches
 
 
@@ -518,9 +557,24 @@ def get_local_machine_release():
         return 0
 
 
+def comma_join(iterable):
+    # type: (Iterable) -> str
+    """Returns the iterable sorted and joined with ', '"""
+    return ", ".join(str(x) for x in sorted(iterable))
+
+
 @contextlib.contextmanager
 def chdir(directory):
     olddir = os.getcwd()
     os.chdir(directory)
     yield
     os.chdir(olddir)
+
+
+def split_nvr(build):
+    """Split an NVR into a (Name, Version, Release) tuple"""
+    match = re.match(r"(?P<name>.+)-(?P<version>[^-]+)-(?P<release>[^-]+)$", build)
+    if match:
+        return match.group('name'), match.group('version'), match.group('release')
+    else:
+        return '', '', ''

@@ -76,17 +76,13 @@ def get_koji_config(config_file=None):
     return __koji_config
 
 
-def get_koji_cmd(use_osg_koji):
+def get_koji_cmd():
     """Get the command used to call koji."""
-    # Use osg-koji wrapper if available and configured.
-    if utils.which("osg-koji") and use_osg_koji:
-        return ["osg-koji"]
-    elif utils.which("koji"):
-        # Not using osg-koji, so we need to find the conf file and do some
-        # checks ourselves.
-        return ["koji", "--config", get_koji_config_file(), "--authtype", "ssl"]
+    which_osg_koji = utils.which("osg-koji")
+    if which_osg_koji:
+        return [which_osg_koji]
     else:
-        raise KojiError("Can't find koji or osg-koji!")
+        raise KojiError("'osg-koji' not found")
 
 
 def get_cn():
@@ -232,7 +228,7 @@ class KojiShellInter(object):
             self.user = user or get_cn()
         else:
             self.user = user or "osgbuild"
-        self.koji_cmd = get_koji_cmd(koji_wrapper)
+        self.koji_cmd = get_koji_cmd()
         self.dry_run = dry_run
 
     def add_pkg(self, tag, package, owner=None):

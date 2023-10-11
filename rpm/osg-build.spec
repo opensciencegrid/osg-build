@@ -1,8 +1,8 @@
 %global betatag .pre
-%global _release 2
+%global _release 1
 
 Name:           osg-build
-Version:        1.99.0
+Version:        1.99.1
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -144,6 +144,10 @@ fi
 
 
 %changelog
+
+* Wed Oct 11 2023 Mátyás Selmeci <matyas@cs.wisc.edu- 1.99.1-0.1.pre
+- Add Kerberos support (SOFTWARE-5696)
+
 * Thu Sep 29 2023  átyás Selmeci <matyas@cs.wisc.edu> - 1.99.0-0.2.pre
 - Merge v1.20.0-1:
     - Allow building from git branches and add branch protection (SOFTWARE-5476)

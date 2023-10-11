@@ -1,4 +1,5 @@
 """utilities for osg-build"""
+import configparser
 import contextlib
 import errno
 from itertools import zip_longest
@@ -10,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import AnyStr
+from typing import Any, AnyStr, Iterable, List, Union
 from datetime import datetime
 
 from . import constants
@@ -65,6 +66,40 @@ try:
     shell_quote = shlex.quote
 except AttributeError:
     from pipes import quote as shell_quote
+
+
+class IniConfiguration:
+    def __init__(self,
+                 inifiles: Union[str, Iterable[str]],
+                 parser_class=configparser.RawConfigParser):
+        if not inifiles:
+            raise ValueError("At least one inifile must be provided")
+
+        self.cp = parser_class()
+        self.cp.read(inifiles)
+        if not self.cp.sections:
+            raise error.Error("No configuration could be loaded")
+
+    def config_safe_get(self, section: str, option: str, default=None) -> Any:
+        """Read an option from a config file, returning the default value
+        if the option or section is missing.
+        """
+        try:
+            return self.cp.get(section, option)
+        except (configparser.NoSectionError, configparser.NoOptionError):
+            return default
+
+    def config_safe_get_list(self, section: str, option: str) -> List[str]:
+        """Read an option from a config file and parse it as a comma-or-whitespace-
+        separated list, returning the empty list value if the option or section
+        is missing.
+        """
+        return self._parse_list_str(self.config_safe_get(section, option, ""))
+
+    @staticmethod
+    def _parse_list_str(list_str: str) -> List[str]:
+        # split string on whitespace or commas, removing empty items
+        return list(filter(None, re.split(r'[ ,\t\n]', list_str)))
 
 
 def checked_call(*args, **kwargs):

@@ -78,7 +78,6 @@ DEFAULT_BUILDOPTS_COMMON = {
     'getfiles': False,
     'koji_backend': None,
     'kojilogin': None,
-    'koji_wrapper': True,
     'mock_clean': True,
     'mock_config': None,
     'mock_config_from_koji': None,

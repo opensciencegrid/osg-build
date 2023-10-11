@@ -444,13 +444,6 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "It is recommended to use the --repo option instead of this when the "
             "desired repo is available")
         koji_group.add_option(
-            "--koji-wrapper", action="store_true", dest="koji_wrapper",
-            help="Use the 'osg-koji' koji wrapper if using the 'shell' backend (default)")
-        koji_group.add_option(
-            "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
-            help="Do not use the 'osg-koji' koji wrapper if using the 'shell' "
-            "backend, even if found")
-        koji_group.add_option(
             "--no-wait", "--nowait", action="store_true", dest="no_wait",
             help="Do not wait for the build to finish")
         koji_group.add_option(

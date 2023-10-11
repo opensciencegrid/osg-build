@@ -207,7 +207,7 @@ def valid_koji_targets():
     if not __koji_targets_cache:
         # HACK
         try:
-            koji_obj = kojiinter.KojiShellInter(dry_run=True, koji_wrapper=True)
+            koji_obj = kojiinter.KojiShellInter(dry_run=True)
             __koji_targets_cache = koji_obj.get_targets()
         except KojiError as err:
             log.warning(str(err))
@@ -411,10 +411,6 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             help="The back end to use for invoking koji. Valid values are: "
             "'shell', 'kojilib'. Default: use kojilib if possible")
         koji_group.add_option(
-            "-k", "--kojilogin", "--koji-login", dest="kojilogin",
-            help="The login you use for koji (most likely your CN, e.g."
-            "'Matyas Selmeci 564109'). Default: what's in ~/.osg-koji/client.crt")
-        koji_group.add_option(
             "--koji-target",
             action="callback",
             callback=parser_targetopts_callback,
@@ -445,13 +441,6 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             " --koji-tag ARG'. "
             "It is recommended to use the --repo option instead of this when the "
             "desired repo is available")
-        koji_group.add_option(
-            "--koji-wrapper", action="store_true", dest="koji_wrapper",
-            help="Use the 'osg-koji' koji wrapper if using the 'shell' backend (default)")
-        koji_group.add_option(
-            "--no-koji-wrapper", action="store_false", dest="koji_wrapper",
-            help="Do not use the 'osg-koji' koji wrapper if using the 'shell' "
-            "backend, even if found")
         koji_group.add_option(
             "--no-wait", "--nowait", action="store_true", dest="no_wait",
             help="Do not wait for the build to finish")

@@ -3,6 +3,7 @@
 
 
 import configparser
+import json
 import logging
 import random
 import re
@@ -42,8 +43,7 @@ def get_koji_config_file():
 
     if not __koji_config_file:
         config_file = (utils.find_file("config", [OSG_KOJI_USER_CONFIG_DIR,
-                                                  KOJI_USER_CONFIG_DIR]) or
-                       utils.find_file(KOJI_CONF, DATA_FILE_SEARCH_PATH))
+                                                  KOJI_USER_CONFIG_DIR]))
         if not config_file:
             raise KojiError("Can't find Koji config file")
         __koji_config_file = config_file
@@ -76,30 +76,13 @@ def get_koji_config(config_file=None):
     return __koji_config
 
 
-def get_koji_cmd(use_osg_koji):
+def get_koji_cmd():
     """Get the command used to call koji."""
-    # Use osg-koji wrapper if available and configured.
-    if utils.which("osg-koji") and use_osg_koji:
-        return ["osg-koji"]
-    elif utils.which("koji"):
-        # Not using osg-koji, so we need to find the conf file and do some
-        # checks ourselves.
-        return ["koji", "--config", get_koji_config_file(), "--authtype", "ssl"]
+    which_osg_koji = utils.which("osg-koji")
+    if which_osg_koji:
+        return [which_osg_koji]
     else:
-        raise KojiError("Can't find koji or osg-koji!")
-
-
-def get_cn():
-    """Return the user's koji login (their CN)"""
-    # TODO This is gonna stop working when we use Kerberos
-    client_cert = KOJI_CLIENT_CERT
-    try:
-        client_cert = os.path.expanduser(
-            get_koji_config().get("koji", "cert")
-        )
-    except KojiError:
-        pass
-    return clientcert.ClientCert(client_cert).first_commonname
+        raise KojiError("'osg-koji' not found")
 
 
 def download_koji_file(task_id, filename, destdir):
@@ -151,19 +134,17 @@ class KojiInter(object):
             log.warning("target-arch ignored on non-scratch builds")
             self.arch_override = None
 
-        self.cn = opts['kojilogin'] or None
-
         if KojiInter.backend is None:
-            if HAVE_KOJILIB and opts.get('koji_backend') != 'shell':
-                log.debug("KojiInter Using KojiLib backend")
-                KojiInter.backend = KojiLibInter(self.cn, opts['dry_run'])
-                KojiInter.backend.read_config_file()
-                KojiInter.backend.init_koji_session()
-            elif not HAVE_KOJILIB and opts['koji_backend'] == 'kojilib':
+            if not HAVE_KOJILIB and opts['koji_backend'] == 'kojilib':
                 raise KojiError("KojiLib backend requested, but can't import it!")
+            elif HAVE_KOJILIB and opts.get('koji_backend') != 'shell':
+                log.debug("KojiInter Using KojiLib backend")
+                KojiInter.backend = KojiLibInter(opts['dry_run'])
             else:
                 log.debug("KojiInter Using shell backend")
-                KojiInter.backend = KojiShellInter(self.cn, opts['dry_run'], opts['koji_wrapper'])
+                KojiInter.backend = KojiShellInter(opts['dry_run'])
+            KojiInter.backend.read_config_file()
+            KojiInter.backend.init_koji_session()
 
         self.target = opts['koji_target']
         self.build_tag, self.dest_tag = KojiInter.backend.get_build_and_dest_tags(self.target)
@@ -227,18 +208,42 @@ class KojiShellInter(object):
     the shell.
 
     """
-    def __init__(self, user=None, dry_run=False, koji_wrapper=False):
-        if not dry_run:
-            self.user = user or get_cn()
-        else:
-            self.user = user or "osgbuild"
-        self.koji_cmd = get_koji_cmd(koji_wrapper)
+    def __init__(self, dry_run=False):
+        self.koji_cmd = get_koji_cmd()
+        self.user = None
+        self.authtype = DEFAULT_AUTHTYPE
+        self.topurl = os.path.join(KOJI_HUB, "kojifiles")
         self.dry_run = dry_run
+
+    def read_config_file(self, config_file=None):
+        # TODO duplication between here and KojiLibInter
+        try:
+            cfg = get_koji_config(config_file)
+            items = dict(cfg.items('koji'))
+        except configparser.Error as err:
+            raise KojiError("Can't read config file from %s: %s" % (config_file, err))
+        for var in ['topurl', 'authtype']:
+            if items.get(var):
+                setattr(self, var, os.path.expanduser(items[var]))
+
+    def init_koji_session(self, login=True):
+        if login and not self.dry_run:
+            self.login_to_koji()
+
+    def login_to_koji(self):
+        log.info("Logging in to koji using %s auth", self.authtype)
+        try:
+            output = utils.checked_backtick(self.koji_cmd + ["call", "--json", "getLoggedInUser"])
+            output_js = json.loads(output)
+            self.user = output_js["name"]
+        except (KeyError, AttributeError, json.JSONDecodeError, utils.CalledProcessError) as err:
+            raise KojiError("Couldn't log in to Koji: %s" % err) from err
 
     def add_pkg(self, tag, package, owner=None):
         if owner is None:
             owner = self.user
-
+        if not self.dry_run and not owner:
+            raise KojiError("Cannot add package without an owner")
         real_package = chop_package_el_suffix(package)
         found = False
         list_pkgs = utils.backtick(self.koji_cmd + ["list-pkgs", "--package", real_package])
@@ -439,7 +444,7 @@ class KojiLibInter(object):
         REPO_STATES = kojilib.REPO_STATES
         TASK_STATES = kojilib.TASK_STATES
 
-    def __init__(self, user=None, dry_run=False):
+    def __init__(self, dry_run=False):
         if not HAVE_KOJILIB:
             raise KojiError("Cannot use KojiLibInter without kojilib!")
 
@@ -448,10 +453,8 @@ class KojiLibInter(object):
         self.kojisession = None
         self.server = os.path.join(KOJI_HUB, "kojihub")
         self.serverca = None
-        if not dry_run:
-            self.user = user or get_cn()
-        else:
-            self.user = user or "osgbuild"
+        self.user = None
+        self.authtype = DEFAULT_AUTHTYPE
         self.weburl = os.path.join(KOJI_WEB, "koji")
         self.topurl = os.path.join(KOJI_WEB, "kojifiles")
         self.dry_run = dry_run
@@ -476,25 +479,36 @@ class KojiLibInter(object):
                 pass
         except configparser.Error as err:
             raise KojiError("Can't read config file from %s: %s" % (config_file, err))
-        for var in ['ca', 'cert', 'server', 'serverca', 'weburl', 'topurl']:
+        for var in ['ca', 'cert', 'server', 'serverca', 'weburl', 'topurl', 'authtype']:
             if items.get(var):
                 setattr(self, var, os.path.expanduser(items[var]))
 
 
     def init_koji_session(self, login=True):
         log.info("Initializing koji session to %s", self.server)
-        self.kojisession = kojilib.ClientSession(self.server, {'user': self.user})
+        self.kojisession = kojilib.ClientSession(self.server, {})
         if login and not self.dry_run:
             self.login_to_koji()
 
 
     def login_to_koji(self):
-        log.info("Logging in to koji as %s", self.user)
+        log.info("Logging in to koji using %s auth", self.authtype)
+        # TODO validate parameters
+        if self.authtype == "ssl":
+            try:
+                self.kojisession.ssl_login(self.cert, self.ca, self.serverca)
+            except Exception as err:
+                raise KojiError("Couldn't do ssl_login: " + str(err))
+        elif self.authtype == "kerberos":
+            try:
+                self.kojisession.gssapi_login()
+            except Exception as err:
+                raise KojiError("Couldn't do gssapi_login: " + str(err))
+        else:
+            raise KojiError("authtype %s not supported; must be either 'kerberos' or 'ssl'" % self.authtype)
         try:
-            self.kojisession.ssl_login(self.cert, self.ca, self.serverca)
-        except Exception as err:
-            raise KojiError("Couldn't do ssl_login: " + str(err))
-        if not self.kojisession.logged_in:
+            self.user = self.kojisession.getLoggedInUser()["name"]
+        except (KeyError, AttributeError):
             raise KojiError("Couldn't log in to koji for unknown reason")
 
 
@@ -502,6 +516,8 @@ class KojiLibInter(object):
     def add_pkg(self, tag, package, owner=None):
         if owner is None:
             owner = self.user
+        if not self.dry_run and not owner:
+            raise KojiError("Cannot add package without an owner")
         tag_obj = self.kojisession.getTag(tag)
         if not tag_obj:
             raise KojiError("Invalid tag %s" % tag)

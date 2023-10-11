@@ -1,0 +1,15 @@
+[koji]
+;configuration for koji cli tool
+koji_hub = koji.osg-htc.org
+koji_web = %(koji_hub)s
+
+;url of XMLRPC server
+server = https://%(koji_hub)s/kojihub
+;url of web interface
+weburl = https://%(koji_web)s/koji
+;url for koji file access
+topurl = https://%(koji_hub)s/kojifiles
+;certificate bundle containing the cert of the CA that issued the HTTPS server certificate
+serverca = ${SERVERCA}
+
+${AUTH_BLOCK}

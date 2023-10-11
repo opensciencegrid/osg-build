@@ -319,9 +319,13 @@ def ask_yn(question):
         return False
 
 
-def safe_make_backup(filename, move=True):
+def safe_make_backup(filename, move=True, simple_suffix=False):
     """Back up a file if it exists (either copy or move)"""
-    newname = filename + datetime.now().strftime(".%y%m%d%H%M%S~")
+    if simple_suffix:
+        suffix = ".bak"
+    else:
+        suffix = datetime.now().strftime(".%y%m%d%H%M%S~")
+    newname = filename + suffix
     try:
         if move:
             os.rename(filename, newname)

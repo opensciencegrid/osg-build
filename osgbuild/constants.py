@@ -15,11 +15,11 @@ KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.koji")
 OSG_KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")
 KOJI_CLIENT_CERT = os.path.join(OSG_KOJI_USER_CONFIG_DIR, "client.crt")
 
-KOJI_CONF = "osg-koji.conf"
 DATA_DIR = "/usr/share/osg-build"
+DEFAULT_AUTHTYPE = "kerberos"
 
-KOJI_HUB = "https://koji.opensciencegrid.org"
-KOJI_WEB = "https://koji.opensciencegrid.org"
+KOJI_HUB = "https://koji.osg-htc.org"
+KOJI_WEB = "https://koji.osg-htc.org"
 
 DATA_FILE_SEARCH_PATH = [os.path.abspath(os.path.dirname(__file__) + "/../data")]
 if "OSG_LOCATION" in os.environ:
@@ -76,8 +76,6 @@ DEFAULT_BUILDOPTS_COMMON = {
     'full_extract': False,
     'getfiles': False,
     'koji_backend': None,
-    'kojilogin': None,
-    'koji_wrapper': True,
     'mock_clean': True,
     'mock_config': None,
     'mock_config_from_koji': None,

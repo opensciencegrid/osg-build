@@ -2,12 +2,14 @@
 import configparser
 import os
 import shutil
+from string import Template
 import sys
 
 from optparse import OptionParser
 
 from osgbuild.constants import (
     DATA_FILE_SEARCH_PATH,
+    DEFAULT_AUTHTYPE,
     KOJI_USER_CONFIG_DIR,     # old koji config dir
     OSG_KOJI_USER_CONFIG_DIR) # new koji config dir (created by this script)
 from osgbuild.utils import (
@@ -24,8 +26,10 @@ from osgbuild import kojiinter
 OLD_CLIENT_CERT_FILE = os.path.join(KOJI_USER_CONFIG_DIR, "client.crt")
 GLOBUS_DIR = os.path.expanduser("~/.globus")
 KOJI_CONFIG_FILE = "config"
+KOJI_CONFIG_TEMPLATE = "osg-koji.conf.in"
+SERVERCA_REDHAT = "/etc/pki/tls/certs/ca-bundle.crt"
+SERVERCA_UBUNTU = "/etc/ssl/certs"
 DEFAULT_CLIENT_CERT_FILE = "client.crt"
-DEFAULT_AUTHTYPE = "ssl"
 
 PROGRAM_NAME = os.path.basename(sys.argv[0])
 
@@ -48,12 +52,20 @@ You must manually copy your certs:
     chmod 0600 %(new_client_cert_path)s
 
 where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
-
-If you wish to use grid proxy authentication, make a symlink from
-%(new_client_cert_path)s to your proxy. If using voms-proxy-init, be sure to
-request an RFC-style proxy (pass -rfc).
 """
 
+KERBEROS_AUTH_BLOCK = """
+; configuration for Kerberos/GSSAPI authentication
+authtype = kerberos
+; specify 'principal' to force using a specific Kerberos principal
+"""
+
+SSL_AUTH_BLOCK = """
+; configuration for SSL authentication
+authtype = ssl
+; client certificate
+cert = ~/.osg-koji/client.crt
+"""
 
 class RunSetupError(Error):
     """Some sort of error where we suggest that the user run `osg-koji setup`"""
@@ -75,14 +87,6 @@ def setup_parse_args(args):
         help="Path to user private key file. Default: %default")
 
     parser.add_option(
-        "--proxy", action="store_true", dest="proxy",
-        help="Use a grid proxy for authentication. Default: ask")
-
-    parser.add_option(
-        "--no-proxy", action="store_false", dest="proxy",
-        help="Do not use a grid proxy for authentication. Default: ask")
-
-    parser.add_option(
         "--write-client-conf", action="store_true",
         help="Overwrite the client config file. Default: ask")
 
@@ -101,18 +105,29 @@ def setup_parse_args(args):
         help="Do not create a ~/.koji -> ~/.osg-koji symlink. Default: ask")
 
     parser.add_option(
-        "--no-server-cert", action="store_false",
-        dest="server_cert",
-        help="Do not overwrite the server CA certs bundle. Default: overwrite"
+        "--kerberos", action="store_const", const="kerberos", dest="authtype",
+        help="Configure Koji for Kerberos authentication" +
+             (" (default)" if DEFAULT_AUTHTYPE == "kerberos" else ""),
+    )
+
+    parser.add_option(
+        "--principal", dest="principal",
+        help="Set the principal to use for Kerberos auth; will use the default if not specified or 'default'"
+    )
+
+    parser.add_option(
+        "--ssl", action="store_const", const="ssl", dest="authtype",
+        help="Configure Koji for SSL authentication" +
+             (" (default)" if DEFAULT_AUTHTYPE == "ssl" else ""),
     )
 
     parser.set_defaults(
         user_cert=os.path.join(GLOBUS_DIR, "usercert.pem"),
         user_key=os.path.join(GLOBUS_DIR, "userkey.pem"),
-        proxy=None,
         write_client_conf=None,
         dot_koji_symlink=None,
-        server_cert=True
+        authtype=DEFAULT_AUTHTYPE,
+        principal=None,
     )
 
     options = parser.parse_args(args)[0]
@@ -120,44 +135,70 @@ def setup_parse_args(args):
     return options
 
 
-_openssl_version = None  # pylint: disable=invalid-name
-def get_openssl_version():
-    """Return the version of OpenSSL as a (major, minor, release) tuple"""
-    global _openssl_version  # pylint: disable=global-statement,invalid-name
+def make_config_text(authtype, principal):
+    template_path = find_file(KOJI_CONFIG_TEMPLATE, DATA_FILE_SEARCH_PATH)
+    if os.path.exists(SERVERCA_REDHAT):
+        serverca = SERVERCA_REDHAT
+    elif os.path.exists(SERVERCA_UBUNTU):
+        serverca = SERVERCA_UBUNTU
+    else:
+        raise Error("System CA certificates bundle not found (looked in %s and %s)" % (SERVERCA_UBUNTU, SERVERCA_REDHAT))
 
-    if _openssl_version is None:
-        version_output = backtick("openssl version")
-        try:
-            version = version_output.strip().split(' ')[1]
-            major, minor, release = version.split('.', 2)
-            major, minor = int(major), int(minor)
-            _openssl_version = (major, minor, release)
-        except ValueError:
-            print("openssl version returned unexpected output: '%s'"
-                  % version_output)
-    return _openssl_version
+    if authtype == "kerberos":
+        print("Configuring the Koji client for Kerberos auth.")
+        print("If you want to configure SSL auth instead (not recommended),")
+        print("re-run this program with --ssl.")
+        auth_block = KERBEROS_AUTH_BLOCK
+
+        if principal is None:
+            # Principal not specified; ask interactively
+            print("")
+            print("Please enter the Kerberos principal you want to use, or just press Enter")
+            print("to use the default principal.")
+            print("")
+            try:
+                principal = input("> ")
+            except EOFError:
+                principal = ""
+
+        if str(principal).lower() not in ["", "none", "default"]:
+            auth_block += f"principal = {principal}\n"
+        else:
+            auth_block += ";principal =\n"
+    elif authtype == "ssl":
+        print("Configuring the Koji client for SSL auth.")
+        print("If you want to configure Kerberos auth instead (recommended),")
+        print("re-run this program with --kerberos.")
+        auth_block = SSL_AUTH_BLOCK
+    else:
+        raise ValueError(f"Invalid authtype {authtype}")
+
+    with open(template_path, "r") as template_fh:
+        config_text = Template(template_fh.read()).safe_substitute({
+            "SERVERCA": serverca,
+            "AUTH_BLOCK": auth_block,
+        })
+        return config_text
 
 
-def setup_koji_config_file(write_client_conf):
+def setup_koji_config_file(write_client_conf, authtype, principal):
     """Create the koji config file (if needed)."""
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
                                         KOJI_CONFIG_FILE)
-    if write_client_conf is False:
-        return
-    elif os.path.exists(new_koji_config_path):
-        if (write_client_conf or
-                ask_yn("""\
+    if os.path.exists(new_koji_config_path):
+        if write_client_conf is False:
+            return
+        if write_client_conf is None and not ask_yn("""\
 Koji configuration file '%s' already exists.
 Overwrite it with a new config file? Unless you have made changes to the file,
 you should say yes.
-""" % new_koji_config_path)):
+""" % new_koji_config_path):
+            return
+        safe_make_backup(new_koji_config_path, simple_suffix=True)
 
-            safe_make_backup(new_koji_config_path)
-            shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
-                        new_koji_config_path)
-    else:
-        shutil.copy(find_file("osg-koji.conf", DATA_FILE_SEARCH_PATH),
-                    new_koji_config_path)
+    config_text = make_config_text(authtype, principal)
+    with open(new_koji_config_path, "w") as config_fh:
+        config_fh.write(config_text)
 
 
 def with_safe_umask(function_to_wrap):
@@ -195,92 +236,51 @@ def create_client_cert_from_cert_and_key(new_client_cert_path, user_cert, user_k
     os.system("sed -i -e 's/\015$//g' %s" % shell_quote(new_client_cert_path))
 
 
-@with_safe_umask
-def create_client_symlink_to_proxy(new_client_cert_path):
-    """Create a symlink at `new_client_cert_path` to the expected grid proxy
-    location for this user.
-    """
-    safe_make_backup(new_client_cert_path)
-    proxy_filename = '/tmp/x509up_u%d' % os.getuid()
-    try:
-        os.symlink(proxy_filename, new_client_cert_path)
-    except EnvironmentError as err:
-        raise Error("Unable to create symlink: %s" % err)
-
-
-def setup_koji_client_cert(user_cert, user_key, proxy):
+def setup_koji_client_cert(user_cert, user_key):
     """Create or copy the client cert file (if needed)."""
     new_client_cert_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, DEFAULT_CLIENT_CERT_FILE)
 
-    if proxy is None:
-        # no value specified for 'proxy', so ask interactively
-        if (os.path.lexists(new_client_cert_path) and
-                not ask_yn("""
+    if (os.path.lexists(new_client_cert_path) and
+            not ask_yn("""
 Client certificate file '%s' already exists.
 Do you want to recreate it now? Enter yes if you have trouble logging in via
-the command-line tools, if you got a new certificate, or want to switch to
-using a grid certificate/key pair instead of a grid proxy or vice versa.
+the command-line tools or if you got a new certificate.
 """ % new_client_cert_path)):
 
-            print("Not writing client cert file " + new_client_cert_path)
-            return
+        print("Not writing client cert file " + new_client_cert_path)
+        return
 
-        if (os.path.exists(KOJI_USER_CONFIG_DIR) and
-                (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
-                 not os.path.samefile(KOJI_USER_CONFIG_DIR,
-                                      OSG_KOJI_USER_CONFIG_DIR)) and
-                os.path.isfile(OLD_CLIENT_CERT_FILE)):
+    if (os.path.exists(KOJI_USER_CONFIG_DIR) and
+            (os.path.isdir(OSG_KOJI_USER_CONFIG_DIR) and
+             not os.path.samefile(KOJI_USER_CONFIG_DIR,
+                                  OSG_KOJI_USER_CONFIG_DIR)) and
+            os.path.isfile(OLD_CLIENT_CERT_FILE)):
 
-            if ask_yn("""
+        if ask_yn("""
 You already have a client certificate at '%s'.
 Reuse that file?
 """ % OLD_CLIENT_CERT_FILE):
-                copy_old_client_cert(new_client_cert_path)
-                return
-
-        if ask_yn("""
-Symlink to expected grid proxy location? Doing so means you can use a grid
-proxy (from grid-proxy-init or voms-proxy-init) for authentication and
-thereby not need to type your password in as often.
-"""):
-            create_client_symlink_to_proxy(new_client_cert_path)
-            print("Proxy symlink created.")
+            copy_old_client_cert(new_client_cert_path)
             return
 
-        # if we get here, there's no old cert to copy
-        if os.path.isfile(user_cert) and os.path.isfile(user_key):
-            create_client_cert_from_cert_and_key(new_client_cert_path,
-                                                 user_cert, user_key)
-            print("Created %s from %s and %s" % (new_client_cert_path,
-                                                 user_cert, user_key))
-            return
-
-        # if we get here, nothing worked
-        print(MANUAL_CERT_INSTALL_MSG_TEMPLATE % locals())
-        sys.exit(1)
-    elif proxy is True:
-        create_client_symlink_to_proxy(new_client_cert_path)
-        print("Proxy symlink created.")
-    elif proxy is False:
-        if os.path.isfile(user_cert) and os.path.isfile(user_key):
-            create_client_cert_from_cert_and_key(new_client_cert_path,
-                                                 user_cert, user_key)
-            print("Created %s from %s and %s" % (new_client_cert_path,
-                                                 user_cert, user_key))
-            return
-        # if we get here, nothing worked
-        print(MANUAL_CERT_INSTALL_MSG_TEMPLATE % locals())
-        sys.exit(1)
-    else:
-        raise ValueError("Unexpected value for `proxy`: %s" % proxy)
+    if os.path.isfile(user_cert) and os.path.isfile(user_key):
+        create_client_cert_from_cert_and_key(new_client_cert_path,
+                                             user_cert, user_key)
+        print("Created %s from %s and %s" % (new_client_cert_path,
+                                             user_cert, user_key))
+        return
+    # if we get here, nothing worked
+    print(MANUAL_CERT_INSTALL_MSG_TEMPLATE % locals())
+    sys.exit(1)
 
 
 def run_setup(options):
     """Set up the koji config dir"""
-    user_cert, user_key = options.user_cert, options.user_key
     safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
-    setup_koji_config_file(options.write_client_conf)
-    setup_koji_client_cert(user_cert, user_key, options.proxy)
+    setup_koji_config_file(options.write_client_conf, options.authtype, options.principal)
+    if options.authtype == "ssl":
+        user_cert, user_key = options.user_cert, options.user_key
+        setup_koji_client_cert(user_cert, user_key)
 
     if not os.path.exists(KOJI_USER_CONFIG_DIR):
         if (options.dot_koji_symlink or
@@ -318,7 +318,8 @@ def verify_koji_config(config_file):
             # lexists() is True for a broken symlink, exists() is False
             target = os.readlink(fullpath)
             print("%s -> %s is a broken symlink.\n"
-                  "You may need to run grid-proxy-init before doing authenticated operations."
+                  "Note: grid certificates no longer function; if you were using them before,\n"
+                  "please re-run osg-koji setup."
                   % (fullpath, target),
                   file=sys.stderr)
     return koji_config
@@ -349,39 +350,41 @@ def main(argv=None, use_exec=False):
     if argv is None:
         argv = sys.argv
 
+    koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR, KOJI_CONFIG_FILE)
     try:
         if len(argv) > 1:
             if argv[1] == "setup":
                 options = setup_parse_args(argv[2:])
                 run_setup(options)
-                print("""
-Setup is done. You may verify that you can log in via the command-line
-tools by running:
-
-    %s list-permissions --mine
-
-If you authenticate with a proxy, be sure to have a valid one first.
-If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
-""" % (PROGRAM_NAME))
-
-            elif argv[1] == "help":
-                run_koji(args=argv[1:])
-                print(EXTRA_HELP)
-            else:
-                if os.path.exists(OSG_KOJI_USER_CONFIG_DIR):
-                    config_dir = OSG_KOJI_USER_CONFIG_DIR
-                elif os.path.exists(KOJI_USER_CONFIG_DIR):
-                    config_dir = KOJI_USER_CONFIG_DIR
-                else:
-                    raise Error("No koji config directory found.\n"
-                                + RUN_SETUP_MSG)
-                config_file = os.path.join(config_dir, KOJI_CONFIG_FILE)
-                koji_config = verify_koji_config(config_file)
+                koji_config = verify_koji_config(koji_config_path)
                 try:
                     authtype = koji_config.get("koji", "authtype")
                 except configparser.NoOptionError:
                     authtype = DEFAULT_AUTHTYPE
-                args = ["--config=" + config_file,
+                print("""
+Setup is done. You may verify that you can log in via the command-line
+tools by running:
+
+    %s hello
+
+""" % (PROGRAM_NAME))
+                if authtype == "kerberos":
+                    print("""\
+Koji has been configured to use Kerberos auth.
+You may need to run `kinit` before running the above command.
+""")
+            elif argv[1] == "help":
+                run_koji(args=argv[1:])
+                print(EXTRA_HELP)
+            else:
+                if not os.path.exists(koji_config_path):
+                    raise RunSetupError(f"No Koji config found at {koji_config_path}")
+                koji_config = verify_koji_config(koji_config_path)
+                try:
+                    authtype = koji_config.get("koji", "authtype")
+                except configparser.NoOptionError:
+                    authtype = DEFAULT_AUTHTYPE
+                args = ["--config=" + koji_config_path,
                         "--authtype=%s" % authtype] + argv[1:]
                 return run_koji(args=args, use_exec=use_exec)
         else:
@@ -393,11 +396,11 @@ If using voms-proxy-init, be sure to request an RFC proxy (pass -rfc).
         print("Interrupted", file=sys.stderr)
         return 3
     except RunSetupError as err:
-        print(str(err), file=sys.stderr)
+        print(err, file=sys.stderr)
         print(RUN_SETUP_MSG, file=sys.stderr)
         return 1
     except Error as err:
-        print(str(err), file=sys.stderr)
+        print(err, file=sys.stderr)
         return 1
     except Exception as err:
         print("Unhandled exception: " + str(err), file=sys.stderr)

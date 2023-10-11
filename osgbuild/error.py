@@ -3,6 +3,7 @@
 import os
 import traceback
 
+
 class Error(Exception):
     """Base class for expected exceptions"""
     def __init__(self, msg, tb=None):

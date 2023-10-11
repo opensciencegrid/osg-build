@@ -1,6 +1,5 @@
 """Global constants for osg-build"""
 import os
-import sys
 
 WD_RESULTS = '_build_results'
 WD_PREBUILD = '_final_srpm_contents'
@@ -136,4 +135,3 @@ REPO_HINTS_STATIC = {
 BUGREPORT_EMAIL = "help@osg-htc.org"
 
 BACKGROUND_THRESHOLD = 5
-

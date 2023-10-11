@@ -7,6 +7,7 @@
 import logging
 from optparse import OptionGroup, OptionParser, OptionValueError
 import re
+import sys
 import tempfile
 import configparser
 

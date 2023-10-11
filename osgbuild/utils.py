@@ -518,9 +518,24 @@ def get_local_machine_release():
         return 0
 
 
+def comma_join(iterable):
+    # type: (Iterable) -> str
+    """Returns the iterable sorted and joined with ', '"""
+    return ", ".join(str(x) for x in sorted(iterable))
+
+
 @contextlib.contextmanager
 def chdir(directory):
     olddir = os.getcwd()
     os.chdir(directory)
     yield
     os.chdir(olddir)
+
+
+def split_nvr(build):
+    """Split an NVR into a (Name, Version, Release) tuple"""
+    match = re.match(r"(?P<name>.+)-(?P<version>[^-]+)-(?P<release>[^-]+)$", build)
+    if match:
+        return match.group('name'), match.group('version'), match.group('release')
+    else:
+        return '', '', ''

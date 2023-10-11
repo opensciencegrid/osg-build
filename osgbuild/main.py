@@ -48,11 +48,11 @@ def main(argv=None):
     vcs = None
 
     if task in ['koji', 'mock']:
-        for dver in buildopts['enabled_dvers']:
-            targetopts = buildopts['targetopts_by_dver'][dver]
+        for build_dver in buildopts['enabled_dvers']:
+            targetopts = buildopts['targetopts_by_dver'][build_dver]
             if kojiinter:
-                targetopts['koji_target'] = targetopts['koji_target'] or target_for_repo_hint(buildopts['repo'], dver)
-                targetopts['koji_tag'] = targetopts['koji_tag'] or tag_for_repo_hint(buildopts['repo'], dver)
+                targetopts['koji_target'] = targetopts['koji_target'] or target_for_repo_hint(buildopts['repo'], build_dver)
+                targetopts['koji_tag'] = targetopts['koji_tag'] or tag_for_repo_hint(buildopts['repo'], build_dver)
     # checks
     if task == 'koji' and buildopts['vcs']:
         # verify working dirs
@@ -91,9 +91,10 @@ def main(argv=None):
     task_ids = []
     task_ids_by_results_dir = dict()
     for pkg in package_dirs:
-        for dver in buildopts['enabled_dvers']:
+        log.info("Performing task %s on package %s", task, pkg if utils.is_url(pkg) else os.path.basename(pkg))
+        for build_dver in buildopts['enabled_dvers']:
             dver_buildopts = buildopts.copy()
-            dver_buildopts.update(buildopts['targetopts_by_dver'][dver])
+            dver_buildopts.update(buildopts['targetopts_by_dver'][build_dver])
 
             mock_obj = None
             koji_obj = None
@@ -191,7 +192,6 @@ def init(argv):
     package_dirs = args[1:]
     if not package_dirs:
         guess = guess_pkg_dir(os.getcwd())
-        log.info("Package dir not specified, using %s", guess)
         package_dirs.append(guess)
 
     return (buildopts, package_dirs, task)

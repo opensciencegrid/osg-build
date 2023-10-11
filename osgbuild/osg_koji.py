@@ -57,6 +57,7 @@ where 'usercert.pem' and 'userkey.pem' are your X.509 public and private keys.
 KERBEROS_AUTH_BLOCK = """
 ; configuration for Kerberos/GSSAPI authentication
 authtype = kerberos
+; specify 'principal' to force using a specific Kerberos principal
 """
 
 SSL_AUTH_BLOCK = """
@@ -110,6 +111,11 @@ def setup_parse_args(args):
     )
 
     parser.add_option(
+        "--principal", dest="principal",
+        help="Set the principal to use for Kerberos auth; will use the default if not specified or 'default'"
+    )
+
+    parser.add_option(
         "--ssl", action="store_const", const="ssl", dest="authtype",
         help="Configure Koji for SSL authentication" +
              (" (default)" if DEFAULT_AUTHTYPE == "ssl" else ""),
@@ -121,6 +127,7 @@ def setup_parse_args(args):
         write_client_conf=None,
         dot_koji_symlink=None,
         authtype=DEFAULT_AUTHTYPE,
+        principal=None,
     )
 
     options = parser.parse_args(args)[0]
@@ -128,7 +135,7 @@ def setup_parse_args(args):
     return options
 
 
-def make_config_text(authtype):
+def make_config_text(authtype, principal):
     template_path = find_file(KOJI_CONFIG_TEMPLATE, DATA_FILE_SEARCH_PATH)
     if os.path.exists(SERVERCA_REDHAT):
         serverca = SERVERCA_REDHAT
@@ -142,6 +149,22 @@ def make_config_text(authtype):
         print("If you want to configure SSL auth instead (not recommended),")
         print("re-run this program with --ssl.")
         auth_block = KERBEROS_AUTH_BLOCK
+
+        if principal is None:
+            # Principal not specified; ask interactively
+            print("")
+            print("Please enter the Kerberos principal you want to use, or just press Enter")
+            print("to use the default principal.")
+            print("")
+            try:
+                principal = input("> ")
+            except EOFError:
+                principal = ""
+
+        if str(principal).lower() not in ["", "none", "default"]:
+            auth_block += f"principal = {principal}\n"
+        else:
+            auth_block += ";principal =\n"
     elif authtype == "ssl":
         print("Configuring the Koji client for SSL auth.")
         print("If you want to configure Kerberos auth instead (recommended),")
@@ -158,7 +181,7 @@ def make_config_text(authtype):
         return config_text
 
 
-def setup_koji_config_file(write_client_conf, authtype):
+def setup_koji_config_file(write_client_conf, authtype, principal):
     """Create the koji config file (if needed)."""
     new_koji_config_path = os.path.join(OSG_KOJI_USER_CONFIG_DIR,
                                         KOJI_CONFIG_FILE)
@@ -173,7 +196,7 @@ you should say yes.
             return
         safe_make_backup(new_koji_config_path, simple_suffix=True)
 
-    config_text = make_config_text(authtype)
+    config_text = make_config_text(authtype, principal)
     with open(new_koji_config_path, "w") as config_fh:
         config_fh.write(config_text)
 
@@ -254,7 +277,7 @@ Reuse that file?
 def run_setup(options):
     """Set up the koji config dir"""
     safe_makedirs(OSG_KOJI_USER_CONFIG_DIR)
-    setup_koji_config_file(options.write_client_conf, options.authtype)
+    setup_koji_config_file(options.write_client_conf, options.authtype, options.principal)
     if options.authtype == "ssl":
         user_cert, user_key = options.user_cert, options.user_key
         setup_koji_client_cert(user_cert, user_key)
@@ -346,7 +369,7 @@ tools by running:
 
 """ % (PROGRAM_NAME))
                 if authtype == "kerberos":
-                    print("""
+                    print("""\
 Koji has been configured to use Kerberos auth.
 You may need to run `kinit` before running the above command.
 """)

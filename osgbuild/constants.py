@@ -16,6 +16,8 @@ OSG_KOJI_USER_CONFIG_DIR = os.path.expanduser("~/.osg-koji")
 KOJI_CLIENT_CERT = os.path.join(OSG_KOJI_USER_CONFIG_DIR, "client.crt")
 
 DATA_DIR = "/usr/share/osg-build"
+PROMOTER_INI = 'promoter.ini'
+SIGNING_KEYS_INI = 'signing_keys.ini'
 DEFAULT_AUTHTYPE = "kerberos"
 
 KOJI_HUB = "https://koji.osg-htc.org"

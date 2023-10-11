@@ -18,6 +18,22 @@ class Error(Exception):
         return str(self.msg)
 
 
+class ConfigErrors(Error):
+    """Class for errors when validating config; can contain multiple errors."""
+    def __init__(self, msg, errors):
+        Error.__init__(self, "Config errors: %s" % msg)
+        self.errors = errors
+
+    def __str__(self):
+        return (self.msg +
+                ":\n- " +
+                "\n- ".join(self.errors) +
+                "\n")
+
+    def __repr__(self):
+        return repr((self.msg, self.errors))
+
+
 class SVNError(Error):
     """Error doing SVN actions"""
     def __init__(self, msg):
@@ -27,7 +43,7 @@ class SVNError(Error):
 class GitError(Error):
     """Error doing Git actions"""
     def __init__(self, msg):
-        Error.__init__(self, "git error: %s" % msg)
+        Error.__init__(self, "Git error: %s" % msg)
 
 
 class GlobNotFoundError(Error):

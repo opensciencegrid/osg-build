@@ -13,6 +13,8 @@ import tempfile
 from typing import AnyStr
 from datetime import datetime
 
+from . import constants
+from . import error
 
 log = logging.getLogger(__name__)
 
@@ -232,30 +234,32 @@ def atomic_unslurp(filename, contents, mode=0o644):
     os.chmod(filename, mode)
 
 
-def find_file(filename, paths=None):
+def find_file(filename, paths=None, strict=False):
     """Go through each directory in paths and look for filename in it. Return
     the first match.
 
     """
-    matches = find_files(filename, paths)
+    matches = find_files(filename, paths, strict)
     if matches:
         return matches[0]
     else:
         return None
 
 
-def find_files(filename, paths=None):
+def find_files(filename, paths=None, strict=False):
     """Go through each directory in paths and look for filename in it. Return
     all matches.
 
     """
     matches = []
     if paths is None:
-        paths = sys.path
+        paths = constants.DATA_FILE_SEARCH_PATH
     for p in paths:
         j = os.path.join(p, filename)
         if os.path.isfile(j):
             matches += [j]
+    if not matches and strict:
+        raise error.FileNotFoundInSearchPathError(filename, paths)
     return matches
 
 

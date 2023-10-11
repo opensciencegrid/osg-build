@@ -701,9 +701,9 @@ class KojiLibInter(object):
                             if not filename.endswith('src.rpm'):
                                 destsubdir = re.sub(r'-build', '', tag_name) + "-" + arch
                                 download_koji_file(task_id, filename, os.path.join(destdir, destsubdir))
-                    except (TypeError, AttributeError, urllib.error.HTTPError):
+                    except (TypeError, AttributeError, urllib.error.HTTPError) as err:
                         # TODO More useful error message
-                        log.warning("Unable to download files for task %d", task_id)
+                        log.warning("Unable to download files for task %d: %s", task_id, err)
                         return False
         return True
 

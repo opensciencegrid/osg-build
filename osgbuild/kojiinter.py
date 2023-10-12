@@ -1,7 +1,6 @@
 """koji interface classes for osg-build"""
 # pylint: disable=W0614,C0103
 
-
 import configparser
 import json
 import logging
@@ -13,7 +12,7 @@ import sys
 import time
 import urllib
 import urllib.request, urllib.error
-from typing import Optional
+from typing import Optional, List, NamedTuple, Set, Dict
 
 from .constants import *
 from . import clientcert, constants
@@ -707,6 +706,13 @@ class KojiLibInter(object):
 # end of class KojiLibInter
 
 
+class RpmKeyidsPair(NamedTuple):
+    """An RPM name (N-V-R.A.rpm) and a set of keyids that this RPM has signatures from.
+    """
+    rpm: str
+    keyids: Set[str]
+
+
 class KojiHelper(KojiLibInter):
     """Extra utility functions for dealing with Koji
     Mostly dealing with querying packages, builds, and tags.
@@ -736,13 +742,39 @@ class KojiHelper(KojiLibInter):
         else:
             return None
 
-    def get_build_uri(self, build_nvr):
+    def get_build_uri(self, build_nvr: str):
         """Return a URI to the kojiweb page of the build with the given NVR"""
         buildinfo = self.koji_get_build(build_nvr)
-        return "%s/koji/buildinfo?buildID=%d" % (constants.KOJI_WEB, int(buildinfo['id']))
+        return f"{self.weburl}/buildinfo?buildID={buildinfo['id']}"
 
     def koji_get_build(self, build_nvr):
         return self.kojisession.getBuild(build_nvr)
+
+    def get_rpms_and_keyids_in_build(self, build_nvr: str) -> List[RpmKeyidsPair]:
+        """Get the RPMs in the build with the given NVR and their signatures"""
+        assert isinstance(build_nvr, str), "%s != str" % type(build_nvr)
+        buildinfo = self.koji_get_build(build_nvr)
+        if buildinfo is None:
+            log.warning("no build with nvr %s", build_nvr)
+            return []
+        rpms = self.kojisession.listRPMs(buildID=buildinfo['build_id']) or []  # type: List[Dict]
+        if not rpms:
+            log.warning("no rpms in build with nvr %s", build_nvr)
+            return []
+
+        rpms_and_keyids = []
+        for rpm in rpms:
+            try:
+                name = "{name}-{version}-{release}.{arch}.rpm".format(**rpm)
+                rpm_id = rpm['id']
+            except KeyError as err:
+                log.warning("missing key %s in rpminfo", err)
+                continue
+            sigs = self.kojisession.queryRPMSigs(rpm_id) or []  # type: List[Dict]
+            sigkeys = set(filter(None, (x.get("sigkey", None) for x in sigs)))
+            rpms_and_keyids.append(RpmKeyidsPair(rpm=name, keyids=sigkeys))
+        log.debug("found rpms and signatures in %s:\n%r", build_nvr, rpms_and_keyids)
+        return rpms_and_keyids
 
     def get_first_tag(self, match, terms):
         """Return the first koji tag matching 'terms'.

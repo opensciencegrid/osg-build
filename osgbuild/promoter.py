@@ -235,8 +235,8 @@ def _parse_list_str(list_str):
     return filtered_items
 
 
-def _bulletedlist(l, prefix=" - "):
-    return prefix + ("\n"+prefix).join(str(x) for x in sorted(l))
+def _bulletedlist(lst, prefix=" - "):
+    return prefix + ("\n"+prefix).join(str(x) for x in sorted(lst))
 
 
 class Promoter(object):
@@ -541,7 +541,8 @@ def write_old_jira(kojihelper, promoted_builds, routes, out=None):
         table_str += "| [%s|%s] | %s |\n" % (build.nvr, uri, tag)
         nvrs_no_dist.add(build.nvr_no_dist)
 
-    out.write("Promoted %s to %s\n" % (", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
+    out.write("Promoted %s to %s\n" % (
+        ", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
     out.write(table_str)
 
 
@@ -562,7 +563,8 @@ def write_jira(kojihelper, promoted_builds, routes, out=None):
         table_str += " [%s](%s) | %s\n" % (build.nvr, uri, tag)
         nvrs_no_dist.add(build.nvr_no_dist)
 
-    out.write("Promoted %s to %s\n" % (", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
+    out.write("Promoted %s to %s\n" % (
+        ", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
     out.write(table_str)
 
 
@@ -598,9 +600,12 @@ def format_aliases(aliases):
 
 def parse_cmdline_args(configuration, argv):
     """
-    :param configuration: A Configuration object. We need the routes to build the various dver arguments and the list of routes in the help text.
+    :param configuration: A Configuration object.
+                          We need the routes to build the various dver arguments
+                          and the list of routes in the help text.
     :param argv: sys.argv
-    :return: the options, the list of route names the user wants to use, and the list of packages or builds to promote
+    :return: the options, the list of route names the user wants to use,
+             and the list of packages or builds to promote
     """
     helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
     helpstring += "\n\nThe following routes exist:\n"
@@ -645,8 +650,8 @@ def parse_cmdline_args(configuration, argv):
     else:
         try:
             wanted_routes = _get_wanted_routes(configuration, options.routes)
-        except error.Error as e:
-            parser.error(str(e))
+        except error.Error as err:
+            parser.error(str(err))
 
     return options, wanted_routes, pkgs_or_builds
 

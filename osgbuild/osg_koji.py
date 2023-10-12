@@ -345,7 +345,7 @@ def run_koji(args=None, use_exec=False):
         raise
 
 
-def main(argv=None, use_exec=False):
+def main(argv=None, use_exec=True):
     """Main function"""
     if argv is None:
         argv = sys.argv
@@ -410,4 +410,4 @@ You may need to run `kinit` before running the above command.
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv, use_exec=True))
+    sys.exit(main())

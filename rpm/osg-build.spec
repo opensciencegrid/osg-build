@@ -1,3 +1,9 @@
+#
+# TODO  This spec file is not used much anymore since we stopped building
+#       osg-build RPMs. I'm keeping it around as a reference for the
+#       dependencies and as a way to store the changelog; both these things
+#       should be split out and the spec file removed.
+# 
 %global betatag .pre
 %global _release 2
 

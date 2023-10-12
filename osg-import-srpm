@@ -1,4 +1,4 @@
 #!/usr/bin/env python3
 import sys
-from osgbuild import importer
-sys.exit(importer.main(sys.argv))
+from osgbuild.importer import main
+sys.exit(main())

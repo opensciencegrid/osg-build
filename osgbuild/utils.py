@@ -298,6 +298,17 @@ def find_files(filename, paths=None, strict=False):
     return matches
 
 
+def find_resource(resource_name):
+    """Return the path to a resource included with this package.
+
+    """
+    try:
+        import importlib_resources
+    except ImportError:
+        import importlib.resources as importlib_resources  # Python 3.9+
+    return importlib_resources.files("osgbuild.data").joinpath(resource_name)
+
+
 def super_unpack(*compressed_files):
     """Extracts compressed files, calling the appropriate expansion
     program based on the file extension."""

@@ -285,7 +285,11 @@ def main(argv: List[str]):
     check_program_requirements()
 
     prog = os.path.basename(argv[0])
-    config = SigningKeysConfig(utils.find_file(constants.SIGNING_KEYS_INI, strict=True))
+    signing_keys_ini = (utils.find_file(constants.SIGNING_KEYS_INI) or
+                        utils.find_resource(constants.SIGNING_KEYS_INI))
+    if not signing_keys_ini:
+        raise SigningError(f"Couldn't find signing keys config {constants.SIGNING_KEYS_INI}")
+    config = SigningKeysConfig(signing_keys_ini)
     args = parse_commandline_args(argv)
 
     if __name__ == "__main__":

@@ -1,5 +1,5 @@
 %global betatag .pre
-%global _release 1
+%global _release 2
 
 Name:           osg-build
 Version:        1.99.1
@@ -144,6 +144,8 @@ fi
 
 
 %changelog
+* Thu Oct 12 2023 Mátyás Selmeci <matyas@cs.wisc.edu>- 1.99.1-0.2.pre
+- Use list-history instead of list-tag-history in koji-blame to work with koji cli 1.24+ (SOFTWARE-4532)
 
 * Wed Oct 11 2023 Mátyás Selmeci <matyas@cs.wisc.edu- 1.99.1-0.1.pre
 - Add Kerberos support (SOFTWARE-5696)

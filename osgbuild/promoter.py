@@ -687,9 +687,14 @@ def _get_route_dvers_pairs(routenames, valid_routes, extra_dvers, no_dvers, only
     return route_dvers_pairs
 
 
-if __name__ == "__main__":
+def entrypoint():
+    """CLI entrypoint for osg-promote"""
     try:
-        sys.exit(main(sys.argv))
+        main()
     except error.Error as e:
         print(e, file=sys.stderr)
-        sys.exit(1)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(entrypoint())

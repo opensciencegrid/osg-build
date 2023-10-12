@@ -129,10 +129,15 @@ def main(argv):
                                                                               since=args.since,
                                                                               until=args.until)))
 
-if __name__ == "__main__":
+
+def entrypoint():
+    """CLI entrypoint for koji-blame"""
     try:
-        sys.exit(main(sys.argv))
+        main(sys.argv)
     except Error as err:
         sys.stderr.write(str(err))
-        sys.exit(1)
+        return 1
 
+
+if __name__ == "__main__":
+    sys.exit(entrypoint())

@@ -14,7 +14,7 @@ from . import constants
 from . import error
 from . import kojiinter
 from . import utils
-from .utils import comma_join, printf, print_table
+from .utils import comma_join, printf, print_table, split_nvr
 from optparse import OptionParser
 
 from collections import namedtuple
@@ -179,15 +179,6 @@ class Configuration(object):
 #
 # Utility functions
 #
-
-
-def split_nvr(build):
-    """Split an NVR into a (Name, Version, Release) tuple"""
-    match = re.match(r"(?P<name>.+)-(?P<version>[^-]+)-(?P<release>[^-]+)$", build)
-    if match:
-        return match.group('name'), match.group('version'), match.group('release')
-    else:
-        return '', '', ''
 
 
 def split_repotag_dver(build, known_repotags=None):

@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/../.."))
 
 from osgbuild import promoter
 from osgbuild import constants
+from osgbuild import utils
 
 INIFILE = "promoter.ini"
 
@@ -242,7 +243,7 @@ class FakeKojiHelper(promoter.KojiHelper):
         self.tagged_packages_by_tag = {}
         for k, v in self.tagged_builds_by_tag.items():
             nvrs = [x['nvr'] for x in v]
-            names = sorted(set([promoter.split_nvr(x)[0] for x in nvrs]))
+            names = sorted(set([osgbuild.utils.split_nvr(x)[0] for x in nvrs]))
             self.tagged_packages_by_tag[k] = names
         self.newly_tagged_packages = []
         super(FakeKojiHelper, self).__init__(*args)
@@ -286,7 +287,7 @@ class FakeKojiHelper(promoter.KojiHelper):
 class TestUtil(unittest.TestCase):
     buildnvr = "osg-build-1.3.2-1.osg35.el7"
     def test_split_nvr(self):
-        self.assertEqual(('osg-build', '1.3.2', '1.osg35.el7'), promoter.split_nvr(self.buildnvr))
+        self.assertEqual(('osg-build', '1.3.2', '1.osg35.el7'), osgbuild.utils.split_nvr(self.buildnvr))
 
     def test_split_repo_dver(self):
         self.assertEqual(('osg-build-1.3.2-1', 'osg35', 'el7'), promoter.split_repotag_dver(self.buildnvr))

@@ -31,23 +31,23 @@ class KojiTagsAreMessedUp(Exception):
     """
 
 
-Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repo', 'dvers', 'extra_dvers'])
+Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repotag', 'dvers', 'extra_dvers'])
 
 
 class Build(object):
-    def __init__(self, name, version, release_no_dist, repo, dver):
+    def __init__(self, name, version, release_no_dist, repotag, dver):
         self.name = name
         self.version = version
         self.release_no_dist = release_no_dist
-        self.repo = repo
+        self.repotag = repotag
         self.dver = dver
 
     @staticmethod
     def new_from_nvr(nvr):
         name, version, release = split_nvr(nvr)
-        release_no_dist, repo, dver = split_repo_dver(release)
+        release_no_dist, repotag, dver = split_repotag_dver(release)
 
-        return Build(name, version, release_no_dist, repo, dver)
+        return Build(name, version, release_no_dist, repotag, dver)
 
     @property
     def vr_no_dist(self):
@@ -67,7 +67,7 @@ class Build(object):
 
     @property
     def dist(self):
-        return '.'.join([self.repo, self.dver]).strip('.')
+        return '.'.join([self.repotag, self.dver]).strip('.')
 
 
 class Reject(object):
@@ -190,10 +190,10 @@ def split_nvr(build):
         return '', '', ''
 
 
-def split_repo_dver(build, known_repos=None):
+def split_repotag_dver(build, known_repotags=None):
     """Split out the dist tag from the NVR of a build, returning a tuple
-    containing (NVR (without dist tag), repo, dver).
-    For example, split_repo_dver("foobar-1-1.osg32.el5") returns
+    containing (NVR (without dist tag), repo tag, dver).
+    For example, split_repotag_dver("foobar-1-1.osg32.el5") returns
     ("foobar-1-1", "osg32", "el5").
     The empty string is returned for any of the components that aren't present.
 
@@ -211,29 +211,29 @@ def split_repo_dver(build, known_repos=None):
 
     """
     build_no_dist = build
-    repo = ""
+    repotag = ""
     dver = ""
 
     build_no_dist_pat = r"(?P<build_no_dist>.+)"
-    repo_pat = r"(?P<repo>[a-z]\w+)"
+    repotag_pat = r"(?P<repotag>[a-z]\w+)"
     dver_pat = r"(?P<dver>el\d+)"
-    if known_repos is not None:
-        repo_pat = r"(?P<repo>" + "|".join(known_repos) + ")"
+    if known_repotags is not None:
+        repotag_pat = r"(?P<repotag>" + "|".join(known_repotags) + ")"
 
     # order matters since later patterns are less specific and would match more
-    pat_1_repo_and_dver = re.compile(build_no_dist_pat + r"\." + repo_pat + r"\." + dver_pat + "$")
+    pat_1_repotag_and_dver = re.compile(build_no_dist_pat + r"\." + repotag_pat + r"\." + dver_pat + "$")
     pat_2_dver_only = re.compile(build_no_dist_pat + r"\." + dver_pat + "$")
-    pat_3_repo_only = re.compile(build_no_dist_pat + r"\." + repo_pat + "$")
+    pat_3_repotag_only = re.compile(build_no_dist_pat + r"\." + repotag_pat + "$")
 
-    match = (pat_1_repo_and_dver.match(build) or
+    match = (pat_1_repotag_and_dver.match(build) or
              pat_2_dver_only.match(build) or
-             pat_3_repo_only.match(build))
+             pat_3_repotag_only.match(build))
 
     if match:
         groupdict = match.groupdict()
-        build_no_dist, repo, dver = groupdict['build_no_dist'], groupdict.get('repo', ''), groupdict.get('dver', '')
+        build_no_dist, repotag, dver = groupdict['build_no_dist'], groupdict.get('repotag', ''), groupdict.get('dver', '')
 
-    return build_no_dist, repo, dver
+    return build_no_dist, repotag, dver
 
 
 def _parse_list_str(list_str):
@@ -266,7 +266,7 @@ class Promoter(object):
         self.rejects = []
         self.kojihelper = kojihelper
         self.route_dvers_pairs = route_dvers_pairs
-        self.repos = set(route.repo for route, _ in self.route_dvers_pairs)
+        self.repotags = set(route.repotag for route, _ in self.route_dvers_pairs)
 
     def add_promotion(self, pkg_or_build, ignore_rejects=False):
         """Run get_builds() for 'pkg_or_build', using from_tag_hint as the
@@ -290,7 +290,7 @@ class Promoter(object):
                 self.tag_pkg_args.setdefault(tag, [])
                 self.tag_pkg_args[tag].append(build)
 
-    def _get_build(self, tag_hint, repo, dver, pkg_or_build):
+    def _get_build(self, tag_hint, repotag, dver, pkg_or_build):
         """Get a single build (as a Build object) out of the tag given by
         tag_hint % dver that matches pkg_or_build. This only returns builds
         where the Release field contains a dist tag with both a repo and a dver
@@ -308,10 +308,10 @@ class Promoter(object):
 
         """
         tag = self._get_valid_tag_for_dver(tag_hint, dver)
-        pkg_or_build_no_dist = split_repo_dver(pkg_or_build, self.repos)[0]
+        pkg_or_build_no_dist = split_repotag_dver(pkg_or_build, self.repotags)[0]
         # Case 1: pkg_or_build is a build, in which case take off its dist tag
         # and put the dist tag specified dist tag on, then find a build for that.
-        build_nvr_1 = self.kojihelper.get_build_in_tag(tag, ".".join([pkg_or_build_no_dist, repo, dver]))
+        build_nvr_1 = self.kojihelper.get_build_in_tag(tag, ".".join([pkg_or_build_no_dist, repotag, dver]))
         # Case 2: pkg_or_build is a package, in which case putting a dist tag
         # on doesn't help--just find the latest build in the tag.
         build_nvr_2 = self.kojihelper.get_build_in_tag(tag, pkg_or_build_no_dist)
@@ -340,12 +340,12 @@ class Promoter(object):
         # all routes, not just one, and rejection handling should be done in
         # add_promotion.
         tag_hint = route.from_tag_hint
-        repo = route.repo
+        repotag = route.repotag
         builds = {}
         # Find each build for all dvers matching pkg_or_build
         for dver in dvers:
-            dist = "%s.%s" % (repo, dver)
-            build = self._get_build(tag_hint, repo, dver, pkg_or_build)
+            dist = "%s.%s" % (repotag, dver)
+            build = self._get_build(tag_hint, repotag, dver, pkg_or_build)
             if not build:
                 if not ignore_rejects:
                     self.rejects.append(Reject(pkg_or_build, dist, Reject.REASON_NOMATCHING_FOR_DIST))

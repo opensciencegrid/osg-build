@@ -28,14 +28,14 @@ def is_tag(maybe_tag):
     return maybe_tag in get_all_tags()
 
 def is_build(maybe_build):
-    out, ret = utils.sbacktick(["osg-koji", "buildinfo", maybe_build])
+    out, ret = utils.sbacktick(["osg-koji", "buildinfo", maybe_build], err2out=True)
     if maybe_build not in out:
         raise Error("koji buildinfo returned unexpected result. Return: %d Output: %s" % (ret, out))
     return "No such build" not in out
 
 def is_package(maybe_package):
     # Returns 1 if package not found
-    out, ret = utils.sbacktick(["osg-koji", "list-pkgs", "--package", maybe_package])
+    out, ret = utils.sbacktick(["osg-koji", "list-pkgs", "--package", maybe_package], err2out=True)
     if maybe_package not in out or (not 0 <= ret <= 1):
         raise Error("koji list-pkgs returned unexpected result. Return: %d Output: %s" % (ret, out))
     return "No such entry" not in out

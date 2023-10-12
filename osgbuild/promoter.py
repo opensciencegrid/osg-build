@@ -14,7 +14,7 @@ from . import constants
 from . import error
 from . import kojiinter
 from . import utils
-from .utils import printf, print_table
+from .utils import comma_join, printf, print_table, split_nvr
 from optparse import OptionParser
 
 from collections import namedtuple
@@ -31,23 +31,23 @@ class KojiTagsAreMessedUp(Exception):
     """
 
 
-Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repo', 'dvers', 'extra_dvers'])
+Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repotag', 'dvers', 'extra_dvers'])
 
 
 class Build(object):
-    def __init__(self, name, version, release_no_dist, repo, dver):
+    def __init__(self, name, version, release_no_dist, repotag, dver):
         self.name = name
         self.version = version
         self.release_no_dist = release_no_dist
-        self.repo = repo
+        self.repotag = repotag
         self.dver = dver
 
     @staticmethod
     def new_from_nvr(nvr):
         name, version, release = split_nvr(nvr)
-        release_no_dist, repo, dver = split_repo_dver(release)
+        release_no_dist, repotag, dver = split_repotag_dver(release)
 
-        return Build(name, version, release_no_dist, repo, dver)
+        return Build(name, version, release_no_dist, repotag, dver)
 
     @property
     def vr_no_dist(self):
@@ -67,7 +67,7 @@ class Build(object):
 
     @property
     def dist(self):
-        return '.'.join([self.repo, self.dver]).strip('.')
+        return '.'.join([self.repotag, self.dver]).strip('.')
 
 
 class Reject(object):
@@ -181,19 +181,10 @@ class Configuration(object):
 #
 
 
-def split_nvr(build):
-    """Split an NVR into a (Name, Version, Release) tuple"""
-    match = re.match(r"(?P<name>.+)-(?P<version>[^-]+)-(?P<release>[^-]+)$", build)
-    if match:
-        return match.group('name'), match.group('version'), match.group('release')
-    else:
-        return '', '', ''
-
-
-def split_repo_dver(build, known_repos=None):
+def split_repotag_dver(build, known_repotags=None):
     """Split out the dist tag from the NVR of a build, returning a tuple
-    containing (NVR (without dist tag), repo, dver).
-    For example, split_repo_dver("foobar-1-1.osg32.el5") returns
+    containing (NVR (without dist tag), repo tag, dver).
+    For example, split_repotag_dver("foobar-1-1.osg32.el5") returns
     ("foobar-1-1", "osg32", "el5").
     The empty string is returned for any of the components that aren't present.
 
@@ -211,29 +202,29 @@ def split_repo_dver(build, known_repos=None):
 
     """
     build_no_dist = build
-    repo = ""
+    repotag = ""
     dver = ""
 
     build_no_dist_pat = r"(?P<build_no_dist>.+)"
-    repo_pat = r"(?P<repo>[a-z]\w+)"
+    repotag_pat = r"(?P<repotag>[a-z]\w+)"
     dver_pat = r"(?P<dver>el\d+)"
-    if known_repos is not None:
-        repo_pat = r"(?P<repo>" + "|".join(known_repos) + ")"
+    if known_repotags is not None:
+        repotag_pat = r"(?P<repotag>" + "|".join(known_repotags) + ")"
 
     # order matters since later patterns are less specific and would match more
-    pat_1_repo_and_dver = re.compile(build_no_dist_pat + r"\." + repo_pat + r"\." + dver_pat + "$")
+    pat_1_repotag_and_dver = re.compile(build_no_dist_pat + r"\." + repotag_pat + r"\." + dver_pat + "$")
     pat_2_dver_only = re.compile(build_no_dist_pat + r"\." + dver_pat + "$")
-    pat_3_repo_only = re.compile(build_no_dist_pat + r"\." + repo_pat + "$")
+    pat_3_repotag_only = re.compile(build_no_dist_pat + r"\." + repotag_pat + "$")
 
-    match = (pat_1_repo_and_dver.match(build) or
+    match = (pat_1_repotag_and_dver.match(build) or
              pat_2_dver_only.match(build) or
-             pat_3_repo_only.match(build))
+             pat_3_repotag_only.match(build))
 
     if match:
         groupdict = match.groupdict()
-        build_no_dist, repo, dver = groupdict['build_no_dist'], groupdict.get('repo', ''), groupdict.get('dver', '')
+        build_no_dist, repotag, dver = groupdict['build_no_dist'], groupdict.get('repotag', ''), groupdict.get('dver', '')
 
-    return build_no_dist, repo, dver
+    return build_no_dist, repotag, dver
 
 
 def _parse_list_str(list_str):
@@ -244,12 +235,8 @@ def _parse_list_str(list_str):
     return filtered_items
 
 
-def _commajoin(l):
-    return ", ".join(str(x) for x in sorted(l))
-
-
-def _bulletedlist(l, prefix=" - "):
-    return prefix + ("\n"+prefix).join(str(x) for x in sorted(l))
+def _bulletedlist(lst, prefix=" - "):
+    return prefix + ("\n"+prefix).join(str(x) for x in sorted(lst))
 
 
 class Promoter(object):
@@ -266,7 +253,7 @@ class Promoter(object):
         self.rejects = []
         self.kojihelper = kojihelper
         self.route_dvers_pairs = route_dvers_pairs
-        self.repos = set(route.repo for route, _ in self.route_dvers_pairs)
+        self.repotags = set(route.repotag for route, _ in self.route_dvers_pairs)
 
     def add_promotion(self, pkg_or_build, ignore_rejects=False):
         """Run get_builds() for 'pkg_or_build', using from_tag_hint as the
@@ -290,7 +277,7 @@ class Promoter(object):
                 self.tag_pkg_args.setdefault(tag, [])
                 self.tag_pkg_args[tag].append(build)
 
-    def _get_build(self, tag_hint, repo, dver, pkg_or_build):
+    def _get_build(self, tag_hint, repotag, dver, pkg_or_build):
         """Get a single build (as a Build object) out of the tag given by
         tag_hint % dver that matches pkg_or_build. This only returns builds
         where the Release field contains a dist tag with both a repo and a dver
@@ -308,10 +295,10 @@ class Promoter(object):
 
         """
         tag = self._get_valid_tag_for_dver(tag_hint, dver)
-        pkg_or_build_no_dist = split_repo_dver(pkg_or_build, self.repos)[0]
+        pkg_or_build_no_dist = split_repotag_dver(pkg_or_build, self.repotags)[0]
         # Case 1: pkg_or_build is a build, in which case take off its dist tag
         # and put the dist tag specified dist tag on, then find a build for that.
-        build_nvr_1 = self.kojihelper.get_build_in_tag(tag, ".".join([pkg_or_build_no_dist, repo, dver]))
+        build_nvr_1 = self.kojihelper.get_build_in_tag(tag, ".".join([pkg_or_build_no_dist, repotag, dver]))
         # Case 2: pkg_or_build is a package, in which case putting a dist tag
         # on doesn't help--just find the latest build in the tag.
         build_nvr_2 = self.kojihelper.get_build_in_tag(tag, pkg_or_build_no_dist)
@@ -340,12 +327,12 @@ class Promoter(object):
         # all routes, not just one, and rejection handling should be done in
         # add_promotion.
         tag_hint = route.from_tag_hint
-        repo = route.repo
+        repotag = route.repotag
         builds = {}
         # Find each build for all dvers matching pkg_or_build
         for dver in dvers:
-            dist = "%s.%s" % (repo, dver)
-            build = self._get_build(tag_hint, repo, dver, pkg_or_build)
+            dist = "%s.%s" % (repotag, dver)
+            build = self._get_build(tag_hint, repotag, dver, pkg_or_build)
             if not build:
                 if not ignore_rejects:
                     self.rejects.append(Reject(pkg_or_build, dist, Reject.REASON_NOMATCHING_FOR_DIST))
@@ -554,7 +541,8 @@ def write_old_jira(kojihelper, promoted_builds, routes, out=None):
         table_str += "| [%s|%s] | %s |\n" % (build.nvr, uri, tag)
         nvrs_no_dist.add(build.nvr_no_dist)
 
-    out.write("Promoted %s to %s\n" % (", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
+    out.write("Promoted %s to %s\n" % (
+        ", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
     out.write(table_str)
 
 
@@ -575,7 +563,8 @@ def write_jira(kojihelper, promoted_builds, routes, out=None):
         table_str += " [%s](%s) | %s\n" % (build.nvr, uri, tag)
         nvrs_no_dist.add(build.nvr_no_dist)
 
-    out.write("Promoted %s to %s\n" % (", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
+    out.write("Promoted %s to %s\n" % (
+        ", ".join(sorted(nvrs_no_dist)), ", ".join([x.to_tag_hint % "el*" for x in routes])))
     out.write(table_str)
 
 
@@ -586,9 +575,9 @@ def format_valid_routes(valid_routes):
     formatted = ""
     for route_name in sorted(valid_routes):
         route = valid_routes[route_name]
-        dvers_list = _commajoin(route.dvers)
+        dvers_list = comma_join(route.dvers)
         if route.extra_dvers:
-            dvers_list += ', [%s]' % _commajoin(route.extra_dvers)
+            dvers_list += ', [%s]' % comma_join(route.extra_dvers)
         formatted += " - %-25s: %-31s -> %-31s (%s)\n" % (
             route_name,
             route.from_tag_hint % '*',
@@ -604,16 +593,19 @@ def format_aliases(aliases):
     :rtype: str
     """
     return "\n".join(
-        [" - %-25s: %s" % (name, _commajoin(aliases[name]))
+        [" - %-25s: %s" % (name, comma_join(aliases[name]))
          for name in sorted(aliases)]
     )
 
 
 def parse_cmdline_args(configuration, argv):
     """
-    :param configuration: A Configuration object. We need the routes to build the various dver arguments and the list of routes in the help text.
+    :param configuration: A Configuration object.
+                          We need the routes to build the various dver arguments
+                          and the list of routes in the help text.
     :param argv: sys.argv
-    :return: the options, the list of route names the user wants to use, and the list of packages or builds to promote
+    :return: the options, the list of route names the user wants to use,
+             and the list of packages or builds to promote
     """
     helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
     helpstring += "\n\nThe following routes exist:\n"
@@ -658,8 +650,8 @@ def parse_cmdline_args(configuration, argv):
     else:
         try:
             wanted_routes = _get_wanted_routes(configuration, options.routes)
-        except error.Error as e:
-            parser.error(str(e))
+        except error.Error as err:
+            parser.error(str(err))
 
     return options, wanted_routes, pkgs_or_builds
 
@@ -683,7 +675,7 @@ def _get_wanted_routes(configuration, route_args):
         else:
             matching_routes = starting_match(arg, configuration.all_names)
             if len(matching_routes) > 1:
-                raise error.Error("Ambiguous route '%s'.\nMatching routes are: %s" % (arg, _commajoin(matching_routes)))
+                raise error.Error("Ambiguous route '%s'.\nMatching routes are: %s" % (arg, comma_join(matching_routes)))
             elif not matching_routes:
                 raise error.Error("Invalid route '%s'." % arg)
             else:
@@ -693,9 +685,9 @@ def _get_wanted_routes(configuration, route_args):
 
 
 def _print_route_dvers(routename, route):
-    printf("The default dver(s) for %s are: %s", routename, _commajoin(route.dvers))
+    printf("The default dver(s) for %s are: %s", routename, comma_join(route.dvers))
     if route.extra_dvers:
-        printf("The route optionally supports these dver(s): %s", _commajoin(route.extra_dvers))
+        printf("The route optionally supports these dver(s): %s", comma_join(route.extra_dvers))
 
 
 def main(argv=None):
@@ -716,7 +708,7 @@ def main(argv=None):
         printf("Promoting from %s to %s for dvers: %s",
                route.from_tag_hint % 'el*',
                route.to_tag_hint % 'el*',
-               _commajoin(dvers))
+               comma_join(dvers))
     printf("Examining the following packages/builds:\n%s", _bulletedlist(pkgs_or_builds))
 
     dvers = set()

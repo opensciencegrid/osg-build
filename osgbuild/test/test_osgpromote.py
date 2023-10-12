@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/../.."))
 
 from osgbuild import promoter
 from osgbuild import constants
+from osgbuild import utils
 
 INIFILE = "promoter.ini"
 
@@ -242,7 +243,7 @@ class FakeKojiHelper(promoter.KojiHelper):
         self.tagged_packages_by_tag = {}
         for k, v in self.tagged_builds_by_tag.items():
             nvrs = [x['nvr'] for x in v]
-            names = sorted(set([promoter.split_nvr(x)[0] for x in nvrs]))
+            names = sorted(set([osgbuild.utils.split_nvr(x)[0] for x in nvrs]))
             self.tagged_packages_by_tag[k] = names
         self.newly_tagged_packages = []
         super(FakeKojiHelper, self).__init__(*args)
@@ -286,17 +287,17 @@ class FakeKojiHelper(promoter.KojiHelper):
 class TestUtil(unittest.TestCase):
     buildnvr = "osg-build-1.3.2-1.osg35.el7"
     def test_split_nvr(self):
-        self.assertEqual(('osg-build', '1.3.2', '1.osg35.el7'), promoter.split_nvr(self.buildnvr))
+        self.assertEqual(('osg-build', '1.3.2', '1.osg35.el7'), osgbuild.utils.split_nvr(self.buildnvr))
 
     def test_split_repo_dver(self):
-        self.assertEqual(('osg-build-1.3.2-1', 'osg35', 'el7'), promoter.split_repo_dver(self.buildnvr))
-        self.assertEqual(('foo-1-1', 'osg', ''), promoter.split_repo_dver('foo-1-1.osg'))
-        self.assertEqual(('foo-1-1', '', 'el7'), promoter.split_repo_dver('foo-1-1.el7'))
-        self.assertEqual(('foo-1-1', '', ''), promoter.split_repo_dver('foo-1-1'))
+        self.assertEqual(('osg-build-1.3.2-1', 'osg35', 'el7'), promoter.split_repotag_dver(self.buildnvr))
+        self.assertEqual(('foo-1-1', 'osg', ''), promoter.split_repotag_dver('foo-1-1.osg'))
+        self.assertEqual(('foo-1-1', '', 'el7'), promoter.split_repotag_dver('foo-1-1.el7'))
+        self.assertEqual(('foo-1-1', '', ''), promoter.split_repotag_dver('foo-1-1'))
         # Tests against SOFTWARE-1420:
-        self.assertEqual(('foo-1-1', 'osg', ''), promoter.split_repo_dver('foo-1-1.osg', ['osg']))
-        self.assertEqual(('bar-1-1.1', '', ''), promoter.split_repo_dver('bar-1-1.1'))
-        self.assertEqual(('bar-1-1.rc1', '', ''), promoter.split_repo_dver('bar-1-1.rc1', ['osg', 'osg35', 'osg36']))
+        self.assertEqual(('foo-1-1', 'osg', ''), promoter.split_repotag_dver('foo-1-1.osg', ['osg']))
+        self.assertEqual(('bar-1-1.1', '', ''), promoter.split_repotag_dver('bar-1-1.1'))
+        self.assertEqual(('bar-1-1.rc1', '', ''), promoter.split_repotag_dver('bar-1-1.rc1', ['osg', 'osg35', 'osg36']))
 
 
 def _config():
@@ -314,26 +315,26 @@ class TestRouteLoader(unittest.TestCase):
     def test_hcc_route(self):
         self.assertEqual('hcc-%s-testing', self.routes['hcc'].from_tag_hint)
         self.assertEqual('hcc-%s-release', self.routes['hcc'].to_tag_hint)
-        self.assertEqual('hcc', self.routes['hcc'].repo)
+        self.assertEqual('hcc', self.routes['hcc'].repotag)
         self.assertEqual(['el7'], self.routes['hcc'].dvers)
 
     def test_osg_route(self):
         self.assertEqual('osg-3.5-%s-development', self.routes['3.5-testing'].from_tag_hint)
         self.assertEqual('osg-3.5-%s-testing', self.routes['3.5-testing'].to_tag_hint)
-        self.assertEqual('osg35', self.routes['3.5-testing'].repo)
+        self.assertEqual('osg35', self.routes['3.5-testing'].repotag)
         self.assertEqual('osg-3.5-upcoming-%s-development', self.routes['3.5-upcoming'].from_tag_hint)
         self.assertEqual('osg-3.5-upcoming-%s-testing', self.routes['3.5-upcoming'].to_tag_hint)
-        self.assertEqual('osg35up', self.routes['3.5-upcoming'].repo)
+        self.assertEqual('osg35up', self.routes['3.5-upcoming'].repotag)
 
         self.assertEqual('osg-3.6-%s-development', self.routes['3.6-testing'].from_tag_hint)
         self.assertEqual('osg-3.6-%s-testing', self.routes['3.6-testing'].to_tag_hint)
-        self.assertEqual('osg36', self.routes['3.6-testing'].repo)
+        self.assertEqual('osg36', self.routes['3.6-testing'].repotag)
         self.assertEqual('osg-3.6-upcoming-%s-development', self.routes['3.6-upcoming'].from_tag_hint)
         self.assertEqual('osg-3.6-upcoming-%s-testing', self.routes['3.6-upcoming'].to_tag_hint)
-        self.assertEqual('osg36up', self.routes['3.6-upcoming'].repo)
+        self.assertEqual('osg36up', self.routes['3.6-upcoming'].repotag)
 
     def test_route_alias(self):
-        for key in 'from_tag_hint', 'to_tag_hint', 'repo':
+        for key in 'from_tag_hint', 'to_tag_hint', 'repotag':
             self.assertEqual(getattr(self.configuration.matching_routes('testing')[0], key), getattr(self.routes['3.5-testing'], key))
             self.assertEqual(getattr(self.configuration.matching_routes('3.5-rfr')[0], key), getattr(self.routes['3.5-prerelease'], key))
             self.assertEqual(getattr(self.configuration.matching_routes('3.5-rfr')[1], key), getattr(self.routes['3.5-rolling'], key))

@@ -1,6 +1,6 @@
 """Sign packages in Koji.  Download the RPMs, add the requested signatures,
-and import them back.  Requires access to the signing key and the "admin"
-Koji permission.
+and import them back.  Requires access to the signing key and the "sign"
+Koji permission (or "admin").
 """
 from argparse import ArgumentParser
 import glob
@@ -344,7 +344,7 @@ def parse_commandline_args(argv: List[str]):
         "--dry-run",
         action="store_true",
         help="Sign RPMs only, don't import the results; "
-             "does not require Koji admin permission"
+             "does not require Koji permissions."
     )
     parser.add_argument(
         "--results",

@@ -5,9 +5,9 @@ import re
 import sys
 import configparser
 
+from osgbuild.kojiinter import KojiHelper
 from . import constants
 from . import error
-from . import kojiinter
 from . import utils
 from .utils import printf, print_table
 from optparse import OptionParser
@@ -432,98 +432,6 @@ class Promoter(object):
                 printf("* Error promoting build %s", build.nvr)
 
         return promoted_builds
-
-
-# don't care if it has too many methods: pylint: disable=R0904
-class KojiHelper(kojiinter.KojiLibInter):
-    """Extra utility functions for dealing with Koji"""
-    tags_cache = []
-    tagged_builds_cache = {}
-    tagged_packages_cache = {}
-
-    def __init__(self, do_login):
-        "Connect to koji-hub. Authenticate if 'do_login' is True."
-        super(KojiHelper, self).__init__()
-        self.read_config_file()
-        self.init_koji_session(login=do_login)
-
-    def get_build_in_tag(self, tag, pkg_or_build):
-        """Return the build matching 'pkg_or_build' in 'tag'.
-        If pkg_or_build is not in the tag, returns None. Otherwise:
-        If pkg_or_build is a package, returns the latest build for that
-        package. If pkg_or_build is a build, it is returned unchanged.
-
-        """
-        if pkg_or_build in self.get_tagged_packages(tag):
-            return self.get_latest_build(pkg_or_build, tag)
-        elif pkg_or_build in self.get_tagged_builds(tag):
-            return pkg_or_build
-        else:
-            return None
-
-    def get_build_uri(self, build_nvr):
-        """Return a URI to the kojiweb page of the build with the given NVR"""
-        buildinfo = self.koji_get_build(build_nvr)
-        return "%s/koji/buildinfo?buildID=%d" % (constants.KOJI_WEB, int(buildinfo['id']))
-
-    def koji_get_build(self, build_nvr):
-        return self.kojisession.getBuild(build_nvr)
-
-    def get_first_tag(self, match, terms):
-        """Return the first koji tag matching 'terms'.
-        'match' is a string which is interpreted as a regex (if 'terms' is
-        'regex') or an exact query (if 'terms' is 'exact').
-        Return None if no such tag(s) are found.
-
-        """
-        try:
-            return self.search_names(terms, 'tag', match)[0]
-        except IndexError:
-            return None
-
-    def get_latest_build(self, package, tag):
-        """Return the NVR of the latest build of a package in a tag, or None"""
-        data = self.kojisession.listTagged(tag, latest=True, package=package)
-        if not data:
-            return None
-        else:
-            try:
-                return data[0]['nvr']
-            except KeyError:
-                return None
-
-    def get_tagged_builds(self, tag):
-        """Return a list of NVRs of all builds in a tag"""
-        if tag not in KojiHelper.tagged_builds_cache:
-            data = self.kojisession.listTagged(tag)
-            KojiHelper.tagged_builds_cache[tag] = [x['nvr'] for x in data]
-        return KojiHelper.tagged_builds_cache[tag]
-
-    def get_tagged_packages(self, tag):
-        """Return a list of names of all builds in a tag"""
-        if tag not in KojiHelper.tagged_packages_cache:
-            KojiHelper.tagged_packages_cache[tag] = [split_nvr(x)[0] for x in self.get_tagged_builds(tag)]
-        return KojiHelper.tagged_packages_cache[tag]
-
-    def get_tags(self):
-        """Return a list of all tag names"""
-        if not KojiHelper.tags_cache:
-            data = self.kojisession.listTags(None, None)
-            KojiHelper.tags_cache = [x['name'] for x in data]
-        return KojiHelper.tags_cache
-
-    def get_task_state(self, task_id):
-        """Return the symbolic state of the task (e.g. OPEN, CLOSED, etc.) as a string"""
-        return self.TASK_STATES[self.kojisession.getTaskInfo(task_id)['state']]
-
-    def regen_repos(self, tags_to_regen):
-        """Regenerate the repos corresponding to the given tags.
-        'tags_to_regen' is a list of strings.
-        Waits for completion.
-
-        """
-        for tag in tags_to_regen:
-            self.watch_tasks([self.regen_repo(tag)])
 
 
 #

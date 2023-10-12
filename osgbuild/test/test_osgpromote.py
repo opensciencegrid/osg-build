@@ -6,6 +6,8 @@ import logging
 import unittest
 from io import StringIO
 
+import osgbuild.kojiinter
+
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/../.."))
 
 from osgbuild import promoter
@@ -169,7 +171,7 @@ TAGS = ['devops-el7-itb',
         ]
 
 
-class FakeKojiHelper(promoter.KojiHelper):
+class FakeKojiHelper(osgbuild.kojiinter.KojiHelper):
     tagged_builds_by_tag = {
             'osg-3.5-el7-development': [
                 {'nvr': 'goodpkg-2000-1.osg35.el7', 'latest': True},

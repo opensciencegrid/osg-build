@@ -14,7 +14,7 @@ from . import constants
 from . import error
 from . import kojiinter
 from . import utils
-from .utils import printf, print_table
+from .utils import comma_join, printf, print_table
 from optparse import OptionParser
 
 from collections import namedtuple
@@ -242,10 +242,6 @@ def _parse_list_str(list_str):
     # remove empty strings from the list
     filtered_items = [_f for _f in items if _f]
     return filtered_items
-
-
-def _commajoin(l):
-    return ", ".join(str(x) for x in sorted(l))
 
 
 def _bulletedlist(l, prefix=" - "):
@@ -586,9 +582,9 @@ def format_valid_routes(valid_routes):
     formatted = ""
     for route_name in sorted(valid_routes):
         route = valid_routes[route_name]
-        dvers_list = _commajoin(route.dvers)
+        dvers_list = comma_join(route.dvers)
         if route.extra_dvers:
-            dvers_list += ', [%s]' % _commajoin(route.extra_dvers)
+            dvers_list += ', [%s]' % comma_join(route.extra_dvers)
         formatted += " - %-25s: %-31s -> %-31s (%s)\n" % (
             route_name,
             route.from_tag_hint % '*',
@@ -604,7 +600,7 @@ def format_aliases(aliases):
     :rtype: str
     """
     return "\n".join(
-        [" - %-25s: %s" % (name, _commajoin(aliases[name]))
+        [" - %-25s: %s" % (name, comma_join(aliases[name]))
          for name in sorted(aliases)]
     )
 
@@ -683,7 +679,7 @@ def _get_wanted_routes(configuration, route_args):
         else:
             matching_routes = starting_match(arg, configuration.all_names)
             if len(matching_routes) > 1:
-                raise error.Error("Ambiguous route '%s'.\nMatching routes are: %s" % (arg, _commajoin(matching_routes)))
+                raise error.Error("Ambiguous route '%s'.\nMatching routes are: %s" % (arg, comma_join(matching_routes)))
             elif not matching_routes:
                 raise error.Error("Invalid route '%s'." % arg)
             else:
@@ -693,9 +689,9 @@ def _get_wanted_routes(configuration, route_args):
 
 
 def _print_route_dvers(routename, route):
-    printf("The default dver(s) for %s are: %s", routename, _commajoin(route.dvers))
+    printf("The default dver(s) for %s are: %s", routename, comma_join(route.dvers))
     if route.extra_dvers:
-        printf("The route optionally supports these dver(s): %s", _commajoin(route.extra_dvers))
+        printf("The route optionally supports these dver(s): %s", comma_join(route.extra_dvers))
 
 
 def main(argv=None):
@@ -716,7 +712,7 @@ def main(argv=None):
         printf("Promoting from %s to %s for dvers: %s",
                route.from_tag_hint % 'el*',
                route.to_tag_hint % 'el*',
-               _commajoin(dvers))
+               comma_join(dvers))
     printf("Examining the following packages/builds:\n%s", _bulletedlist(pkgs_or_builds))
 
     dvers = set()

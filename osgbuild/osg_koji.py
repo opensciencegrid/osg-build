@@ -16,7 +16,6 @@ from osgbuild.utils import (
     ask_yn,
     backtick,
     find_file,
-    find_resource,
     safe_make_backup,
     safe_makedirs,
     shell_quote)
@@ -137,10 +136,7 @@ def setup_parse_args(args):
 
 
 def make_config_text(authtype, principal):
-    template_path = (find_file(KOJI_CONFIG_TEMPLATE, DATA_FILE_SEARCH_PATH) or
-                     find_resource(KOJI_CONFIG_TEMPLATE))
-    if not template_path:
-        raise Error(f"Can't find template config file {KOJI_CONFIG_TEMPLATE}")
+    template_path = find_file(KOJI_CONFIG_TEMPLATE, DATA_FILE_SEARCH_PATH)
     if os.path.exists(SERVERCA_REDHAT):
         serverca = SERVERCA_REDHAT
     elif os.path.exists(SERVERCA_UBUNTU):

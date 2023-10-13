@@ -5,6 +5,7 @@
 # gets the values for the --repo arg -- which is only used for koji builds.
 # Make it so.
 import logging
+import traceback
 from optparse import OptionGroup, OptionParser, OptionValueError
 import re
 import sys
@@ -12,7 +13,7 @@ import tempfile
 import configparser
 
 from .constants import *
-from .error import UsageError, KojiError, SVNError, GitError, Error
+from .error import UsageError, KojiError, SVNError, GitError, Error, type_of_error
 from . import srpm
 from . import svn
 from . import git
@@ -771,6 +772,66 @@ def guess_pkg_dir(start_dir):
     return guess_dir
 
 
-if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+def entrypoint():
+    """CLI entrypoint for osg-build"""
+    try:
+        return main(sys.argv)
+    except UsageError as err:
+        print(str(err), file=sys.stderr)
+        print("""\
+    Type %(prog)s --help for usage info.
+    
+    Common usage patterns follow:
+    
+    To extract and patch the sources without building:
+        %(prog)s prepare PACKAGE1 <PACKAGE2..n>
+    
+    To look for potential errors in package(s):
+        %(prog)s lint PACKAGE1 <PACKAGE2..n>
+    
+    To build on the local machine:
+        %(prog)s rpmbuild PACKAGE1 <PACKAGE2..n>
+            OR
+        %(prog)s mock PACKAGE1 <PACKAGE2..n>
+    
+    To submit test build(s):
+        %(prog)s koji --scratch PACKAGE1 <PACKAGE2..n>
+    
+    To submit final build(s):
+        %(prog)s koji PACKAGE1 <PACKAGE2..n>
+    
+    To submit build(s) for EL7 or EL8 only:
+        %(prog)s koji --el7 PACKAGE1 <PACKAGE2..n>
+        %(prog)s koji --el8 PACKAGE1 <PACKAGE2..n>
+    
+    Also see the documentation at:
+        https://opensciencegrid.github.io/technology/software/osg-build-tools/
+    """ % {'prog': os.path.basename(sys.argv[0])}, file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print("", file=sys.stderr)
+        print("-" * 79, file=sys.stderr)
+        print("Interrupted", file=sys.stderr)
+        print("-" * 79, file=sys.stderr)
+        return 3
+    except Error as err:
+        print("-" * 79, file=sys.stderr)
+        print(str(err), file=sys.stderr)
+        print("-" * 79, file=sys.stderr)
+        log.debug("Full traceback follows:")
+        log.debug(traceback.format_exc())
+        return 4
+    except Exception as err:
+        print("-" * 79, file=sys.stderr)
+        print("An unhandled exception of type %s occurred:" % type_of_error(err), file=sys.stderr)
+        print(str(err), file=sys.stderr)
+        print("Please send a bug report with as much information", file=sys.stderr)
+        print("about the circumstances as you can provide to:", file=sys.stderr)
+        print(BUGREPORT_EMAIL, file=sys.stderr)
+        print("-" * 79, file=sys.stderr)
+        print("Full traceback follows:", file=sys.stderr)
+        raise
 
+
+if __name__ == '__main__':
+    sys.exit(entrypoint())

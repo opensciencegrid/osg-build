@@ -1,44 +1,4 @@
 #!/usr/bin/env python3
-import os
 import sys
-import traceback
-import logging
-
-from osgbuild.constants import BUGREPORT_EMAIL
-from osgbuild.error import Error, UsageError
-from osgbuild.utils import print_line
-from osgbuild import osg_sign
-
-log = logging.getLogger("osgbuild.osg_sign")
-
-try:
-    sys.exit(osg_sign.main(sys.argv))
-except UsageError as err:
-    print(str(err), file=sys.stderr)
-    print("""\
-Type %(prog)s --help for usage info.
-
-""" % {'prog': os.path.basename(sys.argv[0])}, file=sys.stderr)
-    sys.exit(2)
-except KeyboardInterrupt:
-    print("", file=sys.stderr)
-    print_line(sys.stderr)
-    print("Interrupted", file=sys.stderr)
-    print_line(sys.stderr)
-    sys.exit(3)
-except Error as err:
-    print_line(sys.stderr)
-    print(err, file=sys.stderr)
-    print_line(sys.stderr)
-    log.debug("Full traceback follows:")
-    log.debug(traceback.format_exc())
-    sys.exit(4)
-except Exception as err:
-    print_line(sys.stderr)
-    print("An unhandled exception occurred:", file=sys.stderr)
-    print(err, file=sys.stderr)
-    print("Please send a bug report with as much information about the", file=sys.stderr)
-    print("circumstances as you can provide to <%s>" % BUGREPORT_EMAIL, file=sys.stderr)
-    print_line(sys.stderr)
-    print("Full traceback follows:", file=sys.stderr)
-    raise
+from osgbuild.osg_sign import entrypoint
+sys.exit(entrypoint())

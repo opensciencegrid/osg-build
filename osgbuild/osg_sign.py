@@ -9,14 +9,16 @@ import re
 import os
 import shutil
 import subprocess
+import sys
+import traceback
 from tempfile import TemporaryDirectory
 from typing import List, Optional, Dict
 
 from . import constants
-from .error import Error, ProgramNotFoundError, KojiError, ConfigErrors
+from .error import Error, ProgramNotFoundError, KojiError, ConfigErrors, UsageError
 from . import utils
 from .kojiinter import KojiHelper
-from .utils import IniConfiguration
+from .utils import IniConfiguration, print_line
 
 log = logging.getLogger(__name__)
 
@@ -286,7 +288,7 @@ def main(argv: List[str]):
     config = SigningKeysConfig(utils.find_file(constants.SIGNING_KEYS_INI, strict=True))
     args = parse_commandline_args(argv)
 
-    if prog == "osg-sign":  # HACK. Is there a better way to do this?
+    if __name__ == "__main__":
         logging.basicConfig(format=f"{prog}: %(message)s", level=args.loglevel)
     log.setLevel(args.loglevel)
 
@@ -379,3 +381,38 @@ def parse_commandline_args(argv: List[str]):
         parser.error("No builds specified.")
 
     return args
+
+
+def entrypoint():
+    """CLI entrypoint for osg-sign"""
+    try:
+        return main(sys.argv)
+    except UsageError as err:
+        print(str(err), file=sys.stderr)
+        print("""\
+    Type %(prog)s --help for usage info.
+    
+    """ % {'prog': os.path.basename(sys.argv[0])}, file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print("", file=sys.stderr)
+        print_line(sys.stderr)
+        print("Interrupted", file=sys.stderr)
+        print_line(sys.stderr)
+        return 3
+    except Error as err:
+        print_line(sys.stderr)
+        print(err, file=sys.stderr)
+        print_line(sys.stderr)
+        log.debug("Full traceback follows:")
+        log.debug(traceback.format_exc())
+        return 4
+    except Exception as err:
+        print_line(sys.stderr)
+        print("An unhandled exception occurred:", file=sys.stderr)
+        print(err, file=sys.stderr)
+        print("Please send a bug report with as much information about the", file=sys.stderr)
+        print("circumstances as you can provide to <%s>" % constants.BUGREPORT_EMAIL, file=sys.stderr)
+        print_line(sys.stderr)
+        print("Full traceback follows:", file=sys.stderr)
+        raise

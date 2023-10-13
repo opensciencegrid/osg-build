@@ -26,7 +26,14 @@ DATA_FILE_SEARCH_PATH = [os.path.abspath(os.path.dirname(__file__) + "/../data")
 if "OSG_LOCATION" in os.environ:
     DATA_FILE_SEARCH_PATH.append(os.environ["OSG_LOCATION"] + DATA_DIR)
 DATA_FILE_SEARCH_PATH.append(DATA_DIR)
-
+try:
+    try:
+        import importlib_resources
+    except ImportError:
+        import importlib.resources as importlib_resources
+    DATA_FILE_SEARCH_PATH.append(str(importlib_resources.files("osgbuild.data")))
+except (ImportError, AttributeError):
+    pass
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
 SVN_REDHAT_PATH = "/native/redhat"
 

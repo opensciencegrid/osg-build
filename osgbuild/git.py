@@ -5,7 +5,8 @@ import re
 import os
 import errno
 try:
-    from urllib2.urlparse import urlsplit  # Python 2
+    # noinspection PyCompatibility
+    from urlparse import urlsplit  # Python 2
 except ImportError:
     # noinspection PyCompatibility
     from urllib.parse import urlsplit  # Python 3

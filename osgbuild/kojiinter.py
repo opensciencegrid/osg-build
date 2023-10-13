@@ -105,7 +105,7 @@ def download_koji_file(task_id, filename, destdir):
         raise
     utils.safe_makedirs(destdir)
     full_filename = os.path.join(destdir, filename)
-    with open(full_filename, 'w') as desthandle:
+    with open(full_filename, 'wb') as desthandle:
         desthandle.write(handle.read())
 
 

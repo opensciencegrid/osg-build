@@ -1,6 +1,8 @@
 """A package promotion script for OSG"""
 
 
+import logging
+import os
 import re
 import sys
 import configparser
@@ -12,6 +14,7 @@ from . import utils
 from .utils import comma_join, printf, print_table, split_nvr
 from optparse import OptionParser
 
+log = logging.getLogger(__name__)
 from collections import namedtuple
 
 DEFAULT_ROUTE = 'testing'
@@ -521,6 +524,8 @@ def parse_cmdline_args(configuration, argv):
 
     parser = OptionParser(helpstring)
 
+    parser.add_option("--debug", dest="loglevel", action="store_const", const=logging.DEBUG,
+                      help="Print debug messages")
     parser.add_option("-r", "--route", dest="routes", action="append",
                       help="The promotion route to use. May be specified multiple times. "
                       "Multiple routes may also be separated by commas")
@@ -532,6 +537,7 @@ def parse_cmdline_args(configuration, argv):
                       help="Regenerate repo(s) afterward")
     parser.add_option("-y", "--assume-yes", action="store_true", default=False,
                       help="Do not prompt before promotion")
+    parser.set_default("loglevel", logging.INFO)
     for dver in all_dvers:
         parser.add_option("--%s-only" % dver,                action="store_const",  dest="only_dver",   const=dver,
                           default=None, help="Promote only %s builds" % dver)
@@ -600,6 +606,9 @@ def main(argv=None):
     configuration.load_inifile(INIFILE)
 
     options, wanted_routes, pkgs_or_builds = parse_cmdline_args(configuration, argv)
+    if os.path.basename(argv[0]) == "osg-promote":  # HACK. Is there a better way to do this?
+        logging.basicConfig(format=f"%(message)s", level=options.loglevel)
+    log.setLevel(options.loglevel)
     valid_routes = configuration.routes
     route_dvers_pairs = _get_route_dvers_pairs(wanted_routes, valid_routes, options.extra_dvers, options.no_dvers,
                                                options.only_dver)

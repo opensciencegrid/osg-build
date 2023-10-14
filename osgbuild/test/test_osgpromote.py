@@ -19,12 +19,34 @@ INIFILE = "promoter.ini"
 log = logging.getLogger('osgpromote')
 log.setLevel(logging.ERROR)
 
-TAGS = ['devops-el7-itb',
+TAGS = ['condor-el6',
+        'condor-el7',
+        'condor-el7-build',
+        'devops-el7-build',
+        'devops-el7-itb',
         'devops-el7-production',
+        'devops-el8-build',
         'devops-el8-itb',
         'devops-el8-production',
+        'devops-el9-build',
         'devops-el9-itb',
         'devops-el9-production',
+        'dist-el6',
+        'dist-el7',
+        'dist-el7-build',
+        'dist-el8',
+        'dist-el8-build',
+        'dist-el9',
+        'dist-el9-build',
+        'epelrescue-el6',
+        'epelrescue-el7',
+        'goc-el6-itb',
+        'goc-el6-production',
+        'goc-el7-itb',
+        'goc-el7-production',
+        'hcc-el6',
+        'hcc-el6-release',
+        'hcc-el6-testing',
         'hcc-el7',
         'hcc-el7-build',
         'hcc-el7-release',
@@ -37,6 +59,46 @@ TAGS = ['devops-el7-itb',
         'hcc-el9-build',
         'hcc-el9-release',
         'hcc-el9-testing',
+        'kojira-fake',
+        'osg-23-el8-contrib',
+        'osg-23-el8-empty',
+        'osg-23-el9-contrib',
+        'osg-23-el9-empty',
+        'osg-23-internal-el8-build',
+        'osg-23-internal-el8-development',
+        'osg-23-internal-el8-release',
+        'osg-23-internal-el9-build',
+        'osg-23-internal-el9-development',
+        'osg-23-internal-el9-release',
+        'osg-23-main-el8-bootstrap',
+        'osg-23-main-el8-build',
+        'osg-23-main-el8-development',
+        'osg-23-main-el8-prerelease',
+        'osg-23-main-el8-release',
+        'osg-23-main-el8-testing',
+        'osg-23-main-el9-bootstrap',
+        'osg-23-main-el9-build',
+        'osg-23-main-el9-development',
+        'osg-23-main-el9-prerelease',
+        'osg-23-main-el9-release',
+        'osg-23-main-el9-testing',
+        'osg-23-upcoming-el8-build',
+        'osg-23-upcoming-el8-development',
+        'osg-23-upcoming-el8-prerelease',
+        'osg-23-upcoming-el8-release',
+        'osg-23-upcoming-el8-testing',
+        'osg-23-upcoming-el9-build',
+        'osg-23-upcoming-el9-development',
+        'osg-23-upcoming-el9-prerelease',
+        'osg-23-upcoming-el9-release',
+        'osg-23-upcoming-el9-testing',
+        'osg-3.4-el6-contrib',
+        'osg-3.4-el6-development',
+        'osg-3.4-el6-empty',
+        'osg-3.4-el6-prerelease',
+        'osg-3.4-el6-release',
+        'osg-3.4-el6-rolling',
+        'osg-3.4-el6-testing',
         'osg-3.4-el7-build',
         'osg-3.4-el7-contrib',
         'osg-3.4-el7-development',
@@ -52,36 +114,6 @@ TAGS = ['devops-el7-itb',
         'osg-3.5-el7-empty',
         'osg-3.5-el7-prerelease',
         'osg-3.5-el7-release',
-        'osg-3.5-el7-release-3.5.0',
-        'osg-3.5-el7-release-3.5.1',
-        'osg-3.5-el7-release-3.5.10',
-        'osg-3.5-el7-release-3.5.11',
-        'osg-3.5-el7-release-3.5.12',
-        'osg-3.5-el7-release-3.5.13',
-        'osg-3.5-el7-release-3.5.14',
-        'osg-3.5-el7-release-3.5.15',
-        'osg-3.5-el7-release-3.5.16',
-        'osg-3.5-el7-release-3.5.17',
-        'osg-3.5-el7-release-3.5.18',
-        'osg-3.5-el7-release-3.5.19',
-        'osg-3.5-el7-release-3.5.2',
-        'osg-3.5-el7-release-3.5.20',
-        'osg-3.5-el7-release-3.5.21',
-        'osg-3.5-el7-release-3.5.22',
-        'osg-3.5-el7-release-3.5.23',
-        'osg-3.5-el7-release-3.5.24',
-        'osg-3.5-el7-release-3.5.25',
-        'osg-3.5-el7-release-3.5.26',
-        'osg-3.5-el7-release-3.5.27',
-        'osg-3.5-el7-release-3.5.28',
-        'osg-3.5-el7-release-3.5.29',
-        'osg-3.5-el7-release-3.5.3',
-        'osg-3.5-el7-release-3.5.4',
-        'osg-3.5-el7-release-3.5.5',
-        'osg-3.5-el7-release-3.5.6',
-        'osg-3.5-el7-release-3.5.7',
-        'osg-3.5-el7-release-3.5.8',
-        'osg-3.5-el7-release-3.5.9',
         'osg-3.5-el7-release-build',
         'osg-3.5-el7-rolling',
         'osg-3.5-el7-testing',
@@ -91,15 +123,6 @@ TAGS = ['devops-el7-itb',
         'osg-3.5-el8-empty',
         'osg-3.5-el8-prerelease',
         'osg-3.5-el8-release',
-        'osg-3.5-el8-release-3.5.21',
-        'osg-3.5-el8-release-3.5.22',
-        'osg-3.5-el8-release-3.5.23',
-        'osg-3.5-el8-release-3.5.24',
-        'osg-3.5-el8-release-3.5.25',
-        'osg-3.5-el8-release-3.5.26',
-        'osg-3.5-el8-release-3.5.27',
-        'osg-3.5-el8-release-3.5.28',
-        'osg-3.5-el8-release-3.5.29',
         'osg-3.5-el8-release-build',
         'osg-3.5-el8-rolling',
         'osg-3.5-el8-testing',
@@ -141,6 +164,7 @@ TAGS = ['devops-el7-itb',
         'osg-3.6-el9-prerelease',
         'osg-3.6-el9-release',
         'osg-3.6-el9-release-build',
+        'osg-3.6-el9-rolling',
         'osg-3.6-el9-testing',
         'osg-3.6-upcoming-el7-build',
         'osg-3.6-upcoming-el7-development',
@@ -156,7 +180,19 @@ TAGS = ['devops-el7-itb',
         'osg-3.6-upcoming-el9-development',
         'osg-3.6-upcoming-el9-prerelease',
         'osg-3.6-upcoming-el9-release',
+        'osg-3.6-upcoming-el9-rolling',
         'osg-3.6-upcoming-el9-testing',
+        'osg-el6',
+        'osg-el6-internal',
+        'osg-el7',
+        'osg-el7-internal',
+        'osg-el7-internal-build',
+        'osg-el8',
+        'osg-el8-internal',
+        'osg-el8-internal-build',
+        'osg-el9',
+        'osg-el9-internal',
+        'osg-el9-internal-build',
         'osg-upcoming-el7-build',
         'osg-upcoming-el7-development',
         'osg-upcoming-el7-prerelease',
@@ -174,13 +210,13 @@ TAGS = ['devops-el7-itb',
 
 class FakeKojiHelper(osgbuild.kojiinter.KojiHelper):
     tagged_builds_by_tag = {
-            'osg-3.5-el7-development': [
-                {'nvr': 'goodpkg-2000-1.osg35.el7', 'latest': True},
-                {'nvr': 'reject-distinct-repos-1-1.osg35.el7', 'latest': True},
+            'osg-23-main-el9-development': [
+                {'nvr': 'goodpkg-2000-1.osg23.el9', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg23.el9', 'latest': True},
                 ],
-            'osg-3.5-el8-development': [
-                {'nvr': 'goodpkg-2000-1.osg35.el8', 'latest': True},
-                {'nvr': 'reject-distinct-repos-1-1.osg35.el8', 'latest': True},
+            'osg-23-main-el8-development': [
+                {'nvr': 'goodpkg-2000-1.osg23.el8', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg23.el8', 'latest': True},
                 ],
             'osg-3.6-el7-development': [
                 {'nvr': 'goodpkg-1999-1.osg36.el7', 'latest': False},
@@ -214,25 +250,25 @@ class FakeKojiHelper(osgbuild.kojiinter.KojiHelper):
                 {'nvr': 'reject-distinct-dvers-2-1.osgup.el8', 'latest': True},
                 {'nvr': 'partially-overlapping-dvers-in-repo-1-1.osgup.el8', 'latest': True},
                 ],
-            'osg-3.5-upcoming-el7-development': [
-                {'nvr': 'goodpkg-2000-1.osg35.el7', 'latest': True},
-                {'nvr': 'reject-distinct-repos-1-1.osg35.el7', 'latest': True},
+            'osg-23-upcoming-el9-development': [
+                {'nvr': 'goodpkg-2000-1.osg23up.el9', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg23up.el9', 'latest': True},
             ],
-            'osg-3.5-upcoming-el8-development': [
-                {'nvr': 'goodpkg-2000-1.osg35.el8', 'latest': True},
-                {'nvr': 'reject-distinct-repos-1-1.osg35.el8', 'latest': True},
+            'osg-23-upcoming-el8-development': [
+                {'nvr': 'goodpkg-2000-1.osg23up.el8', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg23up.el8', 'latest': True},
             ],
             'osg-3.6-upcoming-el7-development': [
-                {'nvr': 'goodpkg-2000-1.osg35.el7', 'latest': True},
-                {'nvr': 'reject-distinct-repos-1-1.osg35.el7', 'latest': True},
+                {'nvr': 'goodpkg-2000-1.osg36up.el7', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg36up.el7', 'latest': True},
             ],
             'osg-3.6-upcoming-el8-development': [
-                {'nvr': 'goodpkg-2000-1.osg35.el8', 'latest': True},
-                {'nvr': 'reject-distinct-repos-1-1.osg35.el8', 'latest': True},
+                {'nvr': 'goodpkg-2000-1.osg36up.el8', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg36up.el8', 'latest': True},
             ],
             'osg-3.6-upcoming-el9-development': [
-                {'nvr': 'goodpkg-2000-1.osg35.el9', 'latest': True},
-                {'nvr': 'reject-distinct-repos-1-1.osg35.el9', 'latest': True},
+                {'nvr': 'goodpkg-2000-1.osg36up.el9', 'latest': True},
+                {'nvr': 'reject-distinct-repos-1-1.osg36up.el9', 'latest': True},
             ],
     }
 
@@ -284,12 +320,13 @@ class FakeKojiHelper(osgbuild.kojiinter.KojiHelper):
 
 
 class TestUtil(unittest.TestCase):
-    buildnvr = "osg-build-1.3.2-1.osg35.el7"
-    def test_split_nvr(self):
-        self.assertEqual(('osg-build', '1.3.2', '1.osg35.el7'), osgbuild.utils.split_nvr(self.buildnvr))
+    buildnvr = "osg-build-1.3.2-1.osg23.el9"
 
-    def test_split_repo_dver(self):
-        self.assertEqual(('osg-build-1.3.2-1', 'osg35', 'el7'), promoter.split_repotag_dver(self.buildnvr))
+    def test_split_nvr(self):
+        self.assertEqual(('osg-build', '1.3.2', '1.osg23.el9'), osgbuild.utils.split_nvr(self.buildnvr))
+
+    def test_split_repotag_dver(self):
+        self.assertEqual(('osg-build-1.3.2-1', 'osg23', 'el9'), promoter.split_repotag_dver(self.buildnvr))
         self.assertEqual(('foo-1-1', 'osg', ''), promoter.split_repotag_dver('foo-1-1.osg'))
         self.assertEqual(('foo-1-1', '', 'el7'), promoter.split_repotag_dver('foo-1-1.el7'))
         self.assertEqual(('foo-1-1', '', ''), promoter.split_repotag_dver('foo-1-1'))
@@ -318,12 +355,12 @@ class TestRouteLoader(unittest.TestCase):
         self.assertEqual(['el7'], self.routes['hcc'].dvers)
 
     def test_osg_route(self):
-        self.assertEqual('osg-3.5-%s-development', self.routes['3.5-testing'].from_tag_hint)
-        self.assertEqual('osg-3.5-%s-testing', self.routes['3.5-testing'].to_tag_hint)
-        self.assertEqual('osg35', self.routes['3.5-testing'].repotag)
-        self.assertEqual('osg-3.5-upcoming-%s-development', self.routes['3.5-upcoming'].from_tag_hint)
-        self.assertEqual('osg-3.5-upcoming-%s-testing', self.routes['3.5-upcoming'].to_tag_hint)
-        self.assertEqual('osg35up', self.routes['3.5-upcoming'].repotag)
+        self.assertEqual('osg-23-main-%s-development', self.routes['23-main'].from_tag_hint)
+        self.assertEqual('osg-23-main-%s-testing', self.routes['23-main'].to_tag_hint)
+        self.assertEqual('osg23', self.routes['23-main'].repotag)
+        self.assertEqual('osg-23-upcoming-%s-development', self.routes['23-upcoming'].from_tag_hint)
+        self.assertEqual('osg-23-upcoming-%s-testing', self.routes['23-upcoming'].to_tag_hint)
+        self.assertEqual('osg23up', self.routes['23-upcoming'].repotag)
 
         self.assertEqual('osg-3.6-%s-development', self.routes['3.6-testing'].from_tag_hint)
         self.assertEqual('osg-3.6-%s-testing', self.routes['3.6-testing'].to_tag_hint)
@@ -334,88 +371,97 @@ class TestRouteLoader(unittest.TestCase):
 
     def test_route_alias(self):
         for key in 'from_tag_hint', 'to_tag_hint', 'repotag':
-            self.assertEqual(getattr(self.configuration.matching_routes('testing')[0], key), getattr(self.routes['3.5-testing'], key))
-            self.assertEqual(getattr(self.configuration.matching_routes('3.5-rfr')[0], key), getattr(self.routes['3.5-prerelease'], key))
-            self.assertEqual(getattr(self.configuration.matching_routes('3.5-rfr')[1], key), getattr(self.routes['3.5-rolling'], key))
-            self.assertEqual(getattr(self.configuration.matching_routes('3.6-rfr')[0], key), getattr(self.routes['3.6-prerelease'], key))
+            self.assertEqual(getattr(self.configuration.matching_routes('23-testing')[0], key),
+                             getattr(self.routes['23-main'], key))
+            self.assertEqual(getattr(self.configuration.matching_routes('3.6-rfr')[0], key),
+                             getattr(self.routes['3.6-prerelease'], key))
 
     def test_type(self):
         for route in self.routes.values():
-            self.assertTrue(isinstance(route, promoter.Route))
+            self.assertIsInstance(route, promoter.Route)
 
 
 class TestPromoter(unittest.TestCase):
-    dvers = ['el7', 'el8', 'el9']
-    dvers_upcoming = ['el7', 'el8', 'el9']
 
     def setUp(self):
         self.configuration = _config()
         self.kojihelper = FakeKojiHelper(False)
-        self.testing_route = self.configuration.routes['3.6-testing']
-        self.testing_promoter = self._make_promoter([self.testing_route])
-        self.multi_routes = [self.configuration.routes['3.5-testing'], self.configuration.routes['3.6-testing']]
+        self.route_36testing = self.configuration.routes['3.6-testing']
+        self.promoter_36testing = self._make_promoter([self.route_36testing],
+                                                      dvers=self.route_36testing.dvers)
+        self.route_36upcoming = self.configuration.routes['3.6-upcoming']
+        self.promoter_36upcoming = self._make_promoter([self.route_36upcoming],
+                                                       dvers=self.route_36upcoming.dvers)
+        self.route_23main = self.configuration.routes['23-main']
+        self.promoter_23main = self._make_promoter([self.route_23main],
+                                                   dvers=self.route_23main.dvers)
+        self.route_23upcoming = self.configuration.routes['23-upcoming']
+        self.promoter_23upcoming = self._make_promoter([self.route_23upcoming],
+                                                       dvers=self.route_23upcoming.dvers)
+        self.multi_routes = [self.configuration.routes['23-main'], self.configuration.routes['3.6-testing']]
 
-    def _make_promoter(self, routes, dvers=None):
-        dvers = dvers or TestPromoter.dvers
+
+    def _make_promoter(self, routes, dvers):
         pairs = [(route, set(dvers)) for route in routes]
         return promoter.Promoter(self.kojihelper, pairs)
 
     def test_add_promotion(self):
-        self.testing_promoter.add_promotion('goodpkg')
-        for dver in self.dvers:
-            self.assertTrue(
-                'goodpkg-2000-1.osg36.%s' % dver in
-                [x.nvr for x in self.testing_promoter.tag_pkg_args[self.testing_route.to_tag_hint % dver]])
+        self.promoter_36testing.add_promotion('goodpkg')
+        for dver in self.route_36testing.dvers:
+            self.assertIn(
+                'goodpkg-2000-1.osg36.%s' % dver,
+                [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % dver]])
 
     def test_add_promotion_with_nvr(self):
-        self.testing_promoter.add_promotion('goodpkg-2000-1.osg36.el8')
-        for dver in self.dvers:
-            self.assertTrue(
-                'goodpkg-2000-1.osg36.%s' % dver in
-                [x.nvr for x in self.testing_promoter.tag_pkg_args[self.testing_route.to_tag_hint % dver]])
+        self.promoter_36testing.add_promotion('goodpkg-2000-1.osg36.el8')
+        for dver in self.route_36testing.dvers:
+            self.assertIn(
+                'goodpkg-2000-1.osg36.%s' % dver,
+                [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % dver]])
 
     def test_add_promotion_with_nvr_no_dist(self):
-        self.testing_promoter.add_promotion('goodpkg-2000-1')
-        for dver in self.dvers:
-            self.assertTrue(
-                'goodpkg-2000-1.osg36.%s' % dver in
-                [x.nvr for x in self.testing_promoter.tag_pkg_args[self.testing_route.to_tag_hint % dver]])
+        self.promoter_36testing.add_promotion('goodpkg-2000-1')
+        for dver in self.route_36testing.dvers:
+            self.assertIn(
+                'goodpkg-2000-1.osg36.%s' % dver,
+                [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % dver]])
 
     def test_reject_add(self):
-        self.testing_promoter.add_promotion('goodpkg')
-        self.testing_promoter.add_promotion('reject-distinct-dvers')
-        self.assertFalse(
-            'reject-distinct-dvers-1-1.osg36.el8' in
-            [x.nvr for x in self.testing_promoter.tag_pkg_args[self.testing_route.to_tag_hint % 'el8']])
+        self.promoter_36testing.add_promotion('goodpkg')
+        self.promoter_36testing.add_promotion('reject-distinct-dvers')
+        self.assertNotIn(
+            'reject-distinct-dvers-1-1.osg36.el8',
+            [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % 'el8']])
 
     def test_reject_add_with_ignore(self):
-        self.testing_promoter.add_promotion('goodpkg')
-        self.testing_promoter.add_promotion('reject-distinct-dvers', ignore_rejects=True)
-        self.assertTrue(
-            'reject-distinct-dvers-1-1.osg36.el8' in
-            [x.nvr for x in self.testing_promoter.tag_pkg_args[self.testing_route.to_tag_hint % 'el8']])
-        self.assertTrue(
-            'reject-distinct-dvers-2-1.osg36.el7' in
-            [x.nvr for x in self.testing_promoter.tag_pkg_args[self.testing_route.to_tag_hint % 'el7']])
+        self.promoter_36testing.add_promotion('goodpkg')
+        self.promoter_36testing.add_promotion('reject-distinct-dvers', ignore_rejects=True)
+        self.assertIn(
+            'reject-distinct-dvers-1-1.osg36.el8',
+            [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % 'el8']])
+        self.assertIn(
+            'reject-distinct-dvers-2-1.osg36.el7',
+            [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % 'el7']])
 
     def test_new_reject(self):
-        self.testing_promoter.add_promotion('reject-distinct-dvers')
-        rejs = self.testing_promoter.rejects
+        self.promoter_36testing.add_promotion('reject-distinct-dvers')
+        rejs = self.promoter_36testing.rejects
         self.assertEqual(1, len(rejs))
         self.assertEqual('reject-distinct-dvers', rejs[0].pkg_or_build)
         self.assertEqual(promoter.Reject.REASON_DISTINCT_ACROSS_DISTS, rejs[0].reason)
 
     def test_multi_promote(self):
-        prom = self._make_promoter(self.multi_routes)
+        prom = self._make_promoter(self.multi_routes,
+                                   dvers=self.route_23main.dvers)
         prom.add_promotion('goodpkg-2000-1')
-        for dver in ['el8', 'el7']:
-            for osgver in ['3.5', '3.6']:
-                tag = 'osg-%s-%s-testing' % (osgver, dver)
+        for dver in self.route_23main.dvers:
+            for osgver, repo in [('23', '23-main'), ('3.6', '3.6')]:
+                tag = 'osg-%s-%s-testing' % (repo, dver)
                 dist = 'osg%s.%s' % (osgver.replace(".", ""), dver)
                 pkg = 'goodpkg-2000-1.%s' % dist
 
-                self.assertTrue(tag in prom.tag_pkg_args)
-                self.assertTrue(pkg in [x.nvr for x in prom.tag_pkg_args[tag]])
+                self.assertIn(tag, prom.tag_pkg_args)
+                self.assertIn(pkg, [x.nvr for x in prom.tag_pkg_args[tag]])
 
     def test_cross_dist_reject(self):
         prom = self._make_promoter(self.multi_routes, ['el8'])
@@ -425,30 +471,31 @@ class TestPromoter(unittest.TestCase):
         self.assertEqual(promoter.Reject.REASON_DISTINCT_ACROSS_DISTS, rejs[0].reason)
 
     def test_do_promotions(self):
-        self.testing_promoter.add_promotion('goodpkg')
-        promoted_builds = self.testing_promoter.do_promotions()
-        self.assertEqual(2, len(self.kojihelper.newly_tagged_packages))
-        for dver in ['el7', 'el8', 'el9']:
+        self.promoter_36testing.add_promotion('goodpkg')
+        promoted_builds = self.promoter_36testing.do_promotions()
+        self.assertEqual(3, len(self.kojihelper.newly_tagged_packages))
+        for dver in self.route_36testing.dvers:
             tag = 'osg-3.6-%s-testing' % dver
             dist = 'osg36.%s' % dver
             nvr = 'goodpkg-2000-1.%s' % dist
-            self.assertTrue(tag in promoted_builds)
-            self.assertTrue(nvr in [x.nvr for x in promoted_builds[tag]])
+            self.assertIn(tag, promoted_builds)
+            self.assertIn(nvr, [x.nvr for x in promoted_builds[tag]])
             self.assertEqual(1, len(promoted_builds[tag]))
-        self.assertEqual(2, len(promoted_builds))
+        self.assertEqual(3, len(promoted_builds))
 
     def test_do_multi_promotions(self):
-        prom = self._make_promoter(self.multi_routes)
+        prom = self._make_promoter(self.multi_routes,
+                                   dvers=self.route_23main.dvers)
         prom.add_promotion('goodpkg-2000-1')
         promoted_builds = prom.do_promotions()
         self.assertEqual(4, len(self.kojihelper.newly_tagged_packages))
-        for osgver in ['3.5', '3.6']:
-            for dver in ['el7', 'el8']:
-                tag = 'osg-%s-%s-testing' % (osgver, dver)
+        for osgver, repo in [('23', '23-main'), ('3.6', '3.6')]:
+            for dver in self.route_23main.dvers:
+                tag = 'osg-%s-%s-testing' % (repo, dver)
                 dist = 'osg%s.%s' % (osgver.replace(".", ""), dver)
                 nvr = 'goodpkg-2000-1.%s' % dist
-                self.assertTrue(tag in promoted_builds)
-                self.assertTrue(nvr in [x.nvr for x in promoted_builds[tag]])
+                self.assertIn(tag, promoted_builds)
+                self.assertIn(nvr, [x.nvr for x in promoted_builds[tag]])
                 self.assertEqual(1, len(promoted_builds[tag]))
         self.assertEqual(4, len(promoted_builds))
 
@@ -465,16 +512,17 @@ class TestPromoter(unittest.TestCase):
         out = StringIO()
         promoted_builds = {}
         if real_promotions:
-            prom = self._make_promoter(self.multi_routes)
+            prom = self._make_promoter(self.multi_routes,
+                                       dvers=self.route_23main.dvers)
             prom.add_promotion('goodpkg-2000-1')
             promoted_builds = prom.do_promotions()
         expected_lines = [
             "*Promotions*",
-            "Promoted goodpkg-2000-1 to osg-3.5-el*-testing, osg-3.6-el*-testing",
+            "Promoted goodpkg-2000-1 to osg-23-main-el*-testing, osg-3.6-el*-testing",
             "|| Build || Tag ||"]
-        for osgver in ['3.5', '3.6']:
-            for dver in ['el7', 'el8']:
-                tag = 'osg-%s-%s-testing' % (osgver, dver)
+        for osgver, repo in [('23', '23-main'), ('3.6', '3.6')]:
+            for dver in self.route_23main.dvers:
+                tag = 'osg-%s-%s-testing' % (repo, dver)
                 dist = 'osg%s.%s' % (osgver.replace(".", ""), dver)
                 nvr = 'goodpkg-2000-1.%s' % dist
 
@@ -494,18 +542,19 @@ class TestPromoter(unittest.TestCase):
         out = StringIO()
         promoted_builds = {}
         if real_promotions:
-            prom = self._make_promoter(self.multi_routes)
+            prom = self._make_promoter(self.multi_routes,
+                                       dvers=self.route_23main.dvers)
             prom.add_promotion('goodpkg-2000-1')
             promoted_builds = prom.do_promotions()
         expected_lines = [
             "**Promotions**",
-            "Promoted goodpkg-2000-1 to osg-3.5-el*-testing, osg-3.6-el*-testing",
+            "Promoted goodpkg-2000-1 to osg-23-main-el*-testing, osg-3.6-el*-testing",
             "**Build** | **Tag**",
             "--- | ---",
         ]
-        for osgver in ['3.5', '3.6']:
-            for dver in ['el7', 'el8']:
-                tag = 'osg-%s-%s-testing' % (osgver, dver)
+        for osgver, repo in [('23', '23-main'), ('3.6', '3.6')]:
+            for dver in self.route_23main.dvers:
+                tag = 'osg-%s-%s-testing' % (repo, dver)
                 dist = 'osg%s.%s' % (osgver.replace(".", ""), dver)
                 nvr = 'goodpkg-2000-1.%s' % dist
 

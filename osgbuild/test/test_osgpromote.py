@@ -16,7 +16,7 @@ from osgbuild import utils
 
 INIFILE = "promoter.ini"
 
-log = logging.getLogger('osgpromote')
+log = logging.getLogger('promoter')
 log.setLevel(logging.ERROR)
 
 TAGS = ['condor-el6',

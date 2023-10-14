@@ -6,17 +6,17 @@ import os
 import re
 import sys
 import configparser
+from typing import List
 
 from osgbuild.kojiinter import KojiHelper
 from . import constants
 from . import error
 from . import utils
+from .osg_sign import SigningKey
 from .utils import comma_join, printf, print_table, split_nvr
 from optparse import OptionParser
 
 log = logging.getLogger(__name__)
-from collections import namedtuple
-
 DEFAULT_ROUTE = 'testing'
 INIFILE = 'promoter.ini'
 
@@ -29,7 +29,21 @@ class KojiTagsAreMessedUp(Exception):
     """
 
 
-Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repotag', 'dvers', 'extra_dvers'])
+class Route(object):
+    """Information about a promotion route"""
+    def __init__(self, from_tag_hint, to_tag_hint, repotag, dvers, extra_dvers, required_keys=None):
+        # type: (str, str, str, List[str], List[str], List[SigningKey]) -> None
+        self.from_tag_hint = from_tag_hint
+        self.to_tag_hint = to_tag_hint
+        self.repotag = repotag
+        self.dvers = dvers
+        self.extra_dvers = extra_dvers
+        self.required_keys = required_keys or []
+
+    def required_keys_for_dver(self, dver):
+        # type: (str) -> List[SigningKey]
+        """The key ids of the keys required for the given dver for this route"""
+        return [x for x in self.required_keys if dver in x.dvers]
 
 
 class Build(object):

@@ -510,13 +510,12 @@ def parse_cmdline_args(configuration, argv):
     :return: the options, the list of route names the user wants to use,
              and the list of packages or builds to promote
     """
-    helpstring = "%prog [-r|--route ROUTE]... [options] <packages or builds>"
+    helpstring = "%prog -r|--route ROUTE... [options] <packages or builds>"
     helpstring += "\n\nThe following routes exist:\n"
     helpstring += format_valid_routes(configuration.routes)
     if configuration.aliases:
         helpstring += "\nThe following aliases to routes exist:\n"
         helpstring += format_aliases(configuration.aliases)
-    helpstring += "\n\nThe default route is %s.\n" % configuration.default_route
 
     all_dvers = configuration.all_dvers
 
@@ -549,7 +548,7 @@ def parse_cmdline_args(configuration, argv):
 
     wanted_routes = None
     if not options.routes:
-        wanted_routes = [configuration.default_route]
+        parser.error("You must specify a promotion route")
     else:
         try:
             wanted_routes = _get_wanted_routes(configuration, options.routes)

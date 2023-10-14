@@ -5,20 +5,17 @@ import logging
 import os
 import re
 import sys
-import configparser
-from typing import List
+from typing import List, Dict
 
 from osgbuild.kojiinter import KojiHelper
 from . import constants
 from . import error
 from . import utils
-from .osg_sign import SigningKey
-from .utils import comma_join, printf, print_table, split_nvr
+from .osg_sign import SigningKey, SigningKeysConfig
+from .utils import comma_join, printf, print_table, IniConfiguration, split_nvr
 from optparse import OptionParser
 
 log = logging.getLogger(__name__)
-DEFAULT_ROUTE = 'testing'
-INIFILE = 'promoter.ini'
 
 
 class KojiTagsAreMessedUp(Exception):
@@ -100,13 +97,20 @@ class Reject(object):
     __repr__ = __str__
 
 
-class Configuration(object):
-    routes = {}
-    aliases = {}
-    default_route = DEFAULT_ROUTE
+class Configuration(IniConfiguration):
+    def __init__(self, inifiles, signing_keys_config: SigningKeysConfig):
+        super().__init__(inifiles)
 
-    def load_inifile(self, inifile):
-        """Load routes from an ini file.
+        self.signing_keys_config = signing_keys_config
+        self.signing_keys_by_name = signing_keys_config.signing_keys_by_name
+
+        route_sections = [sec for sec in self.cp.sections() if sec.startswith('route ')]
+        self.routes = self.parse_routes(route_sections, self.signing_keys_by_name)
+        self.aliases = self.parse_aliases(self.routes)
+
+    def parse_routes(self, route_sections, signing_keys):
+        # type: (List[str], Dict[str, SigningKey]) -> Dict[str, Route]
+        """Parse the 'route X' sections of the config file
 
         A section called "route X" creates a route named "X".
         Required attributes in a route section are:
@@ -118,51 +122,75 @@ class Configuration(object):
           like '.osg33.el5'
         - dvers: a comma or space separated list of distro versions (dvers)
           supported by default for the tags in the route, e.g. "el5 el6"
-        The optional attribute is:
+        The optional attributes are:
         - extra_dvers: a comma or space separated list of dvers that are supported
           by the tags in the route but should not be on by default
+        - required_keys: a comma or space separated list of signing key names;
+          if present, the packages being promoted must be signed by one of them.
+          There must be a key section corresponding to each key.
 
-        A section called "aliases" defined alternate names for a route.
+        """
+        routes = {}
+        for sec in route_sections:
+            routename = sec.split(None, 1)[1]
+            from_tag_hint = self.config_safe_get(sec, 'from')
+            to_tag_hint = self.config_safe_get(sec, 'to')
+            repotag = self.config_safe_get(sec, 'repotag')
+            dvers = self.config_safe_get_list(sec, 'dvers')
+            extra_dvers = self.config_safe_get_list(sec, 'extra_dvers')
+            required_keys = self.config_safe_get_list(sec, 'required_keys')
+
+            errors = []
+            if not from_tag_hint:
+                errors.append("'from' not provided or empty")
+            if not to_tag_hint:
+                errors.append("'to' not provided or empty")
+            if not repotag:
+                errors.append("'repotag' not provided or empty")
+            if not dvers:
+                errors.append("'dvers' not provided or empty")
+            required_key_objs = []
+            for rk in required_keys:
+                if rk in signing_keys:
+                    required_key_objs.append(signing_keys[rk])
+                else:
+                    errors.append("unknown required_key %r" % rk)
+            if errors:
+                raise error.ConfigErrors("Section %r" % sec, errors)
+
+            routes[routename] = Route(from_tag_hint,
+                                      to_tag_hint,
+                                      repotag,
+                                      dvers,
+                                      extra_dvers,
+                                      required_key_objs)
+        return routes
+
+    def parse_aliases(self, routes):
+        # type: (Dict[str, Route]) -> Dict[str, List[str]]
+        """Parse an 'aliases' section.
+
+        A section called "aliases" defines alternate names for a route.
         The key of each attribute in the section is the new name, and the value
         is the old name, e.g. "testing=3.2-testing".  Aliases to aliases cannot be
         defined.
 
         """
-        cp = configparser.RawConfigParser()
-        cp.read(utils.find_files(inifile, constants.DATA_FILE_SEARCH_PATH))
-        if not cp.sections():
-            raise error.FileNotFoundInSearchPathError(inifile, constants.DATA_FILE_SEARCH_PATH)
-
-        for sec in cp.sections():
-            if not sec.startswith('route '):
-                continue
-            routename = sec.split(None, 1)[1]
-            try:
-                from_tag_hint = cp.get(sec, 'from')
-                to_tag_hint = cp.get(sec, 'to')
-                repotag = cp.get(sec, 'repotag')
-                dvers = _parse_list_str(cp.get(sec, 'dvers'))
-            except configparser.NoOptionError as err:
-                raise error.Error("Malformed config file: %s" % str(err))
-            extra_dvers = []
-            if cp.has_option(sec, 'extra_dvers'):
-                extra_dvers = _parse_list_str(cp.get(sec, 'extra_dvers'))
-
-            self.routes[routename] = Route(from_tag_hint, to_tag_hint, repotag, dvers,
-                                                    extra_dvers)
-
-        if cp.has_section('aliases'):
-            for newname, target in cp.items('aliases'):
-                routelist = _parse_list_str(target)
-                for r in routelist:
-                    if r not in self.routes:
-                        raise error.Error(
-                            "Alias {0} to {1} failed: {2} does not exist".format(
-                                newname, target, r))
-                if newname.lower() == "default":
-                    self.default_route = target
-                else:
-                    self.aliases[newname] = routelist
+        if 'aliases' not in self.cp:
+            return {}
+        aliases = {}
+        errors = []
+        for newname, target in self.cp.items('aliases'):
+            routelist = self._parse_list_str(target)
+            for route in routelist:
+                if route not in routes:
+                    errors.append("Alias %s to %s failed: route named %s is not defined" % (newname, target, route))
+                    break
+            else:
+                aliases[newname] = routelist
+        if errors:
+            raise error.ConfigErrors("Aliases", errors)
+        return aliases
 
     def matching_route_names(self, route_or_alias):
         if route_or_alias in self.routes:
@@ -237,14 +265,6 @@ def split_repotag_dver(build, known_repotags=None):
         build_no_dist, repotag, dver = groupdict['build_no_dist'], groupdict.get('repotag', ''), groupdict.get('dver', '')
 
     return build_no_dist, repotag, dver
-
-
-def _parse_list_str(list_str):
-    # split string on whitespace or commas
-    items = re.split(r'[ ,\t\n]', list_str)
-    # remove empty strings from the list
-    filtered_items = [_f for _f in items if _f]
-    return filtered_items
 
 
 def _bulletedlist(lst, prefix=" - "):
@@ -616,8 +636,10 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    configuration = Configuration()
-    configuration.load_inifile(INIFILE)
+    promoter_ini = utils.find_file(constants.PROMOTER_INI, strict=True)
+    signing_keys_ini = utils.find_file(constants.SIGNING_KEYS_INI, strict=True)
+    signing_keys_config = SigningKeysConfig(signing_keys_ini)
+    configuration = Configuration([promoter_ini], signing_keys_config)
 
     options, wanted_routes, pkgs_or_builds = parse_cmdline_args(configuration, argv)
     if os.path.basename(argv[0]) == "osg-promote":  # HACK. Is there a better way to do this?

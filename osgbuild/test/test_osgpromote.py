@@ -11,10 +11,9 @@ import osgbuild.kojiinter
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/../.."))
 
 from osgbuild import promoter
+from osgbuild import osg_sign
 from osgbuild import constants
 from osgbuild import utils
-
-INIFILE = "promoter.ini"
 
 log = logging.getLogger('promoter')
 log.setLevel(logging.ERROR)
@@ -337,9 +336,13 @@ class TestUtil(unittest.TestCase):
 
 
 def _config():
-    configuration = promoter.Configuration()
-    configuration.load_inifile(INIFILE)
-    configuration.load_inifile("../osgbuild/test/promoter_extra.ini")
+    signing_keys_ini = utils.find_file(constants.SIGNING_KEYS_INI,
+                                       strict=True)
+    signing_keys_config = osg_sign.SigningKeysConfig(signing_keys_ini)
+    configuration = promoter.Configuration([
+        utils.find_file(constants.PROMOTER_INI),
+        "../osgbuild/test/promoter_extra.ini"
+    ], signing_keys_config)
     return configuration
 
 

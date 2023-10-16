@@ -83,19 +83,33 @@ class Build(object):
 class Reject(object):
     REASON_DISTINCT_ACROSS_DISTS = "%(pkg_or_build)s: Matching build versions distinct across dist tags"
     REASON_NOMATCHING_FOR_DIST = "%(pkg_or_build)s: No matching build for dist %(dist)s"
+    REASON_MISSING_REQUIRED_SIGNATURE = "%(pkg_or_build)s: RPM %(rpm)s missing required signature (%(signing_keys)s)"
 
-    def __init__(self, pkg_or_build, dist, reason):
+    def __init__(self, pkg_or_build, reason, details=None):
+        # type: (str, str, Optional[Dict]) -> None
+        if not details:
+            details = {}
         self.pkg_or_build = pkg_or_build
-        self.dist = dist
         self.reason = reason
+        self.details = {
+            'pkg_or_build': self.pkg_or_build,
+            'dist': "?",
+            'rpm': "?",
+            'signing_keys': [],
+        }
+        self.details.update(details)
 
     def __str__(self):
-        return self.reason % {'pkg_or_build': self.pkg_or_build, 'dist': self.dist}
+        details = self.details.copy()
+        details['signing_keys'] = " or ".join(str(x) for x in details['signing_keys'])
+        return self.reason % details
 
     def __lt__(self, other):
-        return (self.pkg_or_build, self.dist, self.reason) < (other.pkg_or_build, other.dist, other.reason)
+        return ((self.pkg_or_build, self.details['dist'], self.reason) <
+                (other.pkg_or_build, other.details['dist'], other.reason))
 
-    __repr__ = __str__
+    def __repr__(self):
+        return "Reject(%r, %r, %r)" % (self.pkg_or_build, self.reason, self.details)
 
 
 class Configuration(IniConfiguration):
@@ -217,6 +231,7 @@ class Configuration(IniConfiguration):
         return dvers
 
 
+
 #
 # Utility functions
 #
@@ -304,7 +319,7 @@ class Promoter(object):
                 tag_build_pairs.append((to_tag, builds[build_dver]))
 
         if not ignore_rejects and self.any_distinct_across_dists(tag_build_pairs):
-            self.rejects.append(Reject(pkg_or_build, None, Reject.REASON_DISTINCT_ACROSS_DISTS))
+            self.rejects.append(Reject(pkg_or_build, Reject.REASON_DISTINCT_ACROSS_DISTS))
         else:
             for tag, build in tag_build_pairs:
                 self.tag_pkg_args.setdefault(tag, [])
@@ -368,7 +383,10 @@ class Promoter(object):
             build = self._get_build(tag_hint, repotag, dver, pkg_or_build)
             if not build:
                 if not ignore_rejects:
-                    self.rejects.append(Reject(pkg_or_build, dist, Reject.REASON_NOMATCHING_FOR_DIST))
+                    self.rejects.append(
+                        Reject(pkg_or_build,
+                               Reject.REASON_NOMATCHING_FOR_DIST,
+                               details={'dist': dist}))
                     return {}
                 else:
                     continue
@@ -668,7 +686,10 @@ def main(argv=None):
 
     if promoter.rejects:
         print("Rejected package or builds:\n%s" % _bulletedlist(promoter.rejects))
-        print("Rejects will not be promoted!  Rerun with --ignore-rejects to promote them anyway.")
+        print("Rejects will not be promoted!")
+        if any(x.reason in (Reject.REASON_DISTINCT_ACROSS_DISTS, Reject.REASON_NOMATCHING_FOR_DIST)
+               for x in promoter.rejects):
+            print("Rerun with --ignore-rejects to ignore rejections from dver mismatches")
 
     if any(promoter.tag_pkg_args.values()):
         text_args = {}

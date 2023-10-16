@@ -294,16 +294,20 @@ class Promoter(object):
     do_promotions should not be called twice.
 
     """
-    def __init__(self, kojihelper, route_dvers_pairs):
-        """kojihelper is an instance of KojiHelper. routes is a list of Route objects. dvers is a list of strings.
-        """
+
+    def __init__(self,
+                 kojihelper: KojiHelper,
+                 route_dvers_pairs: List[Tuple[Route, Set[str]]],
+                 signing_keys: Dict[str, SigningKey],
+                 ) -> None:
         self.tag_pkg_args = {}
         self.rejects = []
         self.kojihelper = kojihelper
         self.route_dvers_pairs = route_dvers_pairs
         self.repotags = set(route.repotag for route, _ in self.route_dvers_pairs)
+        self.signing_keys_by_name = signing_keys
 
-    def add_promotion(self, pkg_or_build, ignore_rejects=False):
+    def add_promotion(self, pkg_or_build, ignore_rejects=False, ignore_signatures=False):
         """Run get_dver_build_pairs() for 'pkg_or_build', using from_tag_hint as the
         tag hint.
         Returns nothing; builds to promote are added to tag_pkg_args, which
@@ -317,13 +321,66 @@ class Promoter(object):
             for dver, build in dver_build_pairs:
                 to_tag = route.to_tag_hint % dver
                 self.tag_pkg_args.setdefault(to_tag, [])
-                tag_build_pairs.append((to_tag, build))
+                reject = None
+                if self.signing_keys_by_name:
+                    reject = self.validate_signatures(route, dver, build)
+                if reject and not ignore_signatures:
+                    self.rejects.append(reject)
+                elif reject and ignore_signatures:
+                    log.warning("%s (ignored)", reject)
+                else:
+                    tag_build_pairs.append((to_tag, build))
 
         if not ignore_rejects and self.any_distinct_across_dists(tag_build_pairs):
             self.rejects.append(Reject(pkg_or_build, Reject.REASON_DISTINCT_ACROSS_DISTS))
         else:
             for tag, build in tag_build_pairs:
                 self.tag_pkg_args[tag].append(build)
+
+    def validate_signatures(self, route: Route, dver: str, build: Build) -> Optional[Reject]:
+        """Validate the signatures of the build for the route and dver
+
+        Make sure that all the RPMs in the build have a signature that's accepted
+        by the route for that dver.
+        """
+        signing_keys = route.required_keys_for_dver(dver)
+        if not signing_keys:  # there are no required keys for this route for this dver
+            return None
+
+        route_keyids = {sk.keyid for sk in signing_keys}
+        for sk in signing_keys:
+            # The RPM may have been signed by a subkey of the signing key.
+            # If we have the public key in our keyring, we can ask GPG to
+            # give us the key IDs of the subkeys too.
+            if sk.have_public_key():
+                route_keyids.update(set(sk.query_all_signing_keyids()))
+
+        # Check if all the RPMs were already signed by one of the accepted keys.
+        bad_rpms = self._validate_route_keyids_vs_rpm_keyids(route_keyids, build_nvr=build.nvr)
+        if bad_rpms:
+            # Nope, one of them was not. Construct a Reject
+            reject = Reject(build.nvr, Reject.REASON_MISSING_REQUIRED_SIGNATURE,
+                            {'rpms': bad_rpms, 'signing_keys': signing_keys})
+
+            return reject
+
+    # TODO maybe move this to osg_sign.py
+    def _validate_route_keyids_vs_rpm_keyids(
+            self,
+            route_keyids: Set[str],
+            build_nvr: str,
+    ) -> List[str]:
+        """Validate that all the RPMs in the build with nvr `build_nvr`
+        have at least one keyid that matches the allowed keyids for the route.
+
+        Returns a list of RPMs for which validation failed.
+        """
+        rpms_and_keyids = self.kojihelper.get_rpms_and_keyids_in_build(build_nvr)
+        bad_rpms = []
+        for rpm, rpm_keyids in rpms_and_keyids:
+            if route_keyids.isdisjoint(rpm_keyids):
+                bad_rpms.append(rpm)
+        return bad_rpms
 
     def _get_build(self, tag_hint, repotag, dver, pkg_or_build):
         """Get a single build (as a Build object) out of the tag given by
@@ -587,6 +644,8 @@ def parse_cmdline_args(configuration, argv):
                       help="Do not promote, just show what would be done")
     parser.add_option("--ignore-rejects", dest="ignore_rejects", action="store_true", default=False,
                       help="Ignore rejections due to version mismatch between dvers or missing package for one dver")
+    parser.add_option("--ignore-signatures", dest="ignore_signatures", action="store_true",
+                      help="Ignore missing package signatures")
     parser.add_option("--regen", default=False, action="store_true",
                       help="Regenerate repo(s) afterward")
     parser.add_option("-y", "--assume-yes", action="store_true", default=False,
@@ -681,9 +740,11 @@ def main(argv=None):
     dvers = set()
     for _, x in route_dvers_pairs:
         dvers.update(x)
-    promoter = Promoter(kojihelper, route_dvers_pairs)
+    promoter = Promoter(kojihelper, route_dvers_pairs, configuration.signing_keys_by_name)
     for pkgb in pkgs_or_builds:
-        promoter.add_promotion(pkgb, options.ignore_rejects)
+        promoter.add_promotion(pkgb,
+                               options.ignore_rejects,
+                               options.ignore_signatures)
 
     if promoter.rejects:
         print("Rejected package or builds:\n%s" % _bulletedlist(promoter.rejects))
@@ -691,6 +752,9 @@ def main(argv=None):
         if any(x.reason in (Reject.REASON_DISTINCT_ACROSS_DISTS, Reject.REASON_NOMATCHING_FOR_DIST)
                for x in promoter.rejects):
             print("Rerun with --ignore-rejects to ignore rejections from dver mismatches")
+        if any(x.reason in (Reject.REASON_MISSING_REQUIRED_SIGNATURE,)
+               for x in promoter.rejects):
+            print("Rerun with --ignore-signatures to ignore missing signatures")
 
     if any(promoter.tag_pkg_args.values()):
         text_args = {}

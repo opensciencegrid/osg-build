@@ -5,11 +5,12 @@ import logging
 import os
 import re
 import sys
-from typing import List, Dict
+from typing import List, Optional, Dict, Set, Tuple
 
 from osgbuild.kojiinter import KojiHelper
 from . import constants
 from . import error
+from . import osg_sign
 from . import utils
 from .osg_sign import SigningKey, SigningKeysConfig
 from .utils import comma_join, printf, print_table, IniConfiguration, split_nvr

@@ -304,7 +304,7 @@ class Promoter(object):
         self.repotags = set(route.repotag for route, _ in self.route_dvers_pairs)
 
     def add_promotion(self, pkg_or_build, ignore_rejects=False):
-        """Run get_builds() for 'pkg_or_build', using from_tag_hint as the
+        """Run get_dver_build_pairs() for 'pkg_or_build', using from_tag_hint as the
         tag hint.
         Returns nothing; builds to promote are added to tag_pkg_args, which
         is a dict keyed by tag (actual tag, not tag hint) of koji builds that
@@ -313,16 +313,16 @@ class Promoter(object):
         """
         tag_build_pairs = []
         for route, dvers in self.route_dvers_pairs:
-            builds = self.get_builds(route, dvers, pkg_or_build, ignore_rejects)
-            for build_dver in builds:
-                to_tag = route.to_tag_hint % build_dver
-                tag_build_pairs.append((to_tag, builds[build_dver]))
+            dver_build_pairs = self.get_dver_build_pairs(route, dvers, pkg_or_build, ignore_rejects)
+            for dver, build in dver_build_pairs:
+                to_tag = route.to_tag_hint % dver
+                self.tag_pkg_args.setdefault(to_tag, [])
+                tag_build_pairs.append((to_tag, build))
 
         if not ignore_rejects and self.any_distinct_across_dists(tag_build_pairs):
             self.rejects.append(Reject(pkg_or_build, Reject.REASON_DISTINCT_ACROSS_DISTS))
         else:
             for tag, build in tag_build_pairs:
-                self.tag_pkg_args.setdefault(tag, [])
                 self.tag_pkg_args[tag].append(build)
 
     def _get_build(self, tag_hint, repotag, dver, pkg_or_build):
@@ -357,8 +357,9 @@ class Promoter(object):
             build_obj = Build.new_from_nvr(build_nvr)
             return build_obj
 
-    def get_builds(self, route, dvers, pkg_or_build, ignore_rejects=False):
-        """Get a dict of builds keyed by dver for pkg_or_build.
+    def get_dver_build_pairs(self, route, dvers, pkg_or_build, ignore_rejects=False):
+        # type: (Route, Set[str], str, bool) -> List[Tuple[str, Build]]
+        """Get (dver, build) pairs for pkg_or_build.
         Uses _get_build to get the build matching pkg_or_build for the given
         route and all given dvers.
 
@@ -367,16 +368,16 @@ class Promoter(object):
         to self.rejects.
 
         In case of a rejection (or no matching packages found at all), an
-        empty dict is returned.
+        empty list is returned.
 
         """
         # TODO Both this and add_promotion currently handle rejections.
-        # I think this should be refactored such that: get_builds goes through
+        # I think this should be refactored such that: get_dver_build_pairs goes through
         # all routes, not just one, and rejection handling should be done in
         # add_promotion.
         tag_hint = route.from_tag_hint
         repotag = route.repotag
-        builds = {}
+        dver_build_pairs = []
         # Find each build for all dvers matching pkg_or_build
         for dver in dvers:
             dist = "%s.%s" % (repotag, dver)
@@ -387,12 +388,12 @@ class Promoter(object):
                         Reject(pkg_or_build,
                                Reject.REASON_NOMATCHING_FOR_DIST,
                                details={'dist': dist}))
-                    return {}
+                    return []
                 else:
                     continue
-            builds[dver] = build
+            dver_build_pairs.append((dver, build))
 
-        return builds
+        return dver_build_pairs
 
     def any_distinct_across_dists(self, tag_build_pairs):
         distinct_nvrs = set()

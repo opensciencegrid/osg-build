@@ -299,6 +299,7 @@ class Promoter(object):
                  kojihelper: KojiHelper,
                  route_dvers_pairs: List[Tuple[Route, Set[str]]],
                  signing_keys: Dict[str, SigningKey],
+                 try_to_sign=False
                  ) -> None:
         self.tag_pkg_args = {}
         self.rejects = []
@@ -306,6 +307,8 @@ class Promoter(object):
         self.route_dvers_pairs = route_dvers_pairs
         self.repotags = set(route.repotag for route, _ in self.route_dvers_pairs)
         self.signing_keys_by_name = signing_keys
+        self.try_to_sign = try_to_sign
+        self.failed_keys = set()  # keys that we have tried and failed to sign with, and shouldn't try again
 
     def add_promotion(self, pkg_or_build, ignore_rejects=False, ignore_signatures=False):
         """Run get_dver_build_pairs() for 'pkg_or_build', using from_tag_hint as the
@@ -361,6 +364,13 @@ class Promoter(object):
             # Nope, one of them was not. Construct a Reject
             reject = Reject(build.nvr, Reject.REASON_MISSING_REQUIRED_SIGNATURE,
                             {'rpms': bad_rpms, 'signing_keys': signing_keys})
+            # We were asked to try and sign, though, so let's give that a shot.
+            if self.try_to_sign:
+                log.debug("%s for %s doesn't have a signature; asked to try to sign",
+                          ", ".join(bad_rpms), build.nvr)
+                # _try_to_sign_build() will do the next round of verification
+                if self._try_to_sign_build(build.nvr, route_keyids, signing_keys):
+                    return None
 
             return reject
 
@@ -381,6 +391,52 @@ class Promoter(object):
             if route_keyids.isdisjoint(rpm_keyids):
                 bad_rpms.append(rpm)
         return bad_rpms
+
+    def _try_to_sign_build(
+            self,
+            build_nvr: str,
+            route_keyids: Set[str],
+            signing_keys: List[SigningKey],
+    ) -> bool:
+        """Try to sign the build with NVR `build_nvr` using one of the keys in the list
+        `signing_keys`.  Verify the signature a second time if we think we've succeeded.
+
+        Return True on success.
+        """
+        for sk in signing_keys:
+            if sk in self.failed_keys:
+                log.debug("skipping %s, it is in the failed_keys list", sk)
+                continue
+            # we of course need the secret key to sign
+            if not sk.have_secret_key():
+                log.debug("secret key missing for key %s", sk)
+                continue
+            log.debug("secret key FOUND for key %s", sk)
+
+            # We have a secret key, let's try to use it.
+            try:
+                osg_sign.sign_and_import_build(build_nvr=build_nvr,
+                                               signing_key=sk,
+                                               kojihelper=self.kojihelper)
+            except osg_sign.SigningError as err:
+                log.error("Failed to sign RPMs for %s using key %s: %s",
+                          build_nvr,
+                          sk,
+                          err)
+                # This one failed, but we may have more keys to try.
+                self.failed_keys.add(sk)
+                continue
+            # We think we succeeded so try validating the keyids again
+            bad_rpms = self._validate_route_keyids_vs_rpm_keyids(route_keyids, build_nvr=build_nvr)
+            if not bad_rpms:
+                return True
+            else:
+                raise error.Error(
+                    f"Signing {build_nvr} with key {sk} appeared to succeed but the "
+                    f"following RPMs didn't have the right signature after checking again: {', '.join(bad_rpms)}"
+                )
+        log.error("No available secret keys to sign %s with", build_nvr)
+        return False
 
     def _get_build(self, tag_hint, repotag, dver, pkg_or_build):
         """Get a single build (as a Build object) out of the tag given by
@@ -646,6 +702,13 @@ def parse_cmdline_args(configuration, argv):
                       help="Ignore rejections due to version mismatch between dvers or missing package for one dver")
     parser.add_option("--ignore-signatures", dest="ignore_signatures", action="store_true",
                       help="Ignore missing package signatures")
+    parser.add_option("--sign", dest="try_to_sign", action="store_true",
+                      help="Attempt to sign packages that don't have the right signature for promotion. "
+                           "Signing is the default if we have a TTY.")
+    parser.add_option("--no-sign", dest="try_to_sign", action="store_false",
+                      help="Do not attempt to sign packages that don't have the right signature for promotion."
+                           "Signing is the default if we have a TTY.")
+    parser.set_default("try_to_sign", sys.stdin.isatty())
     parser.add_option("--regen", default=False, action="store_true",
                       help="Regenerate repo(s) afterward")
     parser.add_option("-y", "--assume-yes", action="store_true", default=False,
@@ -740,7 +803,8 @@ def main(argv=None):
     dvers = set()
     for _, x in route_dvers_pairs:
         dvers.update(x)
-    promoter = Promoter(kojihelper, route_dvers_pairs, configuration.signing_keys_by_name)
+    promoter = Promoter(kojihelper, route_dvers_pairs, configuration.signing_keys_by_name,
+                        try_to_sign=options.try_to_sign)
     for pkgb in pkgs_or_builds:
         promoter.add_promotion(pkgb,
                                options.ignore_rejects,

@@ -83,7 +83,7 @@ class Build(object):
 class Reject(object):
     REASON_DISTINCT_ACROSS_DISTS = "%(pkg_or_build)s: Matching build versions distinct across dist tags"
     REASON_NOMATCHING_FOR_DIST = "%(pkg_or_build)s: No matching build for dist %(dist)s"
-    REASON_MISSING_REQUIRED_SIGNATURE = "%(pkg_or_build)s: RPM %(rpm)s missing required signature (%(signing_keys)s)"
+    REASON_MISSING_REQUIRED_SIGNATURE = "%(pkg_or_build)s: RPM(s) %(rpms)s missing required signature (%(signing_keys)s)"
 
     def __init__(self, pkg_or_build, reason, details=None):
         # type: (str, str, Optional[Dict]) -> None
@@ -94,7 +94,7 @@ class Reject(object):
         self.details = {
             'pkg_or_build': self.pkg_or_build,
             'dist': "?",
-            'rpm': "?",
+            'rpms': "?",
             'signing_keys': [],
         }
         self.details.update(details)

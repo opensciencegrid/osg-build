@@ -11,13 +11,19 @@ import osgbuild.kojiinter
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + "/../.."))
 
 from osgbuild import promoter
+from osgbuild import osg_sign
 from osgbuild import constants
 from osgbuild import utils
-
-INIFILE = "promoter.ini"
+from osgbuild.kojiinter import RpmKeyidsPair
 
 log = logging.getLogger('promoter')
 log.setLevel(logging.ERROR)
+
+
+KEY_OSG_2 = "96d2b90f"
+KEY_OSG_4 = "1887c61a"
+KEY_OSG_23_developer = "92897c00"
+
 
 TAGS = ['condor-el6',
         'condor-el7',
@@ -253,10 +259,12 @@ class FakeKojiHelper(osgbuild.kojiinter.KojiHelper):
             'osg-23-upcoming-el9-development': [
                 {'nvr': 'goodpkg-2000-1.osg23up.el9', 'latest': True},
                 {'nvr': 'reject-distinct-repos-1-1.osg23up.el9', 'latest': True},
+                {'nvr': 'reject-invalid-key-1-1.osg23up.el9', 'latest': True},
             ],
             'osg-23-upcoming-el8-development': [
                 {'nvr': 'goodpkg-2000-1.osg23up.el8', 'latest': True},
                 {'nvr': 'reject-distinct-repos-1-1.osg23up.el8', 'latest': True},
+                {'nvr': 'reject-invalid-key-1-1.osg23up.el8', 'latest': True},
             ],
             'osg-3.6-upcoming-el7-development': [
                 {'nvr': 'goodpkg-2000-1.osg36up.el7', 'latest': True},
@@ -270,6 +278,21 @@ class FakeKojiHelper(osgbuild.kojiinter.KojiHelper):
                 {'nvr': 'goodpkg-2000-1.osg36up.el9', 'latest': True},
                 {'nvr': 'reject-distinct-repos-1-1.osg36up.el9', 'latest': True},
             ],
+    }
+
+    rpms_and_keyids_by_nvr = {
+        'goodpkg-2000-1.osg36up.el9':
+            [RpmKeyidsPair('goodpkg-2000-1.osg36up.el9.x86_64.rpm', {KEY_OSG_4})],
+        'goodpkg-2000-1.osg36up.el8':
+            [RpmKeyidsPair('goodpkg-2000-1.osg36up.el8.x86_64.rpm', {KEY_OSG_2})],
+        'goodpkg-2000-1.osg23up.el9':
+            [RpmKeyidsPair('goodpkg-2000-1.osg23up.el9.x86_64.rpm', {KEY_OSG_23_developer})],
+        'goodpkg-2000-1.osg23up.el8':
+            [RpmKeyidsPair('goodpkg-2000-1.osg23up.el8.x86_64.rpm', {KEY_OSG_23_developer})],
+        'reject-invalid-key-1-1.osg23up.el9':
+            [RpmKeyidsPair('reject-invalid-key-1-1.osg23up.el9.x86_64.rpm', {KEY_OSG_2})],
+        'reject-invalid-key-1-1.osg23up.el8':
+            [RpmKeyidsPair('reject-invalid-key-1-1.osg23up.el8.x86_64.rpm', {KEY_OSG_4})],
     }
 
     want_success = True
@@ -302,6 +325,9 @@ class FakeKojiHelper(osgbuild.kojiinter.KojiHelper):
 
     def koji_get_build(self, build_nvr):
         return {'id': 319}
+
+    def get_rpms_and_keyids_in_build(self, build_nvr):
+        return self.rpms_and_keyids_by_nvr.get(build_nvr, [])
 
     def tag_build(self, tag, build, force=False):
         self.newly_tagged_packages.append(build)
@@ -337,9 +363,13 @@ class TestUtil(unittest.TestCase):
 
 
 def _config():
-    configuration = promoter.Configuration()
-    configuration.load_inifile(INIFILE)
-    configuration.load_inifile("../osgbuild/test/promoter_extra.ini")
+    signing_keys_ini = utils.find_file(constants.SIGNING_KEYS_INI,
+                                       strict=True)
+    signing_keys_config = osg_sign.SigningKeysConfig(signing_keys_ini)
+    configuration = promoter.Configuration([
+        utils.find_file(constants.PROMOTER_INI),
+        "../osgbuild/test/promoter_extra.ini"
+    ], signing_keys_config)
     return configuration
 
 
@@ -400,42 +430,70 @@ class TestPromoter(unittest.TestCase):
                                                        dvers=self.route_23upcoming.dvers)
         self.multi_routes = [self.configuration.routes['23-main'], self.configuration.routes['3.6-testing']]
 
-
     def _make_promoter(self, routes, dvers):
         pairs = [(route, set(dvers)) for route in routes]
-        return promoter.Promoter(self.kojihelper, pairs)
+        signing_keys = self.configuration.signing_keys_by_name
+        return promoter.Promoter(self.kojihelper, pairs, signing_keys)
+
+    @staticmethod
+    def _tagged_nvrs(promoter_obj, route, dver):
+        return [x.nvr for x in promoter_obj.tag_pkg_args[route.to_tag_hint % dver]]
 
     def test_add_promotion(self):
-        self.promoter_36testing.add_promotion('goodpkg')
+        self.promoter_36testing.add_promotion('goodpkg', ignore_signatures=True)
         for dver in self.route_36testing.dvers:
             self.assertIn(
                 'goodpkg-2000-1.osg36.%s' % dver,
                 [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % dver]])
 
     def test_add_promotion_with_nvr(self):
-        self.promoter_36testing.add_promotion('goodpkg-2000-1.osg36.el8')
+        self.promoter_36testing.add_promotion('goodpkg-2000-1.osg36.el8', ignore_signatures=True)
         for dver in self.route_36testing.dvers:
             self.assertIn(
                 'goodpkg-2000-1.osg36.%s' % dver,
                 [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % dver]])
 
     def test_add_promotion_with_nvr_no_dist(self):
-        self.promoter_36testing.add_promotion('goodpkg-2000-1')
+        self.promoter_36testing.add_promotion('goodpkg-2000-1', ignore_signatures=True)
         for dver in self.route_36testing.dvers:
             self.assertIn(
                 'goodpkg-2000-1.osg36.%s' % dver,
                 [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % dver]])
 
+    def test_add_promotion_with_signature_check(self):
+        build_base = 'goodpkg-2000-1'
+        for route, prom in [(self.route_36upcoming, self.promoter_36upcoming),
+                            (self.route_23upcoming, self.promoter_23upcoming)]:
+            repotag = route.repotag
+            prom.add_promotion(build_base, ignore_signatures=False)
+            self.assertEqual(prom.rejects, [])
+            for dver in route.dvers:
+                build = '%s.%s.%s' % (build_base, repotag, dver)
+                self.assertIn(build, self._tagged_nvrs(prom, route, dver))
+
+    def test_reject_signature(self):
+        build_base = 'reject-invalid-key-1-1'
+        route = self.route_23upcoming
+        repotag = route.repotag
+        self.promoter_23upcoming.add_promotion(build_base, ignore_signatures=False)
+        self.assertNotEqual(self.promoter_23upcoming.rejects, [])
+        self.assertTrue(all(
+            x.reason == promoter.Reject.REASON_MISSING_REQUIRED_SIGNATURE for x in self.promoter_23upcoming.rejects))
+        for dver in route.dvers:
+            build = '%s.%s.%s' % (build_base, repotag, dver)
+            self.assertNotIn(build,
+                             self._tagged_nvrs(self.promoter_23upcoming, route, dver))
+
     def test_reject_add(self):
-        self.promoter_36testing.add_promotion('goodpkg')
-        self.promoter_36testing.add_promotion('reject-distinct-dvers')
+        self.promoter_36testing.add_promotion('goodpkg', ignore_signatures=True)
+        self.promoter_36testing.add_promotion('reject-distinct-dvers', ignore_signatures=True)
         self.assertNotIn(
             'reject-distinct-dvers-1-1.osg36.el8',
             [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % 'el8']])
 
     def test_reject_add_with_ignore(self):
-        self.promoter_36testing.add_promotion('goodpkg')
-        self.promoter_36testing.add_promotion('reject-distinct-dvers', ignore_rejects=True)
+        self.promoter_36testing.add_promotion('goodpkg', ignore_signatures=True)
+        self.promoter_36testing.add_promotion('reject-distinct-dvers', ignore_rejects=True, ignore_signatures=True)
         self.assertIn(
             'reject-distinct-dvers-1-1.osg36.el8',
             [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % 'el8']])
@@ -444,7 +502,7 @@ class TestPromoter(unittest.TestCase):
             [x.nvr for x in self.promoter_36testing.tag_pkg_args[self.route_36testing.to_tag_hint % 'el7']])
 
     def test_new_reject(self):
-        self.promoter_36testing.add_promotion('reject-distinct-dvers')
+        self.promoter_36testing.add_promotion('reject-distinct-dvers', ignore_signatures=True)
         rejs = self.promoter_36testing.rejects
         self.assertEqual(1, len(rejs))
         self.assertEqual('reject-distinct-dvers', rejs[0].pkg_or_build)
@@ -453,7 +511,7 @@ class TestPromoter(unittest.TestCase):
     def test_multi_promote(self):
         prom = self._make_promoter(self.multi_routes,
                                    dvers=self.route_23main.dvers)
-        prom.add_promotion('goodpkg-2000-1')
+        prom.add_promotion('goodpkg-2000-1', ignore_signatures=True)
         for dver in self.route_23main.dvers:
             for osgver, repo in [('23', '23-main'), ('3.6', '3.6')]:
                 tag = 'osg-%s-%s-testing' % (repo, dver)
@@ -465,13 +523,13 @@ class TestPromoter(unittest.TestCase):
 
     def test_cross_dist_reject(self):
         prom = self._make_promoter(self.multi_routes, ['el8'])
-        prom.add_promotion('reject-distinct-repos')
+        prom.add_promotion('reject-distinct-repos', ignore_signatures=True)
         rejs = prom.rejects
         self.assertEqual(1, len(rejs))
         self.assertEqual(promoter.Reject.REASON_DISTINCT_ACROSS_DISTS, rejs[0].reason)
 
     def test_do_promotions(self):
-        self.promoter_36testing.add_promotion('goodpkg')
+        self.promoter_36testing.add_promotion('goodpkg', ignore_signatures=True)
         promoted_builds = self.promoter_36testing.do_promotions()
         self.assertEqual(3, len(self.kojihelper.newly_tagged_packages))
         for dver in self.route_36testing.dvers:
@@ -486,7 +544,7 @@ class TestPromoter(unittest.TestCase):
     def test_do_multi_promotions(self):
         prom = self._make_promoter(self.multi_routes,
                                    dvers=self.route_23main.dvers)
-        prom.add_promotion('goodpkg-2000-1')
+        prom.add_promotion('goodpkg-2000-1', ignore_signatures=True)
         promoted_builds = prom.do_promotions()
         self.assertEqual(4, len(self.kojihelper.newly_tagged_packages))
         for osgver, repo in [('23', '23-main'), ('3.6', '3.6')]:
@@ -514,7 +572,7 @@ class TestPromoter(unittest.TestCase):
         if real_promotions:
             prom = self._make_promoter(self.multi_routes,
                                        dvers=self.route_23main.dvers)
-            prom.add_promotion('goodpkg-2000-1')
+            prom.add_promotion('goodpkg-2000-1', ignore_signatures=True)
             promoted_builds = prom.do_promotions()
         expected_lines = [
             "*Promotions*",
@@ -544,7 +602,7 @@ class TestPromoter(unittest.TestCase):
         if real_promotions:
             prom = self._make_promoter(self.multi_routes,
                                        dvers=self.route_23main.dvers)
-            prom.add_promotion('goodpkg-2000-1')
+            prom.add_promotion('goodpkg-2000-1', ignore_signatures=True)
             promoted_builds = prom.do_promotions()
         expected_lines = [
             "**Promotions**",

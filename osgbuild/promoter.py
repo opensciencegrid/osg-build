@@ -5,20 +5,18 @@ import logging
 import os
 import re
 import sys
-import configparser
+from typing import List, Optional, Dict, Set, Tuple
 
 from osgbuild.kojiinter import KojiHelper
 from . import constants
 from . import error
+from . import osg_sign
 from . import utils
-from .utils import comma_join, printf, print_table, split_nvr
+from .osg_sign import SigningKey, SigningKeysConfig
+from .utils import comma_join, printf, print_table, IniConfiguration, split_nvr
 from optparse import OptionParser
 
 log = logging.getLogger(__name__)
-from collections import namedtuple
-
-DEFAULT_ROUTE = 'testing'
-INIFILE = 'promoter.ini'
 
 
 class KojiTagsAreMessedUp(Exception):
@@ -29,7 +27,21 @@ class KojiTagsAreMessedUp(Exception):
     """
 
 
-Route = namedtuple('Route', ['from_tag_hint', 'to_tag_hint', 'repotag', 'dvers', 'extra_dvers'])
+class Route(object):
+    """Information about a promotion route"""
+    def __init__(self, from_tag_hint, to_tag_hint, repotag, dvers, extra_dvers, required_keys=None):
+        # type: (str, str, str, List[str], List[str], List[SigningKey]) -> None
+        self.from_tag_hint = from_tag_hint
+        self.to_tag_hint = to_tag_hint
+        self.repotag = repotag
+        self.dvers = dvers
+        self.extra_dvers = extra_dvers
+        self.required_keys = required_keys or []
+
+    def required_keys_for_dver(self, dver):
+        # type: (str) -> List[SigningKey]
+        """The key ids of the keys required for the given dver for this route"""
+        return [x for x in self.required_keys if dver in x.dvers]
 
 
 class Build(object):
@@ -71,28 +83,49 @@ class Build(object):
 class Reject(object):
     REASON_DISTINCT_ACROSS_DISTS = "%(pkg_or_build)s: Matching build versions distinct across dist tags"
     REASON_NOMATCHING_FOR_DIST = "%(pkg_or_build)s: No matching build for dist %(dist)s"
+    REASON_MISSING_REQUIRED_SIGNATURE = "%(pkg_or_build)s: RPM(s) %(rpms)s missing required signature (%(signing_keys)s)"
 
-    def __init__(self, pkg_or_build, dist, reason):
+    def __init__(self, pkg_or_build, reason, details=None):
+        # type: (str, str, Optional[Dict]) -> None
+        if not details:
+            details = {}
         self.pkg_or_build = pkg_or_build
-        self.dist = dist
         self.reason = reason
+        self.details = {
+            'pkg_or_build': self.pkg_or_build,
+            'dist': "?",
+            'rpms': "?",
+            'signing_keys': [],
+        }
+        self.details.update(details)
 
     def __str__(self):
-        return self.reason % {'pkg_or_build': self.pkg_or_build, 'dist': self.dist}
+        details = self.details.copy()
+        details['signing_keys'] = " or ".join(str(x) for x in details['signing_keys'])
+        return self.reason % details
 
     def __lt__(self, other):
-        return (self.pkg_or_build, self.dist, self.reason) < (other.pkg_or_build, other.dist, other.reason)
+        return ((self.pkg_or_build, self.details['dist'], self.reason) <
+                (other.pkg_or_build, other.details['dist'], other.reason))
 
-    __repr__ = __str__
+    def __repr__(self):
+        return "Reject(%r, %r, %r)" % (self.pkg_or_build, self.reason, self.details)
 
 
-class Configuration(object):
-    routes = {}
-    aliases = {}
-    default_route = DEFAULT_ROUTE
+class Configuration(IniConfiguration):
+    def __init__(self, inifiles, signing_keys_config: SigningKeysConfig):
+        super().__init__(inifiles)
 
-    def load_inifile(self, inifile):
-        """Load routes from an ini file.
+        self.signing_keys_config = signing_keys_config
+        self.signing_keys_by_name = signing_keys_config.signing_keys_by_name
+
+        route_sections = [sec for sec in self.cp.sections() if sec.startswith('route ')]
+        self.routes = self.parse_routes(route_sections, self.signing_keys_by_name)
+        self.aliases = self.parse_aliases(self.routes)
+
+    def parse_routes(self, route_sections, signing_keys):
+        # type: (List[str], Dict[str, SigningKey]) -> Dict[str, Route]
+        """Parse the 'route X' sections of the config file
 
         A section called "route X" creates a route named "X".
         Required attributes in a route section are:
@@ -104,51 +137,75 @@ class Configuration(object):
           like '.osg33.el5'
         - dvers: a comma or space separated list of distro versions (dvers)
           supported by default for the tags in the route, e.g. "el5 el6"
-        The optional attribute is:
+        The optional attributes are:
         - extra_dvers: a comma or space separated list of dvers that are supported
           by the tags in the route but should not be on by default
+        - required_keys: a comma or space separated list of signing key names;
+          if present, the packages being promoted must be signed by one of them.
+          There must be a key section corresponding to each key.
 
-        A section called "aliases" defined alternate names for a route.
+        """
+        routes = {}
+        for sec in route_sections:
+            routename = sec.split(maxsplit=1)[1]
+            from_tag_hint = self.config_safe_get(sec, 'from')
+            to_tag_hint = self.config_safe_get(sec, 'to')
+            repotag = self.config_safe_get(sec, 'repotag')
+            dvers = self.config_safe_get_list(sec, 'dvers')
+            extra_dvers = self.config_safe_get_list(sec, 'extra_dvers')
+            required_keys = self.config_safe_get_list(sec, 'required_keys')
+
+            errors = []
+            if not from_tag_hint:
+                errors.append("'from' not provided or empty")
+            if not to_tag_hint:
+                errors.append("'to' not provided or empty")
+            if not repotag:
+                errors.append("'repotag' not provided or empty")
+            if not dvers:
+                errors.append("'dvers' not provided or empty")
+            required_key_objs = []
+            for rk in required_keys:
+                if rk in signing_keys:
+                    required_key_objs.append(signing_keys[rk])
+                else:
+                    errors.append("unknown required_key %r" % rk)
+            if errors:
+                raise error.ConfigErrors("Section %r" % sec, errors)
+
+            routes[routename] = Route(from_tag_hint,
+                                      to_tag_hint,
+                                      repotag,
+                                      dvers,
+                                      extra_dvers,
+                                      required_key_objs)
+        return routes
+
+    def parse_aliases(self, routes):
+        # type: (Dict[str, Route]) -> Dict[str, List[str]]
+        """Parse an 'aliases' section.
+
+        A section called "aliases" defines alternate names for a route.
         The key of each attribute in the section is the new name, and the value
         is the old name, e.g. "testing=3.2-testing".  Aliases to aliases cannot be
         defined.
 
         """
-        cp = configparser.RawConfigParser()
-        cp.read(utils.find_files(inifile, constants.DATA_FILE_SEARCH_PATH))
-        if not cp.sections():
-            raise error.FileNotFoundInSearchPathError(inifile, constants.DATA_FILE_SEARCH_PATH)
-
-        for sec in cp.sections():
-            if not sec.startswith('route '):
-                continue
-            routename = sec.split(None, 1)[1]
-            try:
-                from_tag_hint = cp.get(sec, 'from')
-                to_tag_hint = cp.get(sec, 'to')
-                repotag = cp.get(sec, 'repotag')
-                dvers = _parse_list_str(cp.get(sec, 'dvers'))
-            except configparser.NoOptionError as err:
-                raise error.Error("Malformed config file: %s" % str(err))
-            extra_dvers = []
-            if cp.has_option(sec, 'extra_dvers'):
-                extra_dvers = _parse_list_str(cp.get(sec, 'extra_dvers'))
-
-            self.routes[routename] = Route(from_tag_hint, to_tag_hint, repotag, dvers,
-                                                    extra_dvers)
-
-        if cp.has_section('aliases'):
-            for newname, target in cp.items('aliases'):
-                routelist = _parse_list_str(target)
-                for r in routelist:
-                    if r not in self.routes:
-                        raise error.Error(
-                            "Alias {0} to {1} failed: {2} does not exist".format(
-                                newname, target, r))
-                if newname.lower() == "default":
-                    self.default_route = target
-                else:
-                    self.aliases[newname] = routelist
+        if 'aliases' not in self.cp:
+            return {}
+        aliases = {}
+        errors = []
+        for newname, target in self.cp.items('aliases'):
+            routelist = self._parse_list_str(target)
+            for route in routelist:
+                if route not in routes:
+                    errors.append("Alias %s to %s failed: route named %s is not defined" % (newname, target, route))
+                    break
+            else:
+                aliases[newname] = routelist
+        if errors:
+            raise error.ConfigErrors("Aliases", errors)
+        return aliases
 
     def matching_route_names(self, route_or_alias):
         if route_or_alias in self.routes:
@@ -225,14 +282,6 @@ def split_repotag_dver(build, known_repotags=None):
     return build_no_dist, repotag, dver
 
 
-def _parse_list_str(list_str):
-    # split string on whitespace or commas
-    items = re.split(r'[ ,\t\n]', list_str)
-    # remove empty strings from the list
-    filtered_items = [_f for _f in items if _f]
-    return filtered_items
-
-
 def _bulletedlist(lst, prefix=" - "):
     return prefix + ("\n"+prefix).join(str(x) for x in sorted(lst))
 
@@ -244,17 +293,24 @@ class Promoter(object):
     do_promotions should not be called twice.
 
     """
-    def __init__(self, kojihelper, route_dvers_pairs):
-        """kojihelper is an instance of KojiHelper. routes is a list of Route objects. dvers is a list of strings.
-        """
+
+    def __init__(self,
+                 kojihelper: KojiHelper,
+                 route_dvers_pairs: List[Tuple[Route, Set[str]]],
+                 signing_keys: Dict[str, SigningKey],
+                 try_to_sign=False
+                 ) -> None:
         self.tag_pkg_args = {}
         self.rejects = []
         self.kojihelper = kojihelper
         self.route_dvers_pairs = route_dvers_pairs
         self.repotags = set(route.repotag for route, _ in self.route_dvers_pairs)
+        self.signing_keys_by_name = signing_keys
+        self.try_to_sign = try_to_sign
+        self.failed_keys = set()  # keys that we have tried and failed to sign with, and shouldn't try again
 
-    def add_promotion(self, pkg_or_build, ignore_rejects=False):
-        """Run get_builds() for 'pkg_or_build', using from_tag_hint as the
+    def add_promotion(self, pkg_or_build, ignore_rejects=False, ignore_signatures=False):
+        """Run get_dver_build_pairs() for 'pkg_or_build', using from_tag_hint as the
         tag hint.
         Returns nothing; builds to promote are added to tag_pkg_args, which
         is a dict keyed by tag (actual tag, not tag hint) of koji builds that
@@ -263,17 +319,123 @@ class Promoter(object):
         """
         tag_build_pairs = []
         for route, dvers in self.route_dvers_pairs:
-            builds = self.get_builds(route, dvers, pkg_or_build, ignore_rejects)
-            for build_dver in builds:
-                to_tag = route.to_tag_hint % build_dver
-                tag_build_pairs.append((to_tag, builds[build_dver]))
+            dver_build_pairs = self.get_dver_build_pairs(route, dvers, pkg_or_build, ignore_rejects)
+            for dver, build in dver_build_pairs:
+                to_tag = route.to_tag_hint % dver
+                self.tag_pkg_args.setdefault(to_tag, [])
+                reject = None
+                if self.signing_keys_by_name:
+                    reject = self.validate_signatures(route, dver, build)
+                if reject and not ignore_signatures:
+                    self.rejects.append(reject)
+                elif reject and ignore_signatures:
+                    log.warning("%s (ignored)", reject)
+                else:
+                    tag_build_pairs.append((to_tag, build))
 
         if not ignore_rejects and self.any_distinct_across_dists(tag_build_pairs):
-            self.rejects.append(Reject(pkg_or_build, None, Reject.REASON_DISTINCT_ACROSS_DISTS))
+            self.rejects.append(Reject(pkg_or_build, Reject.REASON_DISTINCT_ACROSS_DISTS))
         else:
             for tag, build in tag_build_pairs:
-                self.tag_pkg_args.setdefault(tag, [])
                 self.tag_pkg_args[tag].append(build)
+
+    def validate_signatures(self, route: Route, dver: str, build: Build) -> Optional[Reject]:
+        """Validate the signatures of the build for the route and dver
+
+        Make sure that all the RPMs in the build have a signature that's accepted
+        by the route for that dver.
+        """
+        signing_keys = route.required_keys_for_dver(dver)
+        if not signing_keys:  # there are no required keys for this route for this dver
+            return None
+
+        route_keyids = {sk.keyid for sk in signing_keys}
+        for sk in signing_keys:
+            # The RPM may have been signed by a subkey of the signing key.
+            # If we have the public key in our keyring, we can ask GPG to
+            # give us the key IDs of the subkeys too.
+            if sk.have_public_key():
+                route_keyids.update(set(sk.query_all_signing_keyids()))
+
+        # Check if all the RPMs were already signed by one of the accepted keys.
+        bad_rpms = self._validate_route_keyids_vs_rpm_keyids(route_keyids, build_nvr=build.nvr)
+        if bad_rpms:
+            # Nope, one of them was not. Construct a Reject
+            reject = Reject(build.nvr, Reject.REASON_MISSING_REQUIRED_SIGNATURE,
+                            {'rpms': bad_rpms, 'signing_keys': signing_keys})
+            # We were asked to try and sign, though, so let's give that a shot.
+            if self.try_to_sign:
+                log.debug("%s for %s doesn't have a signature; asked to try to sign",
+                          ", ".join(bad_rpms), build.nvr)
+                # _try_to_sign_build() will do the next round of verification
+                if self._try_to_sign_build(build.nvr, route_keyids, signing_keys):
+                    return None
+
+            return reject
+
+    # TODO maybe move this to osg_sign.py
+    def _validate_route_keyids_vs_rpm_keyids(
+            self,
+            route_keyids: Set[str],
+            build_nvr: str,
+    ) -> List[str]:
+        """Validate that all the RPMs in the build with nvr `build_nvr`
+        have at least one keyid that matches the allowed keyids for the route.
+
+        Returns a list of RPMs for which validation failed.
+        """
+        rpms_and_keyids = self.kojihelper.get_rpms_and_keyids_in_build(build_nvr)
+        bad_rpms = []
+        for rpm, rpm_keyids in rpms_and_keyids:
+            if route_keyids.isdisjoint(rpm_keyids):
+                bad_rpms.append(rpm)
+        return bad_rpms
+
+    def _try_to_sign_build(
+            self,
+            build_nvr: str,
+            route_keyids: Set[str],
+            signing_keys: List[SigningKey],
+    ) -> bool:
+        """Try to sign the build with NVR `build_nvr` using one of the keys in the list
+        `signing_keys`.  Verify the signature a second time if we think we've succeeded.
+
+        Return True on success.
+        """
+        for sk in signing_keys:
+            if sk in self.failed_keys:
+                log.debug("skipping %s, it is in the failed_keys list", sk)
+                continue
+            # we of course need the secret key to sign
+            if not sk.have_secret_key():
+                log.debug("secret key missing for key %s", sk)
+                continue
+            log.debug("secret key FOUND for key %s", sk)
+
+            # We have a secret key, let's try to use it.
+            try:
+                osg_sign.sign_and_import_build(build_nvr=build_nvr,
+                                               signing_key=sk,
+                                               kojihelper=self.kojihelper)
+            except osg_sign.SigningError as err:
+                log.error("Failed to sign RPMs for %s using key %s: %s",
+                          build_nvr,
+                          sk,
+                          err)
+                # This one failed, but we may have more keys to try.
+                self.failed_keys.add(sk)
+                continue
+            # We think we succeeded so try validating the keyids again
+            bad_rpms = self._validate_route_keyids_vs_rpm_keyids(route_keyids, build_nvr=build_nvr)
+            if not bad_rpms:
+                return True
+            else:
+                raise error.Error(
+                    f"Signing {build_nvr} with key {sk} appeared to succeed but the "
+                    f"following RPMs didn't have the right signature after checking again: {', '.join(bad_rpms)}"
+                )
+        log.error("No available secret keys to sign %s with", build_nvr)
+        return False
 
     def _get_build(self, tag_hint, repotag, dver, pkg_or_build):
         """Get a single build (as a Build object) out of the tag given by
@@ -307,8 +469,9 @@ class Promoter(object):
             build_obj = Build.new_from_nvr(build_nvr)
             return build_obj
 
-    def get_builds(self, route, dvers, pkg_or_build, ignore_rejects=False):
-        """Get a dict of builds keyed by dver for pkg_or_build.
+    def get_dver_build_pairs(self, route, dvers, pkg_or_build, ignore_rejects=False):
+        # type: (Route, Set[str], str, bool) -> List[Tuple[str, Build]]
+        """Get (dver, build) pairs for pkg_or_build.
         Uses _get_build to get the build matching pkg_or_build for the given
         route and all given dvers.
 
@@ -317,29 +480,32 @@ class Promoter(object):
         to self.rejects.
 
         In case of a rejection (or no matching packages found at all), an
-        empty dict is returned.
+        empty list is returned.
 
         """
         # TODO Both this and add_promotion currently handle rejections.
-        # I think this should be refactored such that: get_builds goes through
+        # I think this should be refactored such that: get_dver_build_pairs goes through
         # all routes, not just one, and rejection handling should be done in
         # add_promotion.
         tag_hint = route.from_tag_hint
         repotag = route.repotag
-        builds = {}
+        dver_build_pairs = []
         # Find each build for all dvers matching pkg_or_build
         for dver in dvers:
             dist = "%s.%s" % (repotag, dver)
             build = self._get_build(tag_hint, repotag, dver, pkg_or_build)
             if not build:
                 if not ignore_rejects:
-                    self.rejects.append(Reject(pkg_or_build, dist, Reject.REASON_NOMATCHING_FOR_DIST))
-                    return {}
+                    self.rejects.append(
+                        Reject(pkg_or_build,
+                               Reject.REASON_NOMATCHING_FOR_DIST,
+                               details={'dist': dist}))
+                    return []
                 else:
                     continue
-            builds[dver] = build
+            dver_build_pairs.append((dver, build))
 
-        return builds
+        return dver_build_pairs
 
     def any_distinct_across_dists(self, tag_build_pairs):
         distinct_nvrs = set()
@@ -533,6 +699,15 @@ def parse_cmdline_args(configuration, argv):
                       help="Do not promote, just show what would be done")
     parser.add_option("--ignore-rejects", dest="ignore_rejects", action="store_true", default=False,
                       help="Ignore rejections due to version mismatch between dvers or missing package for one dver")
+    parser.add_option("--ignore-signatures", dest="ignore_signatures", action="store_true",
+                      help="Ignore missing package signatures")
+    parser.add_option("--sign", dest="try_to_sign", action="store_true",
+                      help="Attempt to sign packages that don't have the right signature for promotion. "
+                           "Signing is the default if we have a TTY.")
+    parser.add_option("--no-sign", dest="try_to_sign", action="store_false",
+                      help="Do not attempt to sign packages that don't have the right signature for promotion."
+                           "Signing is the default if we have a TTY.")
+    parser.set_default("try_to_sign", sys.stdin.isatty())
     parser.add_option("--regen", default=False, action="store_true",
                       help="Regenerate repo(s) afterward")
     parser.add_option("-y", "--assume-yes", action="store_true", default=False,
@@ -602,8 +777,10 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
-    configuration = Configuration()
-    configuration.load_inifile(INIFILE)
+    promoter_ini = utils.find_file(constants.PROMOTER_INI, strict=True)
+    signing_keys_ini = utils.find_file(constants.SIGNING_KEYS_INI, strict=True)
+    signing_keys_config = SigningKeysConfig(signing_keys_ini)
+    configuration = Configuration([promoter_ini], signing_keys_config)
 
     options, wanted_routes, pkgs_or_builds = parse_cmdline_args(configuration, argv)
     if os.path.basename(argv[0]) == "osg-promote":  # HACK. Is there a better way to do this?
@@ -625,13 +802,22 @@ def main(argv=None):
     dvers = set()
     for _, x in route_dvers_pairs:
         dvers.update(x)
-    promoter = Promoter(kojihelper, route_dvers_pairs)
+    promoter = Promoter(kojihelper, route_dvers_pairs, configuration.signing_keys_by_name,
+                        try_to_sign=options.try_to_sign)
     for pkgb in pkgs_or_builds:
-        promoter.add_promotion(pkgb, options.ignore_rejects)
+        promoter.add_promotion(pkgb,
+                               options.ignore_rejects,
+                               options.ignore_signatures)
 
     if promoter.rejects:
         print("Rejected package or builds:\n%s" % _bulletedlist(promoter.rejects))
-        print("Rejects will not be promoted!  Rerun with --ignore-rejects to promote them anyway.")
+        print("Rejects will not be promoted!")
+        if any(x.reason in (Reject.REASON_DISTINCT_ACROSS_DISTS, Reject.REASON_NOMATCHING_FOR_DIST)
+               for x in promoter.rejects):
+            print("Rerun with --ignore-rejects to ignore rejections from dver mismatches")
+        if any(x.reason in (Reject.REASON_MISSING_REQUIRED_SIGNATURE,)
+               for x in promoter.rejects):
+            print("Rerun with --ignore-signatures to ignore missing signatures")
 
     if any(promoter.tag_pkg_args.values()):
         text_args = {}

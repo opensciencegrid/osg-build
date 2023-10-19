@@ -5,10 +5,10 @@
 #       should be split out and the spec file removed.
 # 
 %global betatag .pre
-%global _release 2
+%global _release 1
 
 Name:           osg-build
-Version:        1.99.1
+Version:        1.99.2
 Release:        %{?betatag:0.}%{_release}%{?betatag}%{?dist}
 Summary:        Build tools for the OSG
 
@@ -150,13 +150,17 @@ fi
 
 
 %changelog
-* Thu Oct 12 2023 Mátyás Selmeci <matyas@cs.wisc.edu>- 1.99.1-0.2.pre
+* Thu Oct 19 2023 Mátyás Selmeci <matyas@cs.wisc.ed - 1.99.2-0.1.pre
+- Reorganize code to make it pip installable
+- Add package signing script (SOFTWARE-5637)
+
+* Thu Oct 12 2023 Mátyás Selmeci <matyas@cs.wisc.ed - 1.99.1-0.2.pre
 - Use list-history instead of list-tag-history in koji-blame to work with koji cli 1.24+ (SOFTWARE-4532)
 
 * Wed Oct 11 2023 Mátyás Selmeci <matyas@cs.wisc.edu- 1.99.1-0.1.pre
 - Add Kerberos support (SOFTWARE-5696)
 
-* Thu Sep 29 2023  átyás Selmeci <matyas@cs.wisc.edu> - 1.99.0-0.2.pre
+* Thu Sep 29 2023 Mátyás Selmeci <matyas@cs.wisc.edu> - 1.99.0-0.2.pre
 - Merge v1.20.0-1:
     - Allow building from git branches and add branch protection (SOFTWARE-5476)
     - Make OSG 3.6 the default target release series (SOFTWARE-5208)

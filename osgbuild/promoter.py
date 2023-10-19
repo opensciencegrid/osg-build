@@ -147,7 +147,7 @@ class Configuration(IniConfiguration):
         """
         routes = {}
         for sec in route_sections:
-            routename = sec.split(None, 1)[1]
+            routename = sec.split(maxsplit=1)[1]
             from_tag_hint = self.config_safe_get(sec, 'from')
             to_tag_hint = self.config_safe_get(sec, 'to')
             repotag = self.config_safe_get(sec, 'repotag')

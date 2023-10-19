@@ -231,7 +231,6 @@ class Configuration(IniConfiguration):
         return dvers
 
 
-
 #
 # Utility functions
 #

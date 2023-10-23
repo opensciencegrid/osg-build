@@ -334,16 +334,20 @@ def safe_makedirs(directory, mode=0o777):
         os.makedirs(directory, mode)
 
 
-def ask(question, choices):
-    """Prompt user for a choice from a list. Return the choice."""
+def ask(question: str, choices: Iterable[str], default=None) -> str:
+    """Prompt user for a choice from a list. Return the choice.
+    Return `default` if it's set and the user doesn't enter anything.
+    """
     choices_lc = [x.lower() for x in choices]
     user_choice = ""
     match = False
     while not match:
         print(question)
         user_choice = input("[" + "/".join(choices) + "] ? ").strip().lower()
+        if not user_choice and default is not None:
+            return default
         for choice in choices_lc:
-            if user_choice.startswith(choice):
+            if user_choice.startswith(choice) or choice.startswith(user_choice):
                 match = True
                 break
     return user_choice

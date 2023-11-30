@@ -13,8 +13,8 @@ from osgbuild.constants import (
     KOJI_USER_CONFIG_DIR,     # old koji config dir
     OSG_KOJI_USER_CONFIG_DIR) # new koji config dir (created by this script)
 from osgbuild.utils import (
+    ask,
     ask_yn,
-    backtick,
     find_file,
     safe_make_backup,
     safe_makedirs,
@@ -105,9 +105,11 @@ def setup_parse_args(args):
         help="Do not create a ~/.koji -> ~/.osg-koji symlink. Default: ask")
 
     parser.add_option(
-        "--kerberos", action="store_const", const="kerberos", dest="authtype",
-        help="Configure Koji for Kerberos authentication" +
-             (" (default)" if DEFAULT_AUTHTYPE == "kerberos" else ""),
+        "--authtype",
+        choices=["kerberos", "ssl", "ask"],
+        default="ask",
+        dest="authtype",
+        help="The authentication method to use. Default: %default"
     )
 
     parser.add_option(
@@ -115,18 +117,11 @@ def setup_parse_args(args):
         help="Set the principal to use for Kerberos auth; will use the default if not specified or 'default'"
     )
 
-    parser.add_option(
-        "--ssl", action="store_const", const="ssl", dest="authtype",
-        help="Configure Koji for SSL authentication" +
-             (" (default)" if DEFAULT_AUTHTYPE == "ssl" else ""),
-    )
-
     parser.set_defaults(
         user_cert=os.path.join(GLOBUS_DIR, "usercert.pem"),
         user_key=os.path.join(GLOBUS_DIR, "userkey.pem"),
         write_client_conf=None,
         dot_koji_symlink=None,
-        authtype=DEFAULT_AUTHTYPE,
         principal=None,
     )
 
@@ -146,8 +141,6 @@ def make_config_text(authtype, principal):
 
     if authtype == "kerberos":
         print("Configuring the Koji client for Kerberos auth.")
-        print("If you want to configure SSL auth instead (not recommended),")
-        print("re-run this program with --ssl.")
         auth_block = KERBEROS_AUTH_BLOCK
 
         if principal is None:
@@ -167,8 +160,6 @@ def make_config_text(authtype, principal):
             auth_block += ";principal =\n"
     elif authtype == "ssl":
         print("Configuring the Koji client for SSL auth.")
-        print("If you want to configure Kerberos auth instead (recommended),")
-        print("re-run this program with --kerberos.")
         auth_block = SSL_AUTH_BLOCK
     else:
         raise ValueError(f"Invalid authtype {authtype}")
@@ -196,6 +187,19 @@ you should say yes.
             return
         safe_make_backup(new_koji_config_path, simple_suffix=True)
 
+    if authtype == "ask":
+        if DEFAULT_AUTHTYPE == "kerberos":
+            choices = ("K", "s")  # capitalize the default for emphasis
+        else:
+            assert DEFAULT_AUTHTYPE == "ssl"
+            choices = ("S", "k")
+        answer = ask(f"Use Kerberos (k) or SSL (s)? Default: {DEFAULT_AUTHTYPE}",
+                     choices, choices[0]).lower()[0]
+        if answer == "k":
+            authtype = "kerberos"
+        else:
+            assert answer == "s"
+            authtype = "ssl"
     config_text = make_config_text(authtype, principal)
     with open(new_koji_config_path, "w") as config_fh:
         config_fh.write(config_text)

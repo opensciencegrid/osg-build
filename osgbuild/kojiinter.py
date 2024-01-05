@@ -248,7 +248,7 @@ class KojiShellInter(object):
         found = False
         list_pkgs = utils.backtick(self.koji_cmd + ["list-pkgs", "--package", real_package])
         for line in list_pkgs.split("\n"):
-            fields = re.split(r"\s*", line, 2)
+            fields = re.split(r"\s+", line, 2)
             try:
                 if fields[1] == tag:
                     found = True
@@ -270,7 +270,7 @@ class KojiShellInter(object):
             raise KojiError("Unable to find koji target with the name " + target)
         else:
             try:
-                fields = re.split(r"\s*", line, 2)
+                fields = re.split(r"\s+", line, 2)
                 target_build_tag = fields[1]
                 target_dest_tag = fields[2]
             except IndexError:

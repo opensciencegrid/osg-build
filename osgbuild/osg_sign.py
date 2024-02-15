@@ -244,7 +244,17 @@ def sign_and_import_build(build_nvr: str, signing_key: SigningKey, kojihelper: K
     log.info("%d out of %d RPMs in %s need signing and importing",
              len(rpms_to_import), len(rpms_and_keyids), build_nvr)
 
-    with TemporaryDirectory(prefix=f"osg-sign-{build_nvr}") as workdir:
+    # RPMs are big -- use /var/tmp as the default if no environment variable overrides it (instead of /tmp)
+    # fmt: off
+    temproot = (
+        os.environ.get("TMPDIR",
+        os.environ.get("TEMP",
+        os.environ.get("TMP",
+        "/var/tmp")))
+    )
+    # fmt: on
+    with TemporaryDirectory(prefix=f"osg-sign-{build_nvr}", dir=temproot) \
+            as workdir:
         with utils.chdir(workdir):
             utils.checked_call(["osg-koji",
                                 "download-build",

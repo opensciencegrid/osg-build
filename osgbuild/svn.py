@@ -85,13 +85,13 @@ def verify_working_dir(pkg):
 
     """
     if is_uncommitted(pkg):
-        if not utils.ask_yn("""\
+        if utils.ask_yn("""\
 Package working directory %s has uncommitted changes that will not be included
 in the SVN build.
 Continue (yes/no)?""" % pkg):
             return False
     if is_outdated(pkg):
-        if not utils.ask_yn("""\
+        if utils.ask_yn("""\
 Package working directory %s is out of date and its contents may not reflect
 what will be built.
 Continue (yes/no)?""" % pkg):

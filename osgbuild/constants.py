@@ -37,6 +37,7 @@ except (ImportError, AttributeError):
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
 SVN_REDHAT_PATH = "/native/redhat"
 
+# fmt: off
 SVN_RESTRICTED_BRANCHES = {
     r'^branches/(?P<osgver>[0-9.]+)-upcoming$': 'upcoming',
     r'^branches/osg-internal$'             : 'oldinternal',
@@ -53,6 +54,7 @@ KOJI_RESTRICTED_TARGETS = {
     r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'  : 'versioned',
     r'^(?P<osgver>[0-9.]+)-main-(el\d+)$'  : 'versioned',
     r'^(?P<osgver>[0-9.]+)-internal-(el\d+)$' : 'internal',
+    r'^chtc-(el\d+)$'                      : 'chtc',
 }
 GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?(?P<osgver>[0-9.]+)-upcoming$': 'upcoming',
@@ -62,19 +64,25 @@ GIT_RESTRICTED_BRANCHES = {
     r'^(\w*/)?(?P<osgver>[0-9.]+)-main$'   : 'versioned',
     r'^(\w*/)?(?P<osgver>[0-9.]+)-internal$' : 'internal',
 }
+# fmt: on
 
 OSG_REMOTE = 'https://github.com/opensciencegrid/Software-Redhat.git'
 OSG_AUTH_REMOTE = 'git@github.com:opensciencegrid/Software-Redhat.git'
 HCC_REMOTE = 'https://github.com/unlhcc/hcc-packaging.git'
 HCC_AUTH_REMOTE = 'git@github.com:unlhcc/hcc-packaging.git'
+CHTC_REMOTE = 'https://github.com/CHTC/packaging.git'
+CHTC_AUTH_REMOTE = 'git@github.com:CHTC/packaging.git'
 
 KNOWN_GIT_REMOTES = [HCC_REMOTE,
                      HCC_AUTH_REMOTE,
                      OSG_REMOTE,
-                     OSG_AUTH_REMOTE]
+                     OSG_AUTH_REMOTE,
+                     CHTC_REMOTE,
+                     CHTC_AUTH_REMOTE]
 # Map the authenticated URL to an anonymous checkout URL.
 GIT_REMOTE_MAPS = {HCC_AUTH_REMOTE: HCC_REMOTE,
-                   OSG_AUTH_REMOTE: OSG_REMOTE}
+                   OSG_AUTH_REMOTE: OSG_REMOTE,
+                   CHTC_AUTH_REMOTE: CHTC_REMOTE}
 
 DEFAULT_BUILDOPTS_COMMON = {
     'autoclean': True,
@@ -137,6 +145,7 @@ REPO_HINTS_STATIC = {
     'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
     'devops': {'target': 'devops-%(dver)s', 'tag': 'osg-%(dver)s'},
     'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},
+    'chtc': {'target': 'chtc-%(dver)s', 'tag': 'chtc-%(dver)s'},
 }
 
 BUGREPORT_EMAIL = "help@osg-htc.org"

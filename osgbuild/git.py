@@ -410,40 +410,40 @@ def verify_correct_branch(package_dir, buildopts):
             raise GitError("Forbidden to build from %s branch into %s target" % (branch, target))
 
 
-def _do_target_remote_checks(target, remote, branch):
-        if target.startswith("hcc-"):
-            if "master" not in branch:
-                raise Error("""\
+def _do_target_remote_checks_hcc(remote, branch):
+    if remote not in [constants.HCC_REMOTE, constants.HCC_AUTH_REMOTE]:
+        raise Error("""\
+Error: You must build into the HCC repo from a HCC git checkout.
+You must switch git repos or build targets.""")
+
+    if "master" not in branch:
+        raise Error("""\
 Error: Incorrect branch for koji build
 Only allowed to build into the HCC repo from the
 master branch!  You must switch branches.""")
-            if remote not in [constants.HCC_REMOTE, constants.HCC_AUTH_REMOTE]:
-                raise Error("""\
-Error: You must build into the HCC repo when building from
-a HCC git checkout.  You must switch git repos or build targets.""")
-        elif re.search(r"osg(?:-\d+\.\d+)?-upcoming-el\d+$", target):
-            if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
-                raise Error("""\
-Error: You may not build into the OSG repo when building from
-a non-OSG target.  You must switch git repos or build targets.
-Try adding "--repo=hcc" to the command line.""")
-            if "master" in branch:
-                raise Error("""\
-Error: Incorrect branch for koji build
-Not allowed to build into the upcoming targets from
-master branch!  You must switch branches or build targets.""")
-        elif "osg" in target:
-            if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
-                raise Error("""\
-Error: You may not build into the OSG repo when building from
-a non-OSG target.  You must switch git repos or build targets.
-Try adding "--repo=hcc" to the command line.""")
-            if "upcoming" in branch:
-                raise Error("""\
-Error: Incorrect branch for koji build
-Only allowed to build packages from one of the upcoming branches
-into the upcoming targets.  Either switch the branch to master,
- or pass the appropriate --upcoming or --3.X-upcoming flag.""")
+
+
+def _do_target_remote_checks_osg(remote):
+    if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
+        raise Error("""\
+Error: You must build into the OSG repo from an OSG git checkout.
+You must switch git repos or build targets.""")
+
+
+def _do_target_remote_checks_chtc(remote):
+    if remote not in [constants.CHTC_REMOTE, constants.CHTC_AUTH_REMOTE]:
+        raise Error("""\
+Error: You must build into the CHTC repo from a CHTC git checkout.
+You must switch git repos or build targets.""")
+
+
+def _do_target_remote_checks(target, remote, branch):
+        if target.startswith("hcc-"):
+            _do_target_remote_checks_hcc(remote, branch)
+        elif target.startswith("osg-"):
+            _do_target_remote_checks_osg(remote)
+        elif target.startswith("chtc-"):
+            _do_target_remote_checks_chtc(remote)
 
 
 def koji(package_dir, koji_obj, buildopts):

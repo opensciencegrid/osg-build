@@ -132,6 +132,7 @@ DEFAULT_DVERS_BY_REPO = {
     '23-internal': ['el8', 'el9'],
     'internal': ['el7'],
     'devops': ['el7', 'el8', 'el9'],
+    'chtc': ['el8', 'el9'],
 }
 assert FALLBACK_DVER in DVERS
 for d in DEFAULT_DVERS:

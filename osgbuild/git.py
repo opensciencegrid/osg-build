@@ -430,11 +430,17 @@ Error: You must build into the OSG repo from an OSG git checkout.
 You must switch git repos or build targets.""")
 
 
-def _do_target_remote_checks_chtc(remote):
+def _do_target_remote_checks_chtc(remote, branch):
     if remote not in [constants.CHTC_REMOTE, constants.CHTC_AUTH_REMOTE]:
         raise Error("""\
 Error: You must build into the CHTC repo from a CHTC git checkout.
 You must switch git repos or build targets.""")
+
+    if "main" not in branch:
+        raise Error("""\
+Error: Incorrect branch for koji build
+Only allowed to build into the CHTC repo from the
+main branch!  You must switch branches.""")
 
 
 def _do_target_remote_checks(target, remote, branch):
@@ -443,7 +449,7 @@ def _do_target_remote_checks(target, remote, branch):
         elif target.startswith("osg-"):
             _do_target_remote_checks_osg(remote)
         elif target.startswith("chtc-"):
-            _do_target_remote_checks_chtc(remote)
+            _do_target_remote_checks_chtc(remote, branch)
 
 
 def koji(package_dir, koji_obj, buildopts):

@@ -179,6 +179,8 @@ def get_known_remote(package_dir):
             continue
         if info[1] in constants.KNOWN_GIT_REMOTES:
             return info[0], info[1]
+        elif info[1] + ".git" in constants.KNOWN_GIT_REMOTES:
+            return info[0], info[1] + ".git"
     raise GitError("OSG remote not found for directory %s; are remotes configurated correctly?" % package_dir)
 
 

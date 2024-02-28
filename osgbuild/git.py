@@ -40,6 +40,18 @@ def is_git(package_dir):
     return True
 
 
+def _normalize_remote(remote_url):
+    """Normalize the URL of the given Git repo which means:
+
+    - add the ".git" at the end if necessary
+    - correct the capitalization of Software-Redhat
+    """
+    if not remote_url.endswith(".git"):
+        remote_url = remote_url + ".git"
+    remote_url = re.sub(r"software-redhat", "Software-Redhat", remote_url, flags=re.IGNORECASE)
+    return remote_url
+
+
 def parse_git_url(git_url):
     """Parse a git URL of the type recognized by Koji, which looks like
     `git+REPO?DIRECTORY#BRANCH`
@@ -54,8 +66,7 @@ def parse_git_url(git_url):
         if not (scheme and netloc and path and query):
             return None, None, None
         scheme = scheme.rsplit("+")[-1]  # git+https -> https
-        if not path.endswith(".git"):
-            path = path + ".git"
+        path = _normalize_remote(path)
         repo = "{scheme}://{netloc}{path}".format(**locals())
         directory = query
         branch = fragment or "HEAD"
@@ -165,7 +176,9 @@ def get_branch(package_dir):
 
 def get_known_remote(package_dir):
     """Return the first remote in the current directory's list of remotes which
-       is on osg-build's configured whitelist of remotes."""
+       is on osg-build's configured whitelist of remotes,
+       as a (name, normalized url) tuple.
+       """
     top_dir = os.path.split(os.path.abspath(package_dir))[0]
     command = ["git", "--work-tree", top_dir, "--git-dir", os.path.join(top_dir, ".git"), "remote", "-v"]
     out, err = utils.sbacktick(command, err2out=True)
@@ -177,11 +190,11 @@ def get_known_remote(package_dir):
             continue
         if info[2] != '(fetch)':
             continue
-        if info[1] in constants.KNOWN_GIT_REMOTES:
-            return info[0], info[1]
-        elif info[1] + ".git" in constants.KNOWN_GIT_REMOTES:
-            return info[0], info[1] + ".git"
-    raise GitError("OSG remote not found for directory %s; are remotes configurated correctly?" % package_dir)
+        remote_name = info[0]
+        remote_url = _normalize_remote(info[1])
+        if remote_url in constants.KNOWN_GIT_REMOTES:
+            return remote_name, remote_url
+    raise GitError("Known remote not found for directory %s; are remotes configurated correctly?" % package_dir)
 
 
 def get_fetch_url(package_dir, remote):
@@ -198,14 +211,16 @@ def get_fetch_url(package_dir, remote):
             continue
         if info[2] != '(fetch)':
             continue
-        if info[0] == remote:
-            return constants.GIT_REMOTE_MAPS.setdefault(info[1], info[1])
+        dir_remote_name = info[0]
+        dir_remote_url = _normalize_remote(info[1])
+        if dir_remote_name == remote:
+            return constants.GIT_REMOTE_MAPS.setdefault(dir_remote_url, dir_remote_url)
 
     raise GitError("Remote URL not found for remote %s in directory %s; are remotes " \
         "configured correctly?" % (remote, package_dir))
 
 def get_current_branch_remote(package_dir):
-    """Return the configured remote for the current branch."""
+    """Return the configured remote name for the current branch."""
     branch = get_branch(package_dir)
 
     top_dir = os.path.split(os.path.abspath(package_dir))[0]
@@ -480,6 +495,6 @@ def koji(package_dir, koji_obj, buildopts):
     if not buildopts.get('scratch'):
         koji_obj.add_pkg(package_name)
 
-    return koji_obj.build_git(remote,
+    return koji_obj.build_git(_normalize_remote(remote),
                               rev,
                               package_name)

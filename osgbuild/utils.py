@@ -456,7 +456,7 @@ def get_screen_columns():
         columns = int(os.environ.get('COLUMNS', backtick("stty size").split()[1]))
         if columns < 10:
             columns = default
-    except TypeError:
+    except (TypeError, OSError):
         columns = default
     return columns
 

@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Any, AnyStr, Iterable, List, Union
+from typing import Any, AnyStr, Dict, Iterable, List, Union
 from datetime import datetime
 
 from . import constants
@@ -456,7 +456,7 @@ def get_screen_columns():
         columns = int(os.environ.get('COLUMNS', backtick("stty size").split()[1]))
         if columns < 10:
             columns = default
-    except TypeError:
+    except (TypeError, OSError):
         columns = default
     return columns
 
@@ -471,17 +471,56 @@ def print_line(file=None):
     print("-" * (get_screen_columns() - 1), file=file)
 
 
-def print_table(columns_by_header):
-    """Print a dict of lists in a table, with each list being a column"""
+def print_table(columns_by_header: Dict[str, List[str]]):
+    """ Print a dict of lists in a table, with each list being a column.
+    If the columns are too wide to fit on one row, the table will be split up
+    into multiple sub-tables, printed individually.
+    """
+    # Turn the dict of lists into a list of lists (one for each header), inserting a
+    # divider between the header and the first element.
+    columns: List[List[str]] = []
+    column_widths = []
+    for header in sorted(columns_by_header):
+        column_width = max(len(header), *[len(col) for col in columns_by_header[header]])
+        columns.append([header, '-' * column_width] + sorted(columns_by_header[header]))
+        column_widths.append(column_width)
+
+    # Divide the table into sub-tables such that each sub-table has at least one column
+    # but if possible, the total widths of the columns in the sub-table are less than
+    # the screen width.  Each sub-table will be printed immediately after it's been
+    # constructed.
     screen_columns = get_screen_columns()
-    field_width = int(screen_columns / len(columns_by_header))
-    columns = []
-    for entry in sorted(columns_by_header):
-        columns.append([entry, '-' * len(entry)] + sorted(columns_by_header[entry]))
-    for columns_in_row in zip_longest(fillvalue='', *columns):
-        for col in columns_in_row:
-            printf("%-*s", field_width - 1, col, end=' ')
-        printf("")
+    subtable_columns: List[List[str]] = []
+    subtable_widths: List[int] = []
+    subtable_total_width = 0
+    for idx, column in enumerate(columns):
+        if (subtable_total_width != 0 and
+                (subtable_total_width + column_widths[idx] >= screen_columns)
+        ):
+            # The sub-table is full; print it and clear it for the next columns.
+            _print_subtable(subtable_columns, subtable_widths)
+            subtable_columns = []
+            subtable_total_width = 0
+            subtable_widths = []
+            print()
+
+        # Add the column and its width to the subtable.
+        subtable_columns.append(column)
+        subtable_widths.append(column_widths[idx])
+        subtable_total_width += column_widths[idx]
+
+    # Print the last sub-table.
+    if subtable_columns:
+        _print_subtable(subtable_columns, subtable_widths)
+
+
+def _print_subtable(subtable_columns: List[List[str]], field_widths: List[int]):
+    """ Print a single sub-table. subtable_columns and field_widths are parallel lists. """
+    for row in zip_longest(fillvalue='', *subtable_columns):
+        for idx, item in enumerate(row):
+            field_width = field_widths[idx]
+            printf("%-*s", field_width, item, end=' ')
+        print("")
 
 
 def is_url(location):

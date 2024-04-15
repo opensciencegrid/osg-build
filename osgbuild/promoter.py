@@ -872,7 +872,7 @@ def _get_route_dvers_pairs(routenames, valid_routes, extra_dvers, no_dvers, only
         for no_dver in no_dvers:
             wanted_dvers_for_route.discard(no_dver)
         if not wanted_dvers_for_route:
-            printf("All dvers for route %s have been disabled.")
+            printf("All dvers for route %s have been disabled.", routename)
             _print_route_dvers(routename, route)
             sys.exit(2)
 

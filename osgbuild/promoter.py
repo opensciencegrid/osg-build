@@ -808,6 +808,8 @@ def main(argv=None):
         promoter.add_promotion(pkgb,
                                options.ignore_rejects,
                                options.ignore_signatures)
+        print()
+    print()
 
     if promoter.rejects:
         print("Rejected package or builds:\n%s" % _bulletedlist(promoter.rejects))

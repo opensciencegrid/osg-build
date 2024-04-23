@@ -66,12 +66,15 @@ def main(argv=None):
                     vcs.verify_working_dir(pkg)
                 except (SVNError, GitError) as err:
                     log.error(str(err))
-                    log.error("VCS build requested but no usable VCS found for %s", pkg)
+                    log.error("VCS build requested but no usable VCS (SVN or Git) found for %s", pkg)
                     return 1
 
             if not buildopts['scratch']:
                 if not vcs:
-                    log.error("Non-scratch builds must be built from a VCS and no usable VCS was found for %s", pkg)
+                    log.error(
+                        "Non-scratch builds must be built from a VCS and no usable VCS (SVN or Git) was found for %s",
+                        pkg
+                    )
                     return 1
                 vcs.verify_correct_branch(pkg, buildopts)
     else:

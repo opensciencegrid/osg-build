@@ -70,6 +70,9 @@ def main(argv=None):
                     return 1
 
             if not buildopts['scratch']:
+                if not vcs:
+                    log.error("Non-scratch builds must be built from a VCS and no usable VCS was found for %s", pkg)
+                    return 1
                 vcs.verify_correct_branch(pkg, buildopts)
     else:
         # verify package dirs

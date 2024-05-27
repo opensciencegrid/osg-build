@@ -155,7 +155,13 @@ def make_config_text(authtype, principal):
                 principal = ""
 
         if str(principal).lower() not in ["", "none", "default"]:
-            auth_block += f"principal = {principal}\n"
+            assert isinstance(principal, str)
+            if "@" not in principal:
+                raise Error(f"Invalid principal {principal}: must have an '@' sign")
+            # Let's be nice and fix the domain of the principal
+            username, atsign, domain = principal.partition("@")
+            principal_ = username + atsign + domain.upper()
+            auth_block += f"principal = {principal_}\n"
         else:
             auth_block += ";principal =\n"
     elif authtype == "ssl":

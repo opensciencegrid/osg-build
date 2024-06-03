@@ -566,36 +566,6 @@ class TestPromoter(unittest.TestCase):
     #     self.assertEqual(4, len(self.kojihelper.newly_tagged_packages))
     #     self.assertEqual(4, len(promoted_builds))
 
-    def _test_write_old_jira(self, real_promotions):
-        out = StringIO()
-        promoted_builds = {}
-        if real_promotions:
-            prom = self._make_promoter(self.multi_routes,
-                                       dvers=self.route_23main.dvers)
-            prom.add_promotion('goodpkg-2000-1', ignore_signatures=True)
-            promoted_builds = prom.do_promotions()
-        expected_lines = [
-            "*Promotions*",
-            "Promoted goodpkg-2000-1 to osg-23-main-el*-testing, osg-3.6-el*-testing",
-            "|| Build || Tag ||"]
-        for osgver, repo in [('23', '23-main'), ('3.6', '3.6')]:
-            for dver in self.route_23main.dvers:
-                tag = 'osg-%s-%s-testing' % (repo, dver)
-                dist = 'osg%s.%s' % (osgver.replace(".", ""), dver)
-                nvr = 'goodpkg-2000-1.%s' % dist
-
-                build = promoter.Build.new_from_nvr(nvr)
-                if not real_promotions:
-                    promoted_builds[tag] = [build]
-                build_uri = "%s/koji/buildinfo?buildID=%d" % (constants.KOJI_WEB, 319)
-                expected_lines.append("| [%s|%s] | %s |" % (build.nvr, build_uri, tag))
-        expected_lines.append("")
-        promoter.write_old_jira(self.kojihelper, promoted_builds, self.multi_routes, out)
-        actual_lines = out.getvalue().split("\n")
-        for idx, expected_line in enumerate(expected_lines):
-            self.assertEqual(expected_line, actual_lines[idx])
-        self.assertEqual(len(expected_lines), len(actual_lines))
-
     def _test_write_jira(self, real_promotions):
         out = StringIO()
         promoted_builds = {}
@@ -627,9 +597,6 @@ class TestPromoter(unittest.TestCase):
         for idx, expected_line in enumerate(expected_lines):
             self.assertEqual(expected_line, actual_lines[idx])
         self.assertEqual(len(expected_lines), len(actual_lines))
-
-    def test_write_old_jira(self):
-        self._test_write_old_jira(real_promotions=False)
 
     def test_write_jira(self):
         self._test_write_jira(real_promotions=False)

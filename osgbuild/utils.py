@@ -476,6 +476,8 @@ def print_table(columns_by_header: Dict[str, List[str]]):
     If the columns are too wide to fit on one row, the table will be split up
     into multiple sub-tables, printed individually.
     """
+    column_padding = 2
+
     # Turn the dict of lists into a list of lists (one for each header), inserting a
     # divider between the header and the first element.
     columns: List[List[str]] = []
@@ -495,7 +497,7 @@ def print_table(columns_by_header: Dict[str, List[str]]):
     subtable_total_width = 0
     for idx, column in enumerate(columns):
         if (subtable_total_width != 0 and
-                (subtable_total_width + column_widths[idx] >= screen_columns)
+                (subtable_total_width + column_widths[idx] + column_padding >= screen_columns)
         ):
             # The sub-table is full; print it and clear it for the next columns.
             _print_subtable(subtable_columns, subtable_widths)
@@ -507,7 +509,7 @@ def print_table(columns_by_header: Dict[str, List[str]]):
         # Add the column and its width to the subtable.
         subtable_columns.append(column)
         subtable_widths.append(column_widths[idx])
-        subtable_total_width += column_widths[idx]
+        subtable_total_width += column_widths[idx] + column_padding
 
     # Print the last sub-table.
     if subtable_columns:
@@ -516,10 +518,11 @@ def print_table(columns_by_header: Dict[str, List[str]]):
 
 def _print_subtable(subtable_columns: List[List[str]], field_widths: List[int]):
     """ Print a single sub-table. subtable_columns and field_widths are parallel lists. """
+    column_padding = 2
     for row in zip_longest(fillvalue='', *subtable_columns):
         for idx, item in enumerate(row):
             field_width = field_widths[idx]
-            printf("%-*s", field_width, item, end=' ')
+            printf("%-*s", field_width, item, end=' ' * column_padding)
         print("")
 
 

@@ -133,6 +133,7 @@ REPO_HINTS_STATIC = {
     'internal': {'target': 'osg-%(dver)s-internal', 'tag': 'osg-%(dver)s'},
     'devops': {'target': 'devops-%(dver)s', 'tag': 'osg-%(dver)s'},
     'hcc': {'target': 'hcc-%(dver)s', 'tag': 'hcc-%(dver)s'},
+    'empty': {'target': 'osg-%(dver)s-empty', 'tag': 'osg-%(dver)s'},
 }
 
 BUGREPORT_EMAIL = "help@osg-htc.org"

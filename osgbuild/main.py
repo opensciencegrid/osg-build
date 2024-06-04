@@ -249,6 +249,7 @@ def repo_hints(targets):
                 osg_main_match = re.match(r'osg-(\d+)-main-el\d+', target)
                 osg_upcoming_match = re.match(r'osg-([0-9.]+)-upcoming-el\d+', target)
                 osg_internal_match = re.match(r'osg-(\d+)-internal-el\d+', target)
+                osg_empty_match = re.match(r'osg-([0-9.]+)-el\d+-empty', target)
                 if osg_match:
                     osgver = osg_match.group(1)
                     __repo_hints_cache[osgver] = __repo_hints_cache['osg-%s' % osgver] = {'target': 'osg-%s-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
@@ -261,6 +262,9 @@ def repo_hints(targets):
                 elif osg_internal_match:
                     osgver = osg_internal_match.group(1)
                     __repo_hints_cache["%s-internal" % osgver] = {'target': 'osg-%s-internal-%%(dver)s' % osgver, 'tag': 'osg-%(dver)s'}
+                elif osg_empty_match:
+                    osgver = osg_empty_match.group(1)
+                    __repo_hints_cache["%s-empty" % osgver] = {'target': 'osg-%s-%%(dver)s-empty' % osgver, 'tag': 'osg-%(dver)s'}
 
     return __repo_hints_cache
 

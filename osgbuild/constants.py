@@ -107,12 +107,12 @@ DEFAULT_BUILDOPTS_COMMON = {
 DVERS = ['el7', 'el8', 'el9']
 
 DEFAULT_BUILDOPTS_BY_DVER = {}
-for dver in DVERS:
-    DEFAULT_BUILDOPTS_BY_DVER[dver] = dict(
-        distro_tag='osg.'+dver,
+for _dver in DVERS:
+    DEFAULT_BUILDOPTS_BY_DVER[_dver] = dict(
+        distro_tag='osg.'+_dver,
         koji_tag=None,
         koji_target=None,
-        redhat_release=dver[2:]
+        redhat_release=_dver[2:]
     )
 DEFAULT_BUILDOPTS_BY_DVER['el7']['_binary_payload'] = 'w2.xzdio'
 
@@ -135,11 +135,11 @@ DEFAULT_DVERS_BY_REPO = {
     'chtc': ['el9'],
 }
 assert FALLBACK_DVER in DVERS
-for d in DEFAULT_DVERS:
-    assert d in DVERS
-for ds in DEFAULT_DVERS_BY_REPO.values():
-    for d in ds:
-        assert d in DVERS
+for _d in DEFAULT_DVERS:
+    assert _d in DVERS
+for _ds in DEFAULT_DVERS_BY_REPO.values():
+    for _d in _ds:
+        assert _d in DVERS
 
 REPO_HINTS_STATIC = {
     'osg': {'target': 'osg-%(dver)s', 'tag': 'osg-%(dver)s'},

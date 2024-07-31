@@ -256,11 +256,11 @@ def sign_and_import_build(build_nvr: str, signing_key: SigningKey, kojihelper: K
     with TemporaryDirectory(prefix=f"osg-sign-{build_nvr}", dir=temproot) \
             as workdir:
         with utils.chdir(workdir):
-            utils.checked_call(["osg-koji",
-                                "download-build",
-                                "--debuginfo",
-                                "--noprogress",
-                                build_nvr])
+            cmd = ["osg-koji", "download-build", "--debuginfo"]
+            if not sys.stdout.isatty():
+                cmd.append("--noprogress")
+            cmd.append(build_nvr)
+            utils.checked_call(cmd)
 
         rpms = glob.glob(os.path.join(workdir, "*.rpm"))
         sign_rpms(signing_key, rpms)

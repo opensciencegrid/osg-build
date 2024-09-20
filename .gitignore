@@ -2,3 +2,5 @@
 upstream/test.source
 _final_srpm_contents/
 _build_results/
+/build
+*.egg-info

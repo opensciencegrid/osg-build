@@ -184,6 +184,9 @@ def init(argv):
     if options.loglevel:
         set_loglevel(options.loglevel)
 
+    if options.repo_list:
+        print_repos_and_exit()
+
     task = get_task(args)
     # Check for required modules
     if task == 'mock' and not mock:
@@ -497,10 +500,12 @@ rpmbuild     Build using rpmbuild(8) on the local machine
             "--repo", action="callback",
             callback=parser_targetopts_callback,
             type="string", dest="repo",
-            help="Specify a set of repos to build to (osg-3.6, 3.6-upcoming, "
-            + "23-main, 23-upcoming, "
-            + ", ".join(REPO_HINTS_STATIC.keys())
-            + ")")
+            help="Specify a set of repos to build to; use --repo-list to get a list"
+            " of valid values for this option")
+        koji_group.add_option(
+            "--repo-list", action="store_true", dest="repo_list",
+            help="List the values available for --repo"
+        )
         parser.add_option_group(koji_group)
 
     options, args = parser.parse_args(argv[1:])
@@ -737,6 +742,14 @@ def print_version_and_exit():
         print("osg-build git " + out)
     else:
         print("osg-build " + __version__)
+    sys.exit(0)
+
+
+def print_repos_and_exit():
+    """ Print the list of valid arguments for --repo and exit """
+    repos = repo_hints(valid_koji_targets())
+    print("Valid repos are:\n", end="\n\t")
+    print("\n\t".join(repos))
     sys.exit(0)
 
 

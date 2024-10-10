@@ -202,7 +202,7 @@ def sign_rpms(signing_key, rpms):
 
     try:
         log.debug("Signing rpm with command %r", rpm_cmd)
-        subprocess.run(rpm_cmd, timeout=300, check=True)
+        subprocess.run(rpm_cmd, timeout=600, check=True)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
         raise SigningError("Signing failed: %s" % err) from err
 

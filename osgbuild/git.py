@@ -431,20 +431,26 @@ def verify_correct_branch(package_dir, buildopts):
     if remote not in REMOTES_BY_URL:
         return
 
-    if not is_restricted_branch(branch):
-        # Developer branch -- any target ok
+    remote_info = REMOTES_BY_URL[remote]
+    if remote_info.layout == "legacy":
+        if not is_restricted_branch(branch):
+            # Developer branch -- any target ok
+            return
+        for dver in buildopts['enabled_dvers']:
+            target = buildopts['targetopts_by_dver'][dver]['koji_target']
+            if not target:
+                _log.debug(f"No koji target for {dver} -- skipping VCS check")
+                continue
+            _do_target_remote_checks(target, remote, branch)
+            if not is_restricted_target(target):
+                # Some custom target -- any branch ok
+                continue
+            if not restricted_branch_matches_target(branch, target):
+                raise VCSError("Forbidden to build from %s branch into %s target" % (branch, target))
+
+    elif remote_info.layout == "subtree":
+        _log.warning("Target protection not implemented for Git remotes with 'subtree' layouts")
         return
-    for dver in buildopts['enabled_dvers']:
-        target = buildopts['targetopts_by_dver'][dver]['koji_target']
-        if not target:
-            _log.debug(f"No koji target for {dver} -- skipping VCS check")
-            continue
-        _do_target_remote_checks(target, remote, branch)
-        if not is_restricted_target(target):
-            # Some custom target -- any branch ok
-            continue
-        if not restricted_branch_matches_target(branch, target):
-            raise VCSError("Forbidden to build from %s branch into %s target" % (branch, target))
 
 
 def _do_target_remote_checks_hcc(remote, branch):

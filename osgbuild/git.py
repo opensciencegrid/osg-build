@@ -1,6 +1,5 @@
 """Helper functions for a git build."""
 import logging
-import itertools
 import re
 import os
 import errno
@@ -12,13 +11,13 @@ from . import utils
 from . import constants
 
 
-
 _log = logging.getLogger(__name__)
 
-KNOWN_GIT_REMOTES = list(
-    # flatten list of lists
-    itertools.chain.from_iterable(r.urls for r in REMOTES.values())
-)
+REMOTES_BY_URL = {}
+for k, v in REMOTES.items():
+    for url in v.urls:
+        REMOTES_BY_URL[url] = v
+
 # Map the authenticated URL to an anonymous checkout URL.
 GIT_REMOTE_MAPS = {
     # flatten list of dicts
@@ -219,9 +218,9 @@ def get_known_remote(package_dir):
             continue
         remote_name = info[0]
         remote_url = _normalize_remote(info[1])
-        if remote_url in KNOWN_GIT_REMOTES:
+        if remote_url in REMOTES_BY_URL:
             return remote_name, remote_url
-    raise VCSError("Known remote not found for directory %s; are urls configurated correctly?" % package_dir)
+    raise VCSError("Known remote not found for directory %s; are URLs configurated correctly?" % package_dir)
 
 
 def get_fetch_url(package_dir, remote):
@@ -429,7 +428,7 @@ def verify_correct_branch(package_dir, buildopts):
             verify_git_svn_commit(package_dir)
 
     # We only have branching rules for OSG and HCC repos
-    if remote not in KNOWN_GIT_REMOTES:
+    if remote not in REMOTES_BY_URL:
         return
 
     if not is_restricted_branch(branch):

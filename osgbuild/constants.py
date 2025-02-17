@@ -1,5 +1,4 @@
 """Global constants for osg-build"""
-import itertools as _itertools
 import dataclasses as _dataclasses
 import os as _os
 
@@ -107,15 +106,6 @@ REMOTES = {
     ),
 }
 
-KNOWN_GIT_REMOTES = list(
-    # flatten list of lists
-    _itertools.chain.from_iterable(r.urls for r in REMOTES.values())
-)
-# Map the authenticated URL to an anonymous checkout URL.
-GIT_REMOTE_MAPS = {
-    # flatten list of dicts
-    k: v for r in REMOTES.values() for k, v in r.remote_map.items()
-}
 
 DEFAULT_BUILDOPTS_COMMON = {
     'background': False,

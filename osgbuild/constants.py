@@ -1,4 +1,6 @@
 """Global constants for osg-build"""
+import itertools as _itertools
+import dataclasses as _dataclasses
 import os as _os
 
 WD_RESULTS = '_build_results'
@@ -27,6 +29,7 @@ if "OSG_LOCATION" in _os.environ:
 DATA_FILE_SEARCH_PATH.append(DATA_DIR)
 try:
     try:
+        # noinspection PyPackageRequirements
         import importlib_resources as _importlib_resources
     except ImportError:
         import importlib.resources as _importlib_resources
@@ -63,23 +66,56 @@ GIT_RESTRICTED_BRANCHES = {
 }
 # fmt: on
 
-OSG_REMOTE = 'https://github.com/opensciencegrid/Software-Redhat.git'
-OSG_AUTH_REMOTE = 'git@github.com:opensciencegrid/Software-Redhat.git'
-HCC_REMOTE = 'https://github.com/unlhcc/hcc-packaging.git'
-HCC_AUTH_REMOTE = 'git@github.com:unlhcc/hcc-packaging.git'
-CHTC_REMOTE = 'https://github.com/CHTC/packaging.git'
-CHTC_AUTH_REMOTE = 'git@github.com:CHTC/packaging.git'
+@_dataclasses.dataclass
+class GitRemoteType:
+    unauth: str
+    auth: str
+    layout: str  # "branches" or "directories"
 
-KNOWN_GIT_REMOTES = [HCC_REMOTE,
-                     HCC_AUTH_REMOTE,
-                     OSG_REMOTE,
-                     OSG_AUTH_REMOTE,
-                     CHTC_REMOTE,
-                     CHTC_AUTH_REMOTE]
+    @property
+    def urls(self):
+        return [self.auth, self.unauth]
+
+    @property
+    def remote_map(self) -> _t.Dict[str, str]:
+        """
+        Map the authenticated URL to an anonymous checkout URL.
+        """
+        return {self.auth: self.unauth}
+
+
+REMOTES = {
+    "osg": GitRemoteType(
+        unauth="https://github.com/opensciencegrid/Software-Redhat.git",
+        auth="git@github.com:opensciencegrid/Software-Redhat.git",
+        layout="legacy",
+    ),
+    "hcc": GitRemoteType(
+        unauth="https://github.com/unlhcc/hcc-packaging.git",
+        auth="git@github.com:unlhcc/hcc-packaging.git",
+        layout="legacy",
+    ),
+    "chtc": GitRemoteType(
+        unauth="https://github.com/CHTC/packaging.git",
+        auth="git@github.com:CHTC/packaging.git",
+        layout="legacy",
+    ),
+    "osg2": GitRemoteType(
+        unauth="https://github.com/osg-htc/software-packaging.git",
+        auth="git@github.com:osg-htc/software-packaging.git",
+        layout="subtree",
+    ),
+}
+
+KNOWN_GIT_REMOTES = list(
+    # flatten list of lists
+    _itertools.chain.from_iterable(r.urls for r in REMOTES.values())
+)
 # Map the authenticated URL to an anonymous checkout URL.
-GIT_REMOTE_MAPS = {HCC_AUTH_REMOTE: HCC_REMOTE,
-                   OSG_AUTH_REMOTE: OSG_REMOTE,
-                   CHTC_AUTH_REMOTE: CHTC_REMOTE}
+GIT_REMOTE_MAPS = {
+    # flatten list of dicts
+    k: v for r in REMOTES.values() for k, v in r.remote_map.items()
+}
 
 DEFAULT_BUILDOPTS_COMMON = {
     'background': False,

@@ -193,8 +193,8 @@ def get_branch(package_dir):
 
 
 def get_known_remote(package_dir):
-    """Return the first remote in the current directory's list of remotes which
-       is on osg-build's configured whitelist of remotes,
+    """Return the first remote in the current directory's list of urls which
+       is on osg-build's configured whitelist of urls,
        as a (name, normalized url) tuple.
        """
     top_dir = os.path.split(os.path.abspath(package_dir))[0]
@@ -211,12 +211,12 @@ def get_known_remote(package_dir):
         remote_url = _normalize_remote(info[1])
         if remote_url in constants.KNOWN_GIT_REMOTES:
             return remote_name, remote_url
-    raise VCSError("Known remote not found for directory %s; are remotes configurated correctly?" % package_dir)
+    raise VCSError("Known remote not found for directory %s; are urls configurated correctly?" % package_dir)
 
 
 def get_fetch_url(package_dir, remote):
     """Return a fetch url
-       is on osg-build's configured whitelist of remotes."""
+       is on osg-build's configured whitelist of urls."""
     top_dir = os.path.split(os.path.abspath(package_dir))[0]
     out, err = run_git_cmd(top_dir, "remote", "-v")
     if err:
@@ -233,7 +233,7 @@ def get_fetch_url(package_dir, remote):
             return constants.GIT_REMOTE_MAPS.setdefault(dir_remote_url, dir_remote_url)
             # ^^ mutates a constant, sigh
 
-    raise VCSError("Remote URL not found for remote %s in directory %s; are remotes " \
+    raise VCSError("Remote URL not found for remote %s in directory %s; are urls " \
         "configured correctly?" % (remote, package_dir))
 
 def get_current_branch_remote(package_dir):
@@ -393,7 +393,7 @@ def verify_git_svn_commit(package_dir):
 
 
 def verify_correct_remote(package_dir):
-    """Verify the current branch remote is one of the known remotes."""
+    """Verify the current branch remote is one of the known urls."""
     remote = get_current_branch_remote(package_dir)
     known_remote = get_known_remote(package_dir)[0]
     if remote != known_remote:
@@ -415,7 +415,7 @@ def verify_correct_branch(package_dir, buildopts):
 
         verify_correct_remote(package_dir)
 
-        if remote in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
+        if remote in constants.REMOTES["osg"].urls:
             verify_git_svn_commit(package_dir)
 
     # We only have branching rules for OSG and HCC repos
@@ -439,7 +439,7 @@ def verify_correct_branch(package_dir, buildopts):
 
 
 def _do_target_remote_checks_hcc(remote, branch):
-    if remote not in [constants.HCC_REMOTE, constants.HCC_AUTH_REMOTE]:
+    if remote not in constants.REMOTES["hcc"].urls:
         raise Error("""\
 Error: You must build into the HCC repo from a HCC git checkout.
 You must switch git repos or build targets.""")
@@ -452,14 +452,14 @@ master branch!  You must switch branches.""")
 
 
 def _do_target_remote_checks_osg(remote):
-    if remote not in [constants.OSG_REMOTE, constants.OSG_AUTH_REMOTE]:
+    if remote not in constants.REMOTES["osg"].urls:
         raise Error("""\
 Error: You must build into the OSG repo from an OSG git checkout.
 You must switch git repos or build targets.""")
 
 
 def _do_target_remote_checks_chtc(remote, branch):
-    if remote not in [constants.CHTC_REMOTE, constants.CHTC_AUTH_REMOTE]:
+    if remote not in constants.REMOTES["chtc"].urls:
         raise Error("""\
 Error: You must build into the CHTC repo from a CHTC git checkout.
 You must switch git repos or build targets.""")

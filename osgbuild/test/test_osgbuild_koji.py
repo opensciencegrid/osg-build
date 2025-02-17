@@ -81,7 +81,8 @@ class TestKoji(TestCase):
         try:
             # SCM URI format is 'git+https://host/.../repo.git?path#revision'
             gitbranch = re.sub(r"^native/redhat/branches/", "", OSG_36)
-            scm_uri = "git+%s?%s#%s" % (C.OSG_REMOTE, "osg-xrootd", gitbranch)
+            osg_unauth_remote = C.REMOTES["osg"].unauth
+            scm_uri = "git+%s?%s#%s" % (osg_unauth_remote, "osg-xrootd", gitbranch)
             _ = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--dry-run", scm_uri])
         except CalledProcessError as err:
             out_list = err.output.split("\n")

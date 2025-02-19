@@ -1,6 +1,8 @@
 """Global constants for osg-build"""
 import dataclasses as _dataclasses
 import os as _os
+import re as _re
+import typing as _t
 
 WD_RESULTS = '_build_results'
 WD_PREBUILD = '_final_srpm_contents'
@@ -36,6 +38,118 @@ try:
 except (ImportError, AttributeError):
     pass
 
+
+class RestrictedTarget:
+    name: str
+    remotes: _t.List[str]
+    koji_target_re: _re.Pattern
+    svn_branch_re: _re.Pattern = None
+    git_branch_re: _re.Pattern = None
+
+    def __init__(
+            self,
+            name: str,
+            remotes: _t.Union[str, _t.List[str]],
+            koji_target_re: _t.Union[str, _re.Pattern],
+            svn_branch_re: _t.Union[str, _re.Pattern] = None,
+            git_branch_re: _t.Union[str, _re.Pattern] = None,
+    ):
+        self.name = name
+        if isinstance(koji_target_re, str):
+            self.koji_target_re = _re.compile(koji_target_re)
+        elif isinstance(koji_target_re, _re.Pattern):
+            self.koji_target_re = koji_target_re
+        else:
+            raise TypeError("koji_target_re has the wrong type: %s" % type(koji_target_re))
+
+        if not svn_branch_re:
+            self.svn_branch_re = None
+        elif isinstance(svn_branch_re, str):
+            self.svn_branch_re = _re.compile(svn_branch_re)
+        elif isinstance(svn_branch_re, _re.Pattern):
+            self.svn_branch_re = svn_branch_re
+        else:
+            raise TypeError("svn_branch_re has the wrong type: %s" % type(svn_branch_re))
+
+        if isinstance(git_branch_re, str):
+            self.git_branch_re = _re.compile(git_branch_re)
+        elif isinstance(git_branch_re, _re.Pattern):
+            self.git_branch_re = git_branch_re
+        else:
+            raise TypeError("git_branch_re has the wrong type: %s" % type(git_branch_re))
+
+        if not remotes:
+            raise ValueError("remotes must contain at least one remote")
+        if isinstance(remotes, str):
+            self.remotes = [remotes]
+        else:
+            self.remotes = remotes
+
+
+# fmt: off
+
+# Changes from original pattern: these aren't anchored; use re.fullmatch() or re.match() if you want to anchor them
+# SVN branches implicitly start with 'branches/'
+RESTRICTED_TARGETS = {
+    "upcoming": RestrictedTarget(
+        name="upcoming",
+        remotes=["osg", "osg2"],
+        koji_target_re  =        r'osg-(?P<osgver>[0-9.]+)-upcoming-(el\d+)',
+        svn_branch_re   =            r'(?P<osgver>[0-9.]+)-upcoming',
+        git_branch_re   =     r'(\w*/)?(?P<osgver>[0-9.]+)-upcoming',
+    ),
+    "oldinternal": RestrictedTarget(
+        name="oldinternal",
+        remotes=["osg", "osg2"],
+        koji_target_re  =  r'osg-(el\d+)-internal',
+        svn_branch_re   =          r'osg-internal',
+        git_branch_re   =       r'(\w*/)?internal',
+    ),
+    "devops": RestrictedTarget(
+        name="devops",
+        remotes=["osg", "osg2"],
+        koji_target_re  =          r'devops-(el\d+)',
+        svn_branch_re   =          r'devops',
+        git_branch_re   =   r'(\w*/)?devops',
+    ),
+    "versioned": RestrictedTarget(
+        name="versioned",
+        remotes=["osg", "osg2"],
+        koji_target_re =          r'osg-(?P<osgver>\d+\.\d+)-(el\d+)',
+        svn_branch_re  =          r'osg-(?P<osgver>\d+\.\d+)',
+        git_branch_re  =   r'(\w*/)?osg-(?P<osgver>\d+\.\d+)',
+    ),
+    "newmain": RestrictedTarget(  # XXX rename to 'main' after I've gotten rid of the osg-elX targets
+        name="newmain",
+        remotes=["osg", "osg2"],
+        koji_target_re  =        r'osg-(?P<osgver>[0-9.]+)-main-(el\d+)',
+        svn_branch_re   =            r'(?P<osgver>[0-9.]+)-main',
+        git_branch_re   =     r'(\w*/)?(?P<osgver>[0-9.]+)-main',
+    ),
+    "internal": RestrictedTarget(
+        name="internal",
+        remotes=["osg", "osg2"],
+        koji_target_re  =        r'osg-(?P<osgver>[0-9.]+)-internal-(el\d+)',
+        svn_branch_re   =            r'(?P<osgver>[0-9.]+)-internal',
+        git_branch_re   =     r'(\w*/)?(?P<osgver>[0-9.]+)-internal',
+    ),
+    "chtc": RestrictedTarget(
+        name="chtc",
+        remotes=["chtc"],
+        koji_target_re = r'chtc-(el\d+)',
+        git_branch_re  = r'.*',
+    ),
+    "hcc": RestrictedTarget(
+        name="hcc",
+        remotes=["hcc"],
+        koji_target_re = r'hcc-(el\d+)',
+        git_branch_re  = r'.*',
+    )
+}
+# fmt: on
+
+
+
 # fmt: off
 SVN_RESTRICTED_BRANCHES = {
     r'^branches/(?P<osgver>[0-9.]+)-upcoming$'  : 'upcoming',
@@ -69,7 +183,7 @@ GIT_RESTRICTED_BRANCHES = {
 class GitRemoteType:
     unauth: str
     auth: str
-    layout: str  # "branches" or "directories"
+    layout: str  # "legacy" or "subtree"
 
     @property
     def urls(self):

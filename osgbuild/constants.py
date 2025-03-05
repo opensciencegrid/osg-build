@@ -152,24 +152,24 @@ RESTRICTED_TARGETS = {
 
 
 # fmt: off
-KOJI_RESTRICTED_TARGETS = {
-    r'^osg-(el\d+)$'                                : 'main',
-    r'^osg-(?P<osgver>[0-9.]+)-upcoming-(el\d+)$'   : 'upcoming',
-    r'^devops-(el\d+)$'                             : 'devops',
-    r'^osg-(el\d+)-internal$'                       : 'oldinternal',
-    r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'           : 'versioned',
-    r'^osg-(?P<osgver>[0-9.]+)-main-(el\d+)$'       : 'versioned',
-    r'^osg-(?P<osgver>[0-9.]+)-internal-(el\d+)$'   : 'internal',
-    r'^chtc-(el\d+)$'                               : 'chtc',
-}
-GIT_RESTRICTED_BRANCHES = {
-    r'^(\w*/)?(?P<osgver>[0-9.]+)-upcoming$'    : 'upcoming',
-    r'^(\w*/)?internal$'                        : 'oldinternal',
-    r'^(\w*/)?devops$'                          : 'devops',
-    r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'        : 'versioned',
-    r'^(\w*/)?(?P<osgver>[0-9.]+)-main$'        : 'versioned',
-    r'^(\w*/)?(?P<osgver>[0-9.]+)-internal$'    : 'internal',
-}
+# KOJI_RESTRICTED_TARGETS = {
+#     r'^osg-(el\d+)$'                                : 'main',
+#     r'^osg-(?P<osgver>[0-9.]+)-upcoming-(el\d+)$'   : 'upcoming',
+#     r'^devops-(el\d+)$'                             : 'devops',
+#     r'^osg-(el\d+)-internal$'                       : 'oldinternal',
+#     r'^osg-(?P<osgver>\d+\.\d+)-(el\d+)$'           : 'versioned',
+#     r'^osg-(?P<osgver>[0-9.]+)-main-(el\d+)$'       : 'versioned',
+#     r'^osg-(?P<osgver>[0-9.]+)-internal-(el\d+)$'   : 'internal',
+#     r'^chtc-(el\d+)$'                               : 'chtc',
+# }
+# GIT_RESTRICTED_BRANCHES = {
+#     r'^(\w*/)?(?P<osgver>[0-9.]+)-upcoming$'    : 'upcoming',
+#     r'^(\w*/)?internal$'                        : 'oldinternal',
+#     r'^(\w*/)?devops$'                          : 'devops',
+#     r'^(\w*/)?osg-(?P<osgver>\d+\.\d+)$'        : 'versioned',
+#     r'^(\w*/)?(?P<osgver>[0-9.]+)-main$'        : 'versioned',
+#     r'^(\w*/)?(?P<osgver>[0-9.]+)-internal$'    : 'internal',
+# }
 # fmt: on
 
 

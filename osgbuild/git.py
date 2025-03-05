@@ -5,7 +5,7 @@ import os
 import errno
 from urllib.parse import urlsplit
 
-from .constants import GIT_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS, REMOTES, RemoteLayout
+from .constants import RESTRICTED_TARGETS, REMOTES, RemoteLayout
 from .error import Error, VCSError
 from . import utils
 from . import constants
@@ -116,73 +116,6 @@ def parse_git_url(git_url):
 # hand, if both are restricted then the branch name has to match the target
 # name.
 #
-
-def is_restricted_branch(branch):
-    """branch is a git branch such as 'osg-3.6' or 'devops'.
-    Allows for an optional word as an extra path component on the left.
-
-    """
-    for pattern in GIT_RESTRICTED_BRANCHES:
-        if re.search(pattern, branch):
-            return True
-    return False
-
-
-def is_restricted_target(target):
-    """target is a koji target such as 'osg-el6' or 'osg-3.6-el8'.
-    Assumes no extra characters on either side.
-
-    """
-    for pattern in KOJI_RESTRICTED_TARGETS:
-        if re.search(pattern, target):
-            return True
-    return False
-
-
-def restricted_branch_matches_target(branch, target):
-    """Return True if the pattern that matches `branch` is associated with the
-    same name (e.g. 'devops', 'main', 'upcoming', 'versioned') as the pattern that
-    matches `target`; False otherwise.
-    Special cases:
-    - if the name is 'versioned' (e.g. we're building from 'branches/osg-3.1') then the versions also have to match.
-    - treat 'main' (i.e. 'trunk') as 'versioned' with a version of '3.5'
-    - if the name is 'upcoming' (e.g. building from 'branches/3.6-upcoming') then the versions also have to match.
-      treat a missing version ('branches/upcoming') as '3.5'
-
-    Precondition: is_restricted_branch(branch) and is_restricted_target(target)
-    are True.
-
-    """
-    branch_match = branch_name = target_match = target_name = None
-    for (branch_pattern, branch_name) in GIT_RESTRICTED_BRANCHES.items():
-        branch_match = re.search(branch_pattern, branch)
-        if branch_match:
-            break
-    assert branch_match, \
-            "No GIT_RESTRICTED_BRANCHES pattern matching %s -- is_restricted_branch() should have caught this" % branch
-
-    for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
-        target_match = re.search(target_pattern, target)
-        if target_match:
-            break
-    assert target_match, \
-            "No KOJI_RESTRICTED_TARGETS pattern matching %s -- is_restricted_target() should have caught this" % target
-
-    # At this point branch_name should be one of the values (right-hand side) of
-    # GIT_RESTRICTED_BRANCHES, and target_name should be one of the values of
-    # KOJI_RESTRICTED_TARGETS.
-
-    # These might have OSG version numbers ("3.5") in them; make sure they match
-    branch_osgver = branch_match.groupdict().get("osgver", None)
-    target_osgver = target_match.groupdict().get("osgver", None)
-
-    # Deal with "main" (i.e. the "trunk" branch or the "osg-elX" targets), which are aliases for "3.5"
-    if target_name == "main":
-        target_name = "versioned"
-        target_osgver = "3.6"
-
-    # branch_osgver and target_osgver might be None, e.g. for devops but that's OK
-    return (branch_name == target_name) and (branch_osgver == target_osgver)
 
 
 def get_branch(package_dir):
@@ -424,33 +357,36 @@ def verify_correct_branch(package_dir, buildopts):
 
         verify_correct_remote(package_dir)
 
-        if remote in constants.REMOTES["osg"].urls:
+        if remote in REMOTES["osg"].urls:
             verify_git_svn_commit(package_dir)
 
-    # We only have branching rules for OSG and HCC repos
-    if remote not in REMOTES_BY_URL:
-        return
-
-    remote_info = REMOTES_BY_URL[remote]
-    if remote_info.layout == RemoteLayout.LEGACY:
-        if not is_restricted_branch(branch):
-            # Developer branch -- any target ok
-            return
-        for dver in buildopts['enabled_dvers']:
-            target = buildopts['targetopts_by_dver'][dver]['koji_target']
-            if not target:
-                _log.debug(f"No koji target for {dver} -- skipping VCS check")
+    assert buildopts['enabled_dvers'], "No enabled dvers -- catch this sooner"
+    enabled_dvers = sorted(buildopts['enabled_dvers'])
+    for dver in enabled_dvers:
+        koji_target = buildopts['targetopts_by_dver'][dver]['koji_target']
+        if not koji_target:
+            _log.debug(f"No koji target for {dver} -- skipping VCS check")
+            continue
+        for rt in RESTRICTED_TARGETS.values():
+            target_match = rt.koji_target_re.fullmatch(koji_target)
+            if not target_match:
                 continue
-            _do_target_remote_checks(target, remote, branch)
-            if not is_restricted_target(target):
-                # Some custom target -- any branch ok
-                continue
-            if not restricted_branch_matches_target(branch, target):
-                raise VCSError("Forbidden to build from %s branch into %s target" % (branch, target))
-
-    elif remote_info.layout == RemoteLayout.SUBTREE:
-        _log.warning("Target protection not implemented for Git remotes with 'subtree' layouts")
-        return
+            if not rt.git_branch_re:
+                raise VCSError(f"cannot build into {koji_target} from Git")
+            if remote not in REMOTES_BY_URL:
+                raise VCSError(f"cannot build into {koji_target} from unrecognized remote {remote}")
+            remote_info = REMOTES_BY_URL[remote]
+            if remote_info.name not in rt.remotes:
+                raise VCSError(f"cannot build into {koji_target} from the {remote_info.repo} remote")
+            if remote_info.layout == RemoteLayout.SUBTREE:
+                _log.warning("Target protection not implemented for Git remotes with 'subtree' layouts")
+                break
+            branch_match = rt.git_branch_re.fullmatch(branch)
+            if not branch_match or target_match.groupdict() != branch_match.groupdict():
+                raise VCSError(f"branch/target mismatch: {branch} does not match {koji_target}")
+            break
+        else:
+            _log.debug(f"{koji_target} is not a restricted target")
 
 
 def _do_target_remote_checks_hcc(remote, branch):

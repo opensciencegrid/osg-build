@@ -1,5 +1,6 @@
 """Global constants for osg-build"""
 import dataclasses as _dataclasses
+import enum as _enum
 import os as _os
 import re as _re
 import typing as _t
@@ -171,11 +172,25 @@ GIT_RESTRICTED_BRANCHES = {
 }
 # fmt: on
 
+
+class RemoteLayout(_enum.Enum):
+    LEGACY = "legacy"
+    SUBTREE = "subtree"
+
+
 @_dataclasses.dataclass
-class GitRemoteType:
-    unauth: str
-    auth: str
-    layout: str  # "legacy" or "subtree"
+class GitHubRemoteType:
+    name: str  # TODO This feels hacky
+    repo: str
+    layout: RemoteLayout
+
+    @property
+    def unauth(self):
+        return f"https://github.com/{self.repo}"
+
+    @property
+    def auth(self):
+        return f"git@github.com:{self.repo}"
 
     @property
     def urls(self):
@@ -190,25 +205,25 @@ class GitRemoteType:
 
 
 REMOTES = {
-    "osg": GitRemoteType(
-        unauth="https://github.com/opensciencegrid/Software-Redhat.git",
-        auth="git@github.com:opensciencegrid/Software-Redhat.git",
-        layout="legacy",
+    "osg": GitHubRemoteType(
+        name="osg",
+        repo="opensciencegrid/Software-Redhat.git",
+        layout=RemoteLayout.LEGACY,
     ),
-    "hcc": GitRemoteType(
-        unauth="https://github.com/unlhcc/hcc-packaging.git",
-        auth="git@github.com:unlhcc/hcc-packaging.git",
-        layout="legacy",
+    "hcc": GitHubRemoteType(
+        name="hcc",
+        repo="unlhcc/hcc-packaging.git",
+        layout=RemoteLayout.LEGACY,
     ),
-    "chtc": GitRemoteType(
-        unauth="https://github.com/CHTC/packaging.git",
-        auth="git@github.com:CHTC/packaging.git",
-        layout="legacy",
+    "chtc": GitHubRemoteType(
+        name="chtc",
+        repo="CHTC/packaging.git",
+        layout=RemoteLayout.LEGACY,
     ),
-    "osg2": GitRemoteType(
-        unauth="https://github.com/osg-htc/software-packaging.git",
-        auth="git@github.com:osg-htc/software-packaging.git",
-        layout="subtree",
+    "osg2": GitHubRemoteType(
+        name="osg2",
+        repo="osg-htc/software-packaging.git",
+        layout=RemoteLayout.SUBTREE,
     ),
 }
 

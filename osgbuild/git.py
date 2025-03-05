@@ -5,7 +5,7 @@ import os
 import errno
 from urllib.parse import urlsplit
 
-from .constants import GIT_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS, REMOTES
+from .constants import GIT_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS, REMOTES, RemoteLayout
 from .error import Error, VCSError
 from . import utils
 from . import constants
@@ -432,7 +432,7 @@ def verify_correct_branch(package_dir, buildopts):
         return
 
     remote_info = REMOTES_BY_URL[remote]
-    if remote_info.layout == "legacy":
+    if remote_info.layout == RemoteLayout.LEGACY:
         if not is_restricted_branch(branch):
             # Developer branch -- any target ok
             return
@@ -448,7 +448,7 @@ def verify_correct_branch(package_dir, buildopts):
             if not restricted_branch_matches_target(branch, target):
                 raise VCSError("Forbidden to build from %s branch into %s target" % (branch, target))
 
-    elif remote_info.layout == "subtree":
+    elif remote_info.layout == RemoteLayout.SUBTREE:
         _log.warning("Target protection not implemented for Git remotes with 'subtree' layouts")
         return
 

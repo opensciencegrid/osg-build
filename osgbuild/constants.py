@@ -44,7 +44,7 @@ class RestrictedTarget:
     name: str
     remotes: _t.List[str]
     koji_target_re: _re.Pattern
-    svn_branch_re: _re.Pattern = None
+    svn_branch_re: _t.Optional[_re.Pattern] = None
     git_branch_re: _re.Pattern = None
 
     def __init__(

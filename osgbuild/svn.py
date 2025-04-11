@@ -3,10 +3,9 @@ import logging
 import re
 import os
 
-from .constants import SVN_RESTRICTED_BRANCHES, KOJI_RESTRICTED_TARGETS
+from .constants import RESTRICTED_TARGETS
 from .error import Error, VCSError, UsageError
 from . import utils
-
 
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"
 SVN_REDHAT_PATH = "/native/redhat"
@@ -131,103 +130,36 @@ def verify_package_info(package_info):
 # name.
 #
 
-def is_restricted_branch(branch):
-    """branch is an SVN branch such as 'trunk' or 'branches/osg-3.1'.
-    Assumes no extra characters on either side (no 'native/redhat/trunk' or
-    'trunk/gums')
-
-    """
-    for pattern in SVN_RESTRICTED_BRANCHES:
-        if re.search(pattern, branch):
-            return True
-    return False
-
-def is_restricted_target(target):
-    """target is a koji target such as 'el5-osg' or 'osg-3.1-el5'.
-    Assumes no extra characters on either side.
-
-    """
-    for pattern in KOJI_RESTRICTED_TARGETS:
-        if re.search(pattern, target):
-            return True
-    return False
-
-def restricted_branch_matches_target(branch, target):
-    """Return True if the pattern that matches `branch` is associated with the
-    same name (e.g. 'devops', 'main', 'upcoming', 'versioned') as the pattern that
-    matches `target`; False otherwise.
-    Special cases:
-    - if the name is 'versioned' (e.g. we're building from 'branches/osg-3.1') then the versions also have to match.
-    - treat 'main' (i.e. 'trunk') as 'versioned' with a version of '3.5'
-    - if the name is 'upcoming' (e.g. building from 'branches/3.6-upcoming') then the versions also have to match.
-      treat a missing version ('branches/upcoming') as '3.5'
-
-    Precondition: is_restricted_branch(branch) and is_restricted_target(target)
-    are True.
-
-    """
-    branch_match = branch_name = target_match = target_name = None
-    for (branch_pattern, branch_name) in SVN_RESTRICTED_BRANCHES.items():
-        branch_match = re.search(branch_pattern, branch)
-        if branch_match:
-            break
-    assert branch_match, \
-            "No SVN_RESTRICTED_BRANCHES pattern matching %s -- is_restricted_branch() should have caught this" % branch
-
-    for (target_pattern, target_name) in KOJI_RESTRICTED_TARGETS.items():
-        target_match = re.search(target_pattern, target)
-        if target_match:
-            break
-    assert target_match, \
-            "No KOJI_RESTRICTED_TARGETS pattern matching %s -- is_restricted_target() should have caught this" % target
-
-    # At this point branch_name should be one of the values (right-hand side) of
-    # SVN_RESTRICTED_BRANCHES, and target_name should be one of the values of
-    # KOJI_RESTRICTED_TARGETS.
-
-    # These might have OSG version numbers ("3.5") in them; make sure they match
-    branch_osgver = branch_match.groupdict().get("osgver", None)
-    target_osgver = target_match.groupdict().get("osgver", None)
-
-    if target_name == "main":
-        target_name = "versioned"
-        target_osgver = "3.6"
-
-    # branch_osgver and target_osgver might be None, e.g. for devops but that's OK
-    return (branch_name == target_name) and (branch_osgver == target_osgver)
 
 def verify_correct_branch(package_dir, buildopts):
-    """Check that the user is not trying to build with bad branch/target
-    combinations. For example, building from osg-3.6 into 3.6-upcoming, or building
-    from osg-3.6 into 23-main.
-
-    """
     package_info = get_package_info(package_dir)
     url = package_info['canon_url']
-    # Check for old, deprecated branches
-    if SVN_REDHAT_PATH + '/trunk/' in url:
-        raise VCSError("trunk has been removed; use branches/osg-3.5 instead")
-    elif SVN_REDHAT_PATH + '/branches/upcoming/' in url:
-        raise VCSError("unversioned upcoming has been removed; use branches/3.5-upcoming instead")
-    branch_match = re.search(SVN_REDHAT_PATH + r'/(branches/[^/]+)/', url)
-    if not branch_match:
-        # Building from a weird path (such as a tag). Be permissive -- koji
-        # itself will catch building from outside SVN so we don't have to
-        return
-    branch = branch_match.group(1)
-    if not is_restricted_branch(branch):
-        # Developer branch -- any target ok
-        return
-    for dver in buildopts['enabled_dvers']:
-        target = buildopts['targetopts_by_dver'][dver]['koji_target']
-        if not target:
+
+    if SVN_REDHAT_PATH + '/branches/' not in url:
+        raise VCSError("must build from a branch in branches/")
+
+    branch = url.rsplit('/')[-2]  # .../branches/osg-3.6/xrootd -> osg-3.6
+    assert buildopts['enabled_dvers'], "No enabled dvers -- catch this sooner"
+    enabled_dvers = sorted(buildopts['enabled_dvers'])
+    for dver in enabled_dvers:
+        koji_target = buildopts['targetopts_by_dver'][dver]['koji_target']
+        if not koji_target:
             _log.debug(f"No koji target for {dver} -- skipping VCS check")
             continue
-        if not is_restricted_target(target):
-            # Some custom target -- any branch ok
-            continue
-        if not restricted_branch_matches_target(branch, target):
-            raise VCSError("Forbidden to build from %s branch into %s target" % (branch, target))
+        for rt in RESTRICTED_TARGETS.values():
+            target_match = rt.koji_target_re.fullmatch(koji_target)
+            if not target_match:
+                continue
+            if not rt.svn_branch_re:
+                raise VCSError(f"cannot build into {koji_target} from SVN")
+            branch_match = rt.svn_branch_re.fullmatch(branch)
+            if not branch_match:
+                raise VCSError(f"branch/target mismatch: {branch} does not match {koji_target}")
+            if target_match.groupdict() != branch_match.groupdict():
+                raise VCSError(f"branch/target mismatch: {branch} does not match {koji_target}")
+            break
+        else:
+            _log.debug(f"{koji_target} is not a restricted target")
 
 
 def get_package_info(package_dir):

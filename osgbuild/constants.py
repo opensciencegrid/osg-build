@@ -151,14 +151,6 @@ RESTRICTED_TARGETS = {
 
 
 # fmt: off
-SVN_RESTRICTED_BRANCHES = {
-    r'^branches/(?P<osgver>[0-9.]+)-upcoming$'  : 'upcoming',
-    r'^branches/osg-internal$'                  : 'oldinternal',
-    r'^branches/devops$'                        : 'devops',
-    r'^branches/osg-(?P<osgver>\d+\.\d+)$'      : 'versioned',
-    r'^branches/(?P<osgver>[0-9.]+)-main$'      : 'versioned',
-    r'^branches/(?P<osgver>[0-9.]+)-internal$'  : 'internal',
-}
 KOJI_RESTRICTED_TARGETS = {
     r'^osg-(el\d+)$'                                : 'main',
     r'^osg-(?P<osgver>[0-9.]+)-upcoming-(el\d+)$'   : 'upcoming',

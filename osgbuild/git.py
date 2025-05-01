@@ -8,7 +8,6 @@ from urllib.parse import urlsplit
 
 from .constants import RESTRICTED_TARGETS, REMOTES, RemoteLayout
 from .error import Error, UsageError, VCSError
-from . import constants
 from . import utils
 from . import kojiinter
 
@@ -422,48 +421,6 @@ def verify_correct_branch(package_dir, buildopts):
             break
         else:
             _log.debug(f"{koji_target} is not a restricted target")
-
-
-def _do_target_remote_checks_hcc(remote, branch):
-    if remote not in constants.REMOTES["hcc"].urls:
-        raise Error("""\
-Error: You must build into the HCC repo from a HCC git checkout.
-You must switch git repos or build targets.""")
-
-    if "master" not in branch:
-        raise Error("""\
-Error: Incorrect branch for koji build
-Only allowed to build into the HCC repo from the
-master branch!  You must switch branches.""")
-
-
-def _do_target_remote_checks_osg(remote):
-    if remote not in constants.REMOTES["osg"].urls:
-        raise Error("""\
-Error: You must build into the OSG repo from an OSG git checkout.
-You must switch git repos or build targets.""")
-
-
-def _do_target_remote_checks_chtc(remote, branch):
-    if remote not in constants.REMOTES["chtc"].urls:
-        raise Error("""\
-Error: You must build into the CHTC repo from a CHTC git checkout.
-You must switch git repos or build targets.""")
-
-    if "main" not in branch:
-        raise Error("""\
-Error: Incorrect branch for koji build
-Only allowed to build into the CHTC repo from the
-main branch!  You must switch branches.""")
-
-
-def _do_target_remote_checks(target, remote, branch):
-        if target.startswith("hcc-"):
-            _do_target_remote_checks_hcc(remote, branch)
-        elif target.startswith("osg-"):
-            _do_target_remote_checks_osg(remote)
-        elif target.startswith("chtc-"):
-            _do_target_remote_checks_chtc(remote, branch)
 
 
 def koji(package_dir, koji_obj, buildopts):

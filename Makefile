@@ -38,6 +38,8 @@ install-common:
 install: install-common
 	mkdir -p $(DESTDIR)/$(PYTHON_SITELIB)/$(PYDIR)
 	install -p -m 644 $(PYDIR)/*.py $(DESTDIR)/$(PYTHON_SITELIB)/$(PYDIR)
+	mkdir -p $(DESTDIR)/$(PYTHON_SITELIB)/$(PYDIR)/koji
+	install -p -m 644 $(PYDIR)/koji/*.py $(DESTDIR)/$(PYTHON_SITELIB)/$(PYDIR)/koji
 
 	mkdir -p $(DESTDIR)/$(PYTHON_SITELIB)/$(TESTDIR)
 	install -p -m 755 $(TESTDIR)/*.py $(DESTDIR)/$(PYTHON_SITELIB)/$(TESTDIR)

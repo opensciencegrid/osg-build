@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 import configparser
 
+from .koji.target_protection import REPO_HINTS_STATIC
 from .constants import *
 from .error import UsageError, KojiError, VCSError, Error, type_of_error
 from . import srpm

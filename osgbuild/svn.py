@@ -3,7 +3,7 @@ import logging
 import re
 import os
 
-from .constants import RESTRICTED_TARGETS
+from .koji.target_protection import RESTRICTED_TARGETS
 from .error import Error, VCSError, UsageError
 from . import utils
 

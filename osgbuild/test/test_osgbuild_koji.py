@@ -6,8 +6,8 @@ import pwd
 import unittest
 from unittest import TestCase
 
-import osgbuild.constants as C
 from osgbuild import main, svn
+from osgbuild.koji import target_protection
 from osgbuild.test.common import OSG_23_MAIN, OSG_36, common_setUp, backtick_osg_build, regex_in_list, checked_osg_build
 from osgbuild.utils import CalledProcessError, errprintf
 
@@ -81,7 +81,7 @@ class TestKoji(TestCase):
         try:
             # SCM URI format is 'git+https://host/.../repo.git?path#revision'
             gitbranch = re.sub(r"^native/redhat/branches/", "", OSG_36)
-            osg_unauth_remote = C.REMOTES["osg"].unauth
+            osg_unauth_remote = target_protection.REMOTES["osg"].unauth
             scm_uri = "git+%s?%s#%s" % (osg_unauth_remote, "osg-xrootd", gitbranch)
             _ = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--dry-run", scm_uri])
         except CalledProcessError as err:

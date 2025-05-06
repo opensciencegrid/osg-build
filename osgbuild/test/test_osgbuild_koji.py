@@ -30,14 +30,14 @@ class TestKoji(TestCase):
                 re.search(self.build_target_shell_regex % target, output, re.MULTILINE))
 
     def test_koji_shell_args1(self):
-        output = backtick_osg_build(self.kdr_shell + ["--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_shell + ["--scratch", self.pkg_dir, "--repo", "23-main"])
         self.assertTrue(self.is_building_for("osg.+el8", output),
                         "not building for el8")
         self.assertTrue(self.is_building_for("osg.+el9", output),
                         "not building for el9")
 
     def test_koji_shell_args2(self):
-        output = backtick_osg_build(self.kdr_shell + ["--el9", "--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_shell + ["--el9", "--scratch", self.pkg_dir, "--repo", "23-main"])
         self.assertFalse(self.is_building_for("osg.+el8", output),
                          "falsely building for el8")
         self.assertTrue(self.is_building_for("osg.+el9", output),
@@ -60,7 +60,7 @@ class TestKoji(TestCase):
             "Bad error with --koji-tag=TARGET")
 
     def test_koji_lib_args1(self):
-        output = backtick_osg_build(self.kdr_lib + ["--scratch", self.pkg_dir])
+        output = backtick_osg_build(self.kdr_lib + ["--scratch", self.pkg_dir, "--repo", "23-main"])
         out_list = output.split("\n")
         self.assertTrue(
             regex_in_list(r".*kojisession.build\([^,]+?, 'osg.+el[89]', " + re.escape("{'scratch': True}") + r", None\)", out_list))

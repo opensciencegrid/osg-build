@@ -613,11 +613,10 @@ class KojiLibInter(object):
 
     def get_build_and_dest_tags(self, target):
         """Return the build and destination tags for target."""
-        info = sorted(self.kojisession.getBuildTargets(target))  # TESTME
-        if not info:
-            raise KojiError("Couldn't get info for target %s" % target)
-        return (info[0]['build_tag_name'], info[0]['dest_tag_name'])
-
+        tgt = self.kojisession.getBuildTarget(target)
+        if tgt:
+            return (tgt['build_tag_name'], tgt['dest_tag_name'])
+        raise KojiError("Couldn't get info for target %s" % target)
 
     def regen_repo(self, tag):
         """Regenerate a repo"""

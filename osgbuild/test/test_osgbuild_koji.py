@@ -7,7 +7,15 @@ import unittest
 from unittest import TestCase
 
 from osgbuild import main, svn, target_protection
-from osgbuild.test.common import OSG_23_MAIN, OSG_36, common_setUp, backtick_osg_build, regex_in_list, checked_osg_build
+from osgbuild.test.common import (
+    OSG_23_MAIN,
+    OSG_24_MAIN,
+    OSG_36,
+    backtick_osg_build,
+    checked_osg_build,
+    common_setUp,
+    regex_in_list,
+)
 from osgbuild.utils import CalledProcessError, errprintf
 
 

@@ -6,10 +6,7 @@ import sys
 import tempfile
 from os.path import join as opj
 
-import svn
-
-from typing import List, Optional
-
+from osgbuild import svn
 from osgbuild.utils import find_file, errprintf, checked_backtick, checked_call, CalledProcessError
 
 OSG_36 = "native/redhat/branches/osg-3.6"

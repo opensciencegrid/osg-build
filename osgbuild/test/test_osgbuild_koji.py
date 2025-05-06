@@ -157,8 +157,8 @@ class TestMock(TestCase):
     """Tests for mock"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(OSG_36, "osg-ce"),
-                                    "{2023-07-21}")
+        self.pkg_dir = common_setUp(opj(OSG_23_MAIN, "osg-ce"),
+                                    "{2024-07-21}")
 
     @staticmethod
     def check_for_mock_group():
@@ -178,7 +178,7 @@ class TestMock(TestCase):
 
     def test_mock_koji_cfg(self):
         if self.check_for_mock_group():
-            checked_osg_build(["mock", self.pkg_dir, "--el9", "--mock-config-from-koji=osg-3.6-el9-build"])
+            checked_osg_build(["mock", self.pkg_dir, "--el9", "--mock-config-from-koji=osg-23-main-el9-build"])
 
 
 if __name__ == '__main__':

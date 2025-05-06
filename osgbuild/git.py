@@ -6,8 +6,8 @@ import os
 import errno
 from urllib.parse import urlsplit
 
-from .koji.target_protection import RESTRICTED_TARGETS, RemoteLayout, REMOTES
 from .error import Error, UsageError, VCSError
+from .target_protection import RESTRICTED_TARGETS, RemoteLayout, REMOTES
 from . import utils
 from . import kojiinter
 

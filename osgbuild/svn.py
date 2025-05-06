@@ -3,8 +3,8 @@ import logging
 import re
 import os
 
-from .koji.target_protection import RESTRICTED_TARGETS
 from .error import Error, VCSError, UsageError
+from .target_protection import RESTRICTED_TARGETS
 from . import utils
 
 SVN_ROOT = "https://vdt.cs.wisc.edu/svn"

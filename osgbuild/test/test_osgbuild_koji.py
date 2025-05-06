@@ -6,8 +6,7 @@ import pwd
 import unittest
 from unittest import TestCase
 
-from osgbuild import main, svn
-from osgbuild.koji import target_protection
+from osgbuild import main, svn, target_protection
 from osgbuild.test.common import OSG_23_MAIN, OSG_36, common_setUp, backtick_osg_build, regex_in_list, checked_osg_build
 from osgbuild.utils import CalledProcessError, errprintf
 

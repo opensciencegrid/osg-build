@@ -13,6 +13,8 @@ OSG_36 = "native/redhat/branches/osg-3.6"
 OSG_36_UPCOMING = "native/redhat/branches/3.6-upcoming"
 OSG_23_MAIN = "native/redhat/branches/23-main"
 OSG_23_UPCOMING = "native/redhat/branches/23-upcoming"
+OSG_24_MAIN = "native/redhat/branches/24-main"
+OSG_24_UPCOMING = "native/redhat/branches/24-upcoming"
 
 
 def regex_in_list(pattern, listing):

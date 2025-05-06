@@ -157,8 +157,8 @@ class TestMock(TestCase):
     """Tests for mock"""
 
     def setUp(self):
-        self.pkg_dir = common_setUp(opj(OSG_23_MAIN, "osg-ce"),
-                                    "{2024-07-21}")
+        self.pkg_dir = common_setUp(opj(OSG_24_MAIN, "osg-ca-certs"),
+                                    "{2025-05-01}")
 
     @staticmethod
     def check_for_mock_group():

@@ -69,10 +69,11 @@ class TestKoji(TestCase):
         try:
             _ = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--dry-run", opj(svn.SVN_ROOT, OSG_23_MAIN, "osg-xrootd")])
         except CalledProcessError as err:
-            out_list = err.output.split("\n")
-            self.assertTrue(
-                regex_in_list(r".*Forbidden to build from .+ branch into .+ target", out_list),
-                "did not detect attempt to build for wrong branch (wrong error message)")
+            self.assertIn(
+                "branch/target mismatch:",
+                err.output,
+                "did not detect attempt to build for wrong branch"
+            )
             return
         self.fail("did not detect attempt to build for wrong branch (no error message)")
 
@@ -84,10 +85,11 @@ class TestKoji(TestCase):
             scm_uri = "git+%s?%s#%s" % (osg_unauth_remote, "osg-xrootd", gitbranch)
             _ = backtick_osg_build(self.kdr_lib + ["--repo", "3.6-upcoming", "--dry-run", scm_uri])
         except CalledProcessError as err:
-            out_list = err.output.split("\n")
-            self.assertTrue(
-                regex_in_list(r".*Forbidden to build from .+ branch into .+ target", out_list),
-                "did not detect attempt to build for wrong branch (wrong error message)")
+            self.assertIn(
+                "branch/target mismatch:",
+                err.output,
+                "did not detect attempt to build for wrong branch"
+            )
             return
         self.fail("did not detect attempt to build for wrong branch (no error message)")
 

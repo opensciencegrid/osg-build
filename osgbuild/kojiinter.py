@@ -141,11 +141,12 @@ class KojiInter(object):
             KojiInter.backend.init_koji_session()
 
         self.target = opts['koji_target']
-        self.build_tag, self.dest_tag = KojiInter.backend.get_build_and_dest_tags(self.target)
-        if opts['koji_tag'] == 'TARGET':
-            self.tag = self.dest_tag
-        else:
-            self.tag = opts['koji_tag']
+        if self.target:
+            self.build_tag, self.dest_tag = KojiInter.backend.get_build_and_dest_tags(self.target)
+            if opts['koji_tag'] == 'TARGET':
+                self.tag = self.dest_tag
+            else:
+                self.tag = opts['koji_tag']
 
         self.background = opts['background']
 

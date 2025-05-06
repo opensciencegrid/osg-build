@@ -143,14 +143,14 @@ class TestKojiMisc(TestCase):
     """Other Koji tests"""
     def test_cmdline_scratch_svn(self):
         buildopts = main.init(
-            ["osg-build", "koji", "--scratch", "."])[0]
-        self.assertFalse(buildopts['vcs'],
-                         "vcs not false for scratch build")
+            ["osg-build", "koji", "--scratch", ".", "--repo", "23-main"])[0]
+        self.assertFalse(buildopts.get("want_vcs"),
+                         "want_vcs not false for scratch build")
 
         buildopts = main.init(
-            ["osg-build", "koji", "."])[0]
-        self.assertTrue(buildopts['vcs'],
-                        "vcs not true for non-scratch build")
+            ["osg-build", "koji", ".", "--repo", "23-main"])[0]
+        self.assertTrue(buildopts.get("want_vcs"),
+                        "want_vcs not true for non-scratch build")
 
 
 class TestMock(TestCase):

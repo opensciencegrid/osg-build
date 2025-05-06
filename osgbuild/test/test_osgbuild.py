@@ -32,11 +32,11 @@ class TestLint(TestCase):
     def test_lint(self):
         out = backtick_osg_build(["lint", self.pkg_dir])
         try:
-            self.assertRegexpMatches(
+            self.assertRegex(
                 out,
                 re.escape("1 packages and 0 specfiles checked"),
                 "unexpected number of packages checked")
-            self.assertRegexpMatches(
+            self.assertRegex(
                 out,
                 re.escape("rpmlint ok for condor"),
                 "rpmlint not ok for condor")
@@ -55,7 +55,7 @@ class TestRpmbuild(TestCase):
     def test_rpmbuild(self):
         out = backtick_osg_build(["rpmbuild", self.pkg_dir])
         try:
-            self.assertRegexpMatches(
+            self.assertRegex(
                 out,
                 r'(?ms)The following RPM[(]s[)] have been created:\n',
                 "rpm created message not found")
@@ -122,7 +122,7 @@ class TestPrebuild(TestCase):
         tarball_contents = os.listdir(opj(pkg_dir, C.WD_UNPACKED_TARBALL,
                                            "xrootd-multiuser-2.1.3"))
 
-        self.assertNotRegexpMatches(
+        self.assertNotRegex(
             out,
             re.escape("cpio: premature end of archive"),
             "file unreadable by cpio")
@@ -171,7 +171,7 @@ class TestFetch(TestCase):
             "source tarball not found")
         head_out = checked_backtick(
             ["head", "-n", "1", "xrootd/xrootd.spec"])
-        self.assertRegexpMatches(
+        self.assertRegex(
             head_out,
             r"# OSG additions",
             "Spec file not overridden")
